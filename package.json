@@ -1,4 +1,5 @@
 {
+  "name": "scute-monorepo",
   "private": true,
   "scripts": {
     "build": "turbo run build",
@@ -9,10 +10,9 @@
   "devDependencies": {
     "@turbo/gen": "^1.10.3",
     "eslint": "^8.42.0",
-    "eslint-config-custom": "workspace:*",
+    "@scute/eslint-config-custom": "workspace:*",
     "prettier": "^2.8.8",
     "turbo": "^1.10.3"
   },
-  "packageManager": "pnpm@8.4.0",
-  "name": "scute-monorepo"
+  "packageManager": "pnpm@8.4.0"
 }

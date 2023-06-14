@@ -1,0 +1,4 @@
+{
+  "root": true,
+  "extends": ["@scute/eslint-config", "prettier"]
+}
