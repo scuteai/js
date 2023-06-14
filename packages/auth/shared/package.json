@@ -1,0 +1,7 @@
+{
+  "name": "@scute/auth-shared",
+  "version": "0.0.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}
