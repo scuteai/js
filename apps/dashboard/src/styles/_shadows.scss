@@ -1,0 +1,207 @@
+
+:root {
+
+    --shadows-none: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-device: inset 0 -1.5px 3px -2.2px rgba(42, 43, 48, 0.16), inset 0 0.8px 2.8px 0 rgba(42, 43, 48, 0.06), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.6px rgba(9, 11, 20, 0.04), 0 1px 1px 0 rgba(9, 11, 20, 0.08), 0 1px 2px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlPrimaryInitialLight: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(43, 48, 91, 0.85), 0 2px 1px 0 rgba(9, 11, 20, 0.12), 0 2px 3px 0 rgba(9, 11, 20, 0.18), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlPrimaryHoveredLight: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(43, 48, 91, 0.95), 0 2px 1px 0 rgba(9, 11, 20, 0.2), 0 2px 3px 0 rgba(9, 11, 20, 0.35), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlPrimaryFocusedLight: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgb(43, 48, 91), 0 0 0 1px rgba(43, 48, 91, 0.95), 0 0 0 3px rgba(105, 119, 225, 0.7), 0 2px 1px 0 rgba(9, 11, 20, 0.2), 0 2px 3px 0 rgba(9, 11, 20, 0.35);
+    --shadows-controlPrimaryDisabledLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgb(43, 48, 91), 0 2px 1px 0 rgba(9, 11, 20, 0.02), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+
+
+
+    --shadows-controlPrimaryInitialDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.2), 0 2px 1px 0 rgba(9, 11, 20, 0.12), 0 2px 3px 0 rgba(9, 11, 20, 0.2), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlPrimaryHoveredDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.24), 0 2px 1px 0 rgba(9, 11, 20, 0.16), 0 2px 3px 0 rgba(9, 11, 20, 0.24), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlPrimaryFocusedDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgb(43, 48, 91), 0 0 0 1px rgba(9, 11, 20, 0.24), 0 0 0 3px rgba(105, 119, 225, 0.7), 0 2px 1px 0 rgba(9, 11, 20, 0.16), 0 2px 3px 0 rgba(9, 11, 20, 0.24);
+    --shadows-controlPrimaryDisabledDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.05), 0 0 0 1px rgba(9, 11, 20, 0.16), 0 2px 1px 0 rgba(9, 11, 20, 0.02), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+
+
+
+
+
+
+
+    --shadows-controlDestructiveFocusedDark: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    0 0 0 1px rgb(43, 48, 91), 
+    0 0 0 1px rgba(9, 11, 20, 0.24), 
+    0 0 0 3px rgba(105, 119, 225, 0.7), 
+    0 2px 1px 0 rgba(9, 11, 20, 0.16), 
+    0 2px 3px 0 rgba(9, 11, 20, 0.24);
+
+
+    --shadows-controlSecondaryInitialLight: 
+    inset 0 1px 0 0 rgb(255, 255, 255), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    0 0 0 1px rgba(78, 81, 97, 0.3), 
+    0 2px 1px 0 rgba(9, 11, 20, 0.08), 
+    0 2px 3px 0 rgba(9, 11, 20, 0.05), 
+    0 0 0 0 rgba(0,0,0,0), 
+    0 0 0 0 rgba(0,0,0,0);
+
+    --shadows-controlSecondaryHoveredLight: 
+    inset 0 1px 0 0 rgb(255, 255, 255), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    0 0 0 1px rgba(78, 81, 97, 0.4), 
+    0 2px 1px 0 rgba(9, 11, 20, 0.12), 
+    0 2px 3px 0 rgba(9, 11, 20, 0.18), 
+    0 0 0 0 rgba(0,0,0,0), 
+    0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlSecondaryFocusedLight: 
+    inset 0 1px 0 0 rgb(255, 255, 255), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    0 0 0 1px rgb(119, 247, 0), 
+    0 0 0 1px rgba(179, 0, 255, 0.4), 
+    0 0 0 3px rgba(16, 192, 219, 0.7), 
+    0 2px 1px 0 rgba(9, 11, 20, 0.12), 
+    0 2px 3px 0 rgba(9, 11, 20, 0.18);
+    --shadows-controlSecondaryDisabledLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgb(151, 153, 173), 0 2px 1px 0 rgba(9, 11, 20, 0.02), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlSecondaryInitialDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.4), 0 2px 1px 0 rgba(9, 11, 20, 0.12), 0 2px 3px 0 rgba(9, 11, 20, 0.2), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlSecondaryHoveredDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.5), 0 2px 1px 0 rgba(9, 11, 20, 0.16), 0 2px 3px 0 rgba(9, 11, 20, 0.24), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlSecondaryFocusedDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgb(43, 48, 91), 0 0 0 1px rgba(9, 11, 20, 0.5), 0 0 0 3px rgba(105, 119, 225, 0.9), 0 2px 1px 0 rgba(9, 11, 20, 0.16), 0 2px 3px 0 rgba(9, 11, 20, 0.24);
+    --shadows-controlSecondaryDisabledDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.3), 0 2px 1px 0 rgba(9, 11, 20, 0.02), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlDestructiveInitialLight: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(117, 5, 5, 0.85), 0 2px 1px 0 rgba(9, 11, 20, 0.12), 0 2px 3px 0 rgba(9, 11, 20, 0.18), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlDestructiveHoveredLight: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(117, 5, 5, 0.95), 0 2px 1px 0 rgba(9, 11, 20, 0.2), 0 2px 3px 0 rgba(9, 11, 20, 0.35), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlDestructiveFocusedLight: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgb(43, 48, 91), 0 0 0 1px rgba(117, 5, 5, 0.95), 0 0 0 3px rgba(105, 119, 225, 0.7), 0 2px 1px 0 rgba(9, 11, 20, 0.2), 0 2px 3px 0 rgba(9, 11, 20, 0.35);
+    --shadows-controlDestructiveDisabledLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgb(117, 5, 5), 0 2px 1px 0 rgba(9, 11, 20, 0.02), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlDestructiveInitialDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.2), 0 2px 1px 0 rgba(9, 11, 20, 0.12), 0 2px 3px 0 rgba(9, 11, 20, 0.2), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlDestructiveHoveredDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.24), 0 2px 1px 0 rgba(9, 11, 20, 0.16), 0 2px 3px 0 rgba(9, 11, 20, 0.24), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlDestructiveFocusedDark: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgb(43, 48, 91), 0 0 0 1px rgba(9, 11, 20, 0.24), 0 0 0 3px rgba(105, 119, 225, 0.7), 0 2px 1px 0 rgba(9, 11, 20, 0.16), 0 2px 3px 0 rgba(9, 11, 20, 0.24);
+    --shadows-controlDestructiveDisabledDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.16), 0 2px 1px 0 rgba(9, 11, 20, 0.02), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlTertiaryInitialLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px #E4E6F0, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlTertiaryHoveredLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px #C5C8D6, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlTertiaryDisabledLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px #E4E6F0, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlTertiaryFocusedLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(43, 48, 91, 0.7), 0 0 0 4px rgba(84, 97, 200, 0.7), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlTertiaryInitialDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px #4E5161, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlTertiaryHoveredDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px #66687A, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlTertiaryDisabledDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px #343647, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-controlTertiaryFocusedDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(216, 220, 255, 0.7), 0 0 0 4px rgba(201, 207, 255, 0.7), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fieldInitialLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(78, 81, 97, 0.3), 0 2px 1px 0 rgba(9, 11, 20, 0.08), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fieldHoveredLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(78, 81, 97, 0.4), 0 2px 1px 0 rgba(9, 11, 20, 0.12), 0 2px 3px 0 rgba(9, 11, 20, 0.18), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fieldFocusedLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(78, 81, 97, 0.4), 0 0 0 1px rgba(84, 97, 200, 0.6), 0 0 0 3px rgba(84, 97, 200, 0.5), 0 2px 1px 0 rgba(9, 11, 20, 0.12), 0 2px 3px 0 rgba(9, 11, 20, 0.18);
+    --shadows-fieldDisabledLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(177, 181, 199, 1), 0 2px 1px 0 rgba(9, 11, 20, 0.08), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fieldErrorLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1.5px rgba(187, 15, 15, 0.8), 0 2px 1px 0 rgba(9, 11, 20, 0.08), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fieldInitialDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.5), 0 2px 1px 0 rgba(9, 11, 20, 0.25), 0 2px 3px 0 rgba(9, 11, 20, 0.4), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fieldHoveredDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.7), 0 2px 1px 0 rgba(9, 11, 20, 0.4), 0 2px 3px 0 rgba(9, 11, 20, 0.5), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fieldFocusedDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(105, 119, 225, 0.6), 0 0 0 1px rgba(9, 11, 20, 0.7), 0 0 0 3px rgba(105, 119, 225, 0.5), 0 2px 1px 0 rgba(9, 11, 20, 0.4), 0 2px 3px 0 rgba(9, 11, 20, 0.5);
+    --shadows-fieldDisabledDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.4), 0 2px 1px 0 rgba(9, 11, 20, 0.02), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fieldErrorDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(244, 87, 87, 0.8), 0 2px 1px 0 rgba(9, 11, 20, 0.25), 0 2px 3px 0 rgba(9, 11, 20, 0.4), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceTopLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 -1px 0 0 rgba(78, 81, 97, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceTopDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 -1px 0 0 rgb(9, 11, 20), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceTopInsetLight: inset 0 1px 0 0 rgba(78, 81, 97, 0.15), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceTopInsetDark: inset 0 1px 0 0 rgb(9, 11, 20), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceRightLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 1px 0 0 0 rgba(78, 81, 97, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceRightDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 1px 0 0 0 rgb(9, 11, 20), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceRightInsetLight: inset -1px 0 0 0 rgba(78, 81, 97, 0.15), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceRightInsetDark: inset -1px 0 0 0 rgb(9, 11, 20), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceBottomLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 1px 0 0 rgba(78, 81, 97, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceBottomDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 1px 0 0 rgb(9, 11, 20), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceBottomInsetLight: inset 0 -1px 0 0 rgba(78, 81, 97, 0.15), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceBottomInsetDark: inset 0 -1px 0 0 rgb(9, 11, 20), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceLeftLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), -1px 0 0 0 rgba(78, 81, 97, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceLeftDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), -1px 0 0 0 rgb(9, 11, 20), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceLeftInsetLight: inset 1px 0 0 0 rgba(78, 81, 97, 0.15), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-surfaceLeftInsetDark: inset 1px 0 0 0 rgb(9, 11, 20), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceAllLight: inset 0 0 0 0.5px rgba(215, 216, 219, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.5px rgba(215, 216, 219, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceAllDark: inset 0 0 0 0.5px rgba(52,54,71, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.5px rgba(52,54,71, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceActiveAllLight: inset 0 0 0 0.5px #C9CFFF, inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.5px #C9CFFF, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceActiveAllDark: inset 0 0 0 0.5px #4551AF, inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.5px #4551AF, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceErrorAllLight: inset 0 0 0 0.5px #FFC7C7, inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.5px #FFC7C7, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceErrorAllDark: inset 0 0 0 0.5px #9E0707, inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.5px #9E0707, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceTopBottomLight: inset 0 -0.5px 0 0 rgba(215, 216, 219, 1), inset 0 0.5px 0 0 rgba(215, 216, 219, 1), inset 0 0 0 0 rgba(0,0,0,0), 0 -0.5px 0 0 rgba(215, 216, 219, 1), 0 0.5px 0 0 rgba(215, 216, 219, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceTopBottomDark: inset 0 -0.5px 0 0 rgba(52,54,71, 1), inset 0 0.5px 0 0 rgba(52,54,71, 1), inset 0 0 0 0 rgba(0,0,0,0), 0 -0.5px 0 0 rgba(52,54,71, 1), 0 0.5px 0 0 rgba(52,54,71, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceErrorTopBottomLight: inset 0 -0.5px 0 0 #FFC7C7, inset 0 0.5px 0 0 #FFC7C7, inset 0 0 0 0 rgba(0,0,0,0), 0 -0.5px 0 0 #FFC7C7, 0 0.5px 0 0 #FFC7C7, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceErrorTopBottomDark: inset 0 -0.5px 0 0 #9E0707, inset 0 0.5px 0 0 #9E0707, inset 0 0 0 0 rgba(0,0,0,0), 0 -0.5px 0 0 #9E0707, 0 0.5px 0 0 #9E0707, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-rowActiveTopBottomLight: inset 0 -0.5px 0 0 #C9CFFF, inset 0 0.5px 0 0 #C9CFFF, inset 0 0 0 0 rgba(0,0,0,0), 0 -0.5px 0 0 #C9CFFF, 0 0.5px 0 0 #C9CFFF, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-rowActiveTopBottomDark: inset 0 -0.5px 0 0 #4551AF, inset 0 0.5px 0 0 #4551AF, inset 0 0 0 0 rgba(0,0,0,0), 0 -0.5px 0 0 #4551AF, 0 0.5px 0 0 #4551AF, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-rowFocusedTopBottomLight: inset 0 -1px 0 0 #8A96F4, inset 0 1px 0 0 #8A96F4, inset 0 0 0 0 rgba(0,0,0,0), 0 -1px 0 0 #8A96F4, 0 1px 0 0 #8A96F4, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-rowFocusedTopBottomDark: inset 0 -1px 0 0 #6977E1, inset 0 1px 0 0 #6977E1, inset 0 0 0 0 rgba(0,0,0,0), 0 -1px 0 0 #6977E1, 0 1px 0 0 #6977E1, 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceRightLeftLight: inset -0.5px 0 0 0 rgba(215, 216, 219, 1), inset 0.5px 0 0 0 rgba(215, 216, 219, 1), inset 0 0 0 0 rgba(0,0,0,0), -0.5px 0 0 0 rgba(215, 216, 219, 1), 0.5px 0 0 0 rgba(215, 216, 219, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceRightLeftDark: inset -0.5px 0 0 0 rgba(52,54,71, 1), inset 0.5px 0 0 0 rgba(52,54,71, 1), inset 0 0 0 0 rgba(0,0,0,0), -0.5px 0 0 0 rgba(52,54,71, 1), 0.5px 0 0 0 rgba(52,54,71, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceTopLight: inset 0 0.5px 0 0 rgba(215, 216, 219, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 -0.5px 0 0 rgba(215, 216, 219, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceTopDark: inset 0 0.5px 0 0 rgba(52,54,71, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 -0.5px 0 0 rgba(52,54,71, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceRightLight: inset -0.5px 0 0 0 rgba(215, 216, 219, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0.5px 0 0 0 rgba(215, 216, 219, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceRightDark: inset -0.5px 0 0 0 rgba(52,54,71, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0.5px 0 0 0 rgba(52,54,71, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceBottomLight: inset 0 -0.5px 0 0 rgba(215, 216, 219, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0.5px 0 0 rgba(215, 216, 219, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceBottomDark: inset 0 -0.5px 0 0 rgba(52,54,71, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0.5px 0 0 rgba(52,54,71, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceLeftLight: inset 0.5px 0 0 0 rgba(215, 216, 219, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), -0.5px 0 0 0 rgba(215, 216, 219, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceLeftDark: inset 0.5px 0 0 0 rgba(52,54,71, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), -0.5px 0 0 0 rgba(52,54,71, 1), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceFocusedLight: inset 0 0 0 0.5px rgba(215, 216, 219, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.5px rgba(215, 216, 219, 1), 0 0 0 1px rgb(43, 48, 91), 0 0 0 3px rgba(105, 119, 225, 0.7), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-fenceFocusedDark: inset 0 0 0 0.5px rgba(52,54,71, 1), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 0.5px rgba(52,54,71, 1), 0 0 0 1px rgb(43, 48, 91), 0 0 0 3px rgba(105, 119, 225, 0.7), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-focusRingLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(43, 48, 91, 0.7), 0 0 0 4px rgba(84, 97, 200, 0.7), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-focusRingDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(216, 220, 255, 0.7), 0 0 0 4px rgba(201, 207, 255, 0.7), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneTopLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 -1px 0 0 rgba(9, 11, 20, 0.04), 0 -1px 2px 0 rgba(9, 11, 20, 0.05), 0 -3px 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneTopDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 -1px 0 0 rgba(9, 11, 20, 0.45), 0 -2px 2px 0 rgba(9, 11, 20, 0.4), 0 -4px 5px 0 rgba(9, 11, 20, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneTopInsetLight: inset 0 1px 0 0 rgba(9, 11, 20, 0.04), inset 0 1px 2px 0 rgba(9, 11, 20, 0.05), inset 0 3px 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneTopInsetDark: inset 0 1px 0 0 rgba(9, 11, 20, 0.45), inset 0 2px 2px 0 rgba(9, 11, 20, 0.4), inset 0 4px 5px 0 rgba(9, 11, 20, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneRightLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 1px 0 0 0 rgba(9, 11, 20, 0.04), 1px 0 2px 0 rgba(9, 11, 20, 0.05), 3px 0 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneRightDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 1px 0 0 0 rgba(9, 11, 20, 0.45), 2px 0 2px 0 rgba(9, 11, 20, 0.4), 4px 0 5px 0 rgba(9, 11, 20, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneRightInsetLight: inset -1px 0 0 0 rgba(9, 11, 20, 0.04), inset -1px 0 2px 0 rgba(9, 11, 20, 0.05), inset -3px 0 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneRightInsetDark: inset -1px 0 0 0 rgba(9, 11, 20, 0.45), inset -2px 0 2px 0 rgba(9, 11, 20, 0.4), inset -4px 0 5px 0 rgba(9, 11, 20, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneLeftLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), -1px 0 0 0 rgba(9, 11, 20, 0.04), -1px 0 2px 0 rgba(9, 11, 20, 0.05), -3px 0 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneLeftDark: inset 1px 0 0 0 rgba(9, 11, 20, 0.04), inset 1px 0 2px 0 rgba(9, 11, 20, 0.05), inset 3px 0 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneLeftInsetLight: inset 1px 0 0 0 rgba(41, 42, 51, 0.04), inset 1px 0 2px 0 rgba(9, 11, 20, 0.05), inset 3px 0 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneLeftInsetDark: inset 1px 0 0 0 rgba(9, 11, 20, 0.45), inset 2px 0 2px 0 rgba(9, 11, 20, 0.4), inset 4px 0 5px 0 rgba(9, 11, 20, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneBottomLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 1px 0 0 rgba(9, 11, 20, 0.04), 0 1px 2px 0 rgba(9, 11, 20, 0.05), 0 3px 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneBottomDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 1px 0 0 rgba(9, 11, 20, 0.45), 0 2px 2px 0 rgba(9, 11, 20, 0.4), 0 4px 5px 0 rgba(9, 11, 20, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneBottomInsetLight: inset 0 -1px 0 0 rgba(9, 11, 20, 0.04), inset 0 -1px 2px 0 rgba(9, 11, 20, 0.05), inset 0 -3px 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-paneBottomInsetDark: inset 0 -1px 0 0 rgba(9, 11, 20, 0.45), inset 0 -2px 2px 0 rgba(9, 11, 20, 0.4), inset 0 -4px 5px 0 rgba(9, 11, 20, 0.15), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-overlayLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.08), 0 1px 0 0 rgba(9, 11, 20, 0.05), 0 2px 3px 0 rgba(9, 11, 20, 0.05), 0 3px 5px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-overlayDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.4), 0 1px 0 0 rgba(9, 11, 20, 0.3), 0 1px 2px 0 rgba(9, 11, 20, 0.4), 0 2px 3px 0 rgba(9, 11, 20, 0.1), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-modalLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.08), 0 3px 0 0 rgba(9, 11, 20, 0.04), 0 7px 8px 0 rgba(9, 11, 20, 0.05), 0 9px 11px 0 rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-modalDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.4), 0 3px 0 0 rgba(9, 11, 20, 0.3), 0 7px 8px 0 rgba(9, 11, 20, 0.4), 0 9px 11px 0 rgba(9, 11, 20, 0.1), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-manufacturerLight: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(9, 11, 20, 0.06), 0px 1px 0px rgba(9, 11, 20, 0.06), 0px 2px 1px rgba(9, 11, 20, 0.05), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+    --shadows-manufacturerDark: inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), inset 0 0 0 0 rgba(0,0,0,0), 0 0 0 1px rgba(52, 54, 71, 0.06), 0px 1px 0px rgba(52, 54, 71, 0.1), 0px 2px 1px rgba(52, 54, 71, 0.3), 0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0);
+
+
+
+
+
+
+
+
+
+--shadows-controlPrimaryInitialLight: 
+inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 
+inset 0 0 0 0 rgba(0,0,0,0), 
+inset 0 0 0 0 rgba(0,0,0,0), 
+0 0 0 1px rgba(43, 48, 91, 0.85), 
+0 2px 1px 0 rgba(9, 11, 20, 0.12), 
+0 2px 3px 0 rgba(9, 11, 20, 0.18), 
+0 0 0 0 rgba(0,0,0,0),
+ 0 0 0 0 rgba(0,0,0,0);
+--shadows-controlPrimaryHoveredLight: 
+inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 
+inset 0 0 0 0 rgba(0,0,0,0), 
+inset 0 0 0 0 rgba(0,0,0,0), 
+0 0 0 1px rgba(43, 48, 91, 0.95), 
+0 2px 1px 0 rgba(9, 11, 20, 0.2), 
+0 2px 3px 0 rgba(9, 11, 20, 0.35), 
+0 0 0 0 rgba(0,0,0,0), 
+0 0 0 0 rgba(0,0,0,0);
+--shadows-controlPrimaryFocusedLight: 
+inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 
+inset 0 0 0 0 rgba(0,0,0,0), 
+inset 0 0 0 0 rgba(0,0,0,0), 
+0 0 0 1px rgb(43, 48, 91), 
+0 0 0 1px rgba(43, 48, 91, 0.95), 
+0 0 0 3px rgba(105, 119, 225, 0.7), 
+0 2px 1px 0 rgba(9, 11, 20, 0.2), 
+0 2px 3px 0 rgba(9, 11, 20, 0.35);
+--shadows-controlPrimaryDisabledLight: 
+inset 0 0 0 0 rgba(0,0,0,0), 
+inset 0 0 0 0 rgba(0,0,0,0), 
+inset 0 0 0 0 rgba(0,0,0,0), 
+0 0 0 1px rgb(43, 48, 91), 
+0 2px 1px 0 rgba(9, 11, 20, 0.02), 
+0 2px 3px 0 rgba(9, 11, 20, 0.05), 
+0 0 0 0 rgba(0,0,0,0), 
+0 0 0 0 rgba(0,0,0,0);
+
+
+}

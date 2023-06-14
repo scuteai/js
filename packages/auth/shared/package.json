@@ -3,5 +3,9 @@
   "version": "0.0.0",
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@scute/tsconfig": "workspace:*",
+    "typescript": "4.9.5"
   }
 }

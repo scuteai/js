@@ -1,0 +1,324 @@
+import { createStitches } from "@stitches/core";
+import type * as Stitches from "@stitches/core";
+export type { VariantProps } from "@stitches/core";
+
+export const {
+  css,
+  theme,
+  createTheme,
+  getCssText,
+  globalCss,
+  keyframes,
+  config,
+  reset,
+} = createStitches({
+  prefix: "scute",
+  theme: {
+    colors: {
+      contrast0: "#ffffff",
+      contrast1: "#EDEDED",
+      contrast2: "#DEDEDE",
+      contrast3: "#BABABA",
+      contrast4: "#999999",
+      contrast5: "#757575",
+      contrast6: "#545454",
+      contrast7: "#424242",
+      contrast8: "#333333",
+      contrast9: "#212121",
+      contrast10: "#121212",
+      black: "$contrast10",
+      // Semantic colors
+      hiContrast: "$contrast10",
+      loContrast: "$contrast0",
+      headingColor: "$contrast10",
+      textColor: "$contrast9",
+      errorColor: "#fe4f0d",
+      focusColor: "rgba(46, 234, 175, 0.3)",
+      focusColorLight: "rgba(46, 234, 175, 0.2)",
+      cardBg: "$contrast0",
+      cardShadow:
+        "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
+      cardBorder: "none",
+      // panel
+      panel: "$loContrast",
+      panelShadow:
+        "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
+
+      // Buttons
+      buttonIconColor: "#444444",
+      buttonIdleText: "white",
+      buttonIdleBg: "$contrast9",
+      buttonPassiveBg: "$contrast5",
+      buttonHoverBg: "$contrast10",
+      buttonHoverText: "white",
+      buttonIdleBorder: "rgba(0,0,0,1)",
+      buttonIdleShadow1: "rgba(0,0,0,1)",
+      buttonIdleShadow2: "rgba(0,0,0,1)",
+      buttonHoverBorder: "black",
+      buttonHoverShadow1: "rgba(0,0,0,1)",
+      buttonHoverShadow2: "rgba(0,0,0,1)",
+
+      buttonFocusBorder: "$focusColor",
+      buttonFocusRing1: "$focusColor",
+      buttonFocusRing2: "$focusColor",
+      buttonFocusShadow1: "$focusColor",
+      buttonFocusShadow2: "$focusColor",
+
+      buttonAltIdleText: "$contrast8",
+      buttonAltIdleBg: "white",
+      buttonAltPassiveBg: "$contrast5",
+      buttonAltHoverBg: "$contrast10",
+      buttonAltHoverText: "white",
+
+      buttonAltIdleBorder: "rgba(0,0,0,0.2)",
+      buttonAltIdleShadow1: "rgba(0,0,0,0.05)",
+      buttonAltIdleShadow2: "rgba(0,0,0,0.05)",
+
+      buttonAltHoverBorder: "rgba(0,0,0,0.05)",
+      buttonAltHoverRing1: "rgba(0,0,0,0.05)",
+      buttonAltHoverRing2: "rgba(0,0,0,0.05)",
+      buttonAltHoverShadow1: "rgba(0,0,0,0.05)",
+      buttonAltHoverShadow2: "rgba(0,0,0,0.05)",
+
+      buttonAltFocusBorder: "$focusColor",
+      buttonAltFocusRing1: "$focusColor",
+      buttonAltFocusRing2: "$focusColor",
+      buttonAltFocusShadow1: "$focusColor",
+      buttonAltFocusShadow2: "$focusColor",
+    },
+    fonts: {
+      main: '"Inter", -apple-system, system-ui, sans-serif',
+      mono: "monospace",
+    },
+    space: {
+      1: "5px",
+      2: "10px",
+      3: "15px",
+      4: "20px",
+      5: "25px",
+      6: "35px",
+      7: "45px",
+      8: "65px",
+      9: "80px",
+    },
+    sizes: {
+      1: "5px",
+      2: "10px",
+      3: "15px",
+      4: "20px",
+      5: "25px",
+      6: "30px",
+      7: "40px",
+      8: "46px",
+      9: "50px",
+      10: "60px",
+    },
+    fontSizes: {
+      0: "0.75rem",
+      1: "0.8125rem",
+      2: "0.875rem",
+      3: "1rem",
+    },
+    radii: {
+      1: "4px",
+      2: "6px",
+      3: "8px",
+      4: "12px",
+      round: "50%",
+      pill: "9999px",
+    },
+  },
+  media: {
+    bp1: "(min-width: 520px)",
+    bp2: "(min-width: 900px)",
+    bp3: "(min-width: 1200px)",
+    bp4: "(min-width: 1800px)",
+    motion: "(prefers-reduced-motion)",
+    hover: "(any-hover: hover)",
+    dark: "(prefers-color-scheme: dark)",
+    light: "(prefers-color-scheme: light)",
+  },
+  utils: {
+    p: (value: Stitches.PropertyValue<"padding">) => ({
+      padding: value,
+    }),
+    pt: (value: Stitches.PropertyValue<"paddingTop">) => ({
+      paddingTop: value,
+    }),
+    pr: (value: Stitches.PropertyValue<"paddingRight">) => ({
+      paddingRight: value,
+    }),
+    pb: (value: Stitches.PropertyValue<"paddingBottom">) => ({
+      paddingBottom: value,
+    }),
+    pl: (value: Stitches.PropertyValue<"paddingLeft">) => ({
+      paddingLeft: value,
+    }),
+    px: (value: Stitches.PropertyValue<"paddingLeft">) => ({
+      paddingLeft: value,
+      paddingRight: value,
+    }),
+    py: (value: Stitches.PropertyValue<"paddingTop">) => ({
+      paddingTop: value,
+      paddingBottom: value,
+    }),
+
+    m: (value: Stitches.PropertyValue<"margin">) => ({
+      margin: value,
+    }),
+    mt: (value: Stitches.PropertyValue<"marginTop">) => ({
+      marginTop: value,
+    }),
+    mr: (value: Stitches.PropertyValue<"marginRight">) => ({
+      marginRight: value,
+    }),
+    mb: (value: Stitches.PropertyValue<"marginBottom">) => ({
+      marginBottom: value,
+    }),
+    ml: (value: Stitches.PropertyValue<"marginLeft">) => ({
+      marginLeft: value,
+    }),
+    mx: (value: Stitches.PropertyValue<"marginLeft">) => ({
+      marginLeft: value,
+      marginRight: value,
+    }),
+    my: (value: Stitches.PropertyValue<"marginTop">) => ({
+      marginTop: value,
+      marginBottom: value,
+    }),
+
+    ta: (value: Stitches.PropertyValue<"textAlign">) => ({ textAlign: value }),
+
+    fd: (value: Stitches.PropertyValue<"flexDirection">) => ({
+      flexDirection: value,
+    }),
+    fw: (value: Stitches.PropertyValue<"flexWrap">) => ({ flexWrap: value }),
+
+    ai: (value: Stitches.PropertyValue<"alignItems">) => ({
+      alignItems: value,
+    }),
+    ac: (value: Stitches.PropertyValue<"alignContent">) => ({
+      alignContent: value,
+    }),
+    jc: (value: Stitches.PropertyValue<"justifyContent">) => ({
+      justifyContent: value,
+    }),
+    as: (value: Stitches.PropertyValue<"alignSelf">) => ({ alignSelf: value }),
+    fg: (value: Stitches.PropertyValue<"flexGrow">) => ({ flexGrow: value }),
+    fs: (value: Stitches.PropertyValue<"flexShrink">) => ({
+      flexShrink: value,
+    }),
+    fb: (value: Stitches.PropertyValue<"flexBasis">) => ({ flexBasis: value }),
+
+    bc: (value: Stitches.PropertyValue<"backgroundColor">) => ({
+      backgroundColor: value,
+    }),
+
+    br: (value: Stitches.PropertyValue<"borderRadius">) => ({
+      borderRadius: value,
+    }),
+    btrr: (value: Stitches.PropertyValue<"borderTopRightRadius">) => ({
+      borderTopRightRadius: value,
+    }),
+    bbrr: (value: Stitches.PropertyValue<"borderBottomRightRadius">) => ({
+      borderBottomRightRadius: value,
+    }),
+    bblr: (value: Stitches.PropertyValue<"borderBottomLeftRadius">) => ({
+      borderBottomLeftRadius: value,
+    }),
+    btlr: (value: Stitches.PropertyValue<"borderTopLeftRadius">) => ({
+      borderTopLeftRadius: value,
+    }),
+
+    bs: (value: Stitches.PropertyValue<"boxShadow">) => ({ boxShadow: value }),
+
+    pe: (value: Stitches.PropertyValue<"pointerEvents">) => ({
+      pointerEvents: value,
+    }),
+    userSelect: (value: Stitches.PropertyValue<"userSelect">) => ({
+      WebkitUserSelect: value,
+      userSelect: value,
+    }),
+
+    size: (value: Stitches.PropertyValue<"width">) => ({
+      width: value,
+      height: value,
+    }),
+
+    appearance: (value: Stitches.PropertyValue<"appearance">) => ({
+      WebkitAppearance: value,
+      appearance: value,
+    }),
+    backgroundClip: (value: Stitches.PropertyValue<"backgroundClip">) => ({
+      WebkitBackgroundClip: value,
+      backgroundClip: value,
+    }),
+  },
+});
+
+export type CSS = Stitches.CSS<typeof config>;
+
+export const shadowCreator = (
+  state: string,
+  border: string,
+  ring1: string,
+  ring2: string,
+  bottom1: string,
+  bottom2: string
+) => {
+  if (state === "focus") {
+    return `
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 
+      inset 0 0 0 0 rgba(0,0,0,0), 
+      inset 0 0 0 0 rgba(0,0,0,0), 
+      0 0 0 1px ${border}, 
+      0 0 0 1px ${ring1}, 
+      0 0 0 3px ${ring2}, 
+      0 2px 1px 0 ${bottom1}, 
+      0 2px 3px 0 ${bottom2}
+    `;
+  } else if (state === "disabled") {
+    return `
+      inset 0 0 0 0 rgba(0,0,0,0), 
+      inset 0 0 0 0 rgba(0,0,0,0), 
+      inset 0 0 0 0 rgba(0,0,0,0), 
+      0 0 0 1px ${border}, 
+      0 2px 1px 0 ${bottom1}, 
+      0 2px 3px 0 ${bottom2}, 
+      0 0 0 0 rgba(0,0,0,0), 
+      0 0 0 0 rgba(0,0,0,0);
+    `;
+  } else {
+    return `
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    inset 0 0 0 0 rgba(0,0,0,0), 
+    0 0 0 1px ${border}, 
+    0 2px 1px 0 ${bottom1}, 
+    0 2px 3px 0 ${bottom2}, 
+    0 0 0 0 rgba(0,0,0,0),
+    0 0 0 0 rgba(0,0,0,0)
+ `;
+  }
+};
+
+export const darkTheme = createTheme({
+  colors: {
+    hiContrast: "hsl(206,2%,93%)",
+    loContrast: "hsl(206,8%,8%)",
+    cardBg: "red",
+    contrast0: "#ffffff",
+    contrast1: "#EDEDED",
+    contrast2: "#DEDEDE",
+    contrast3: "#BABABA",
+    contrast4: "#999999",
+    contrast5: "#757575",
+    contrast6: "#545454",
+    contrast7: "#424242",
+    contrast8: "#333333",
+    contrast9: "red",
+    contrast10: "red",
+  },
+  space: {},
+  fonts: {},
+});

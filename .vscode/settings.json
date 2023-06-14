@@ -1,0 +1,4 @@
+{
+  "eslint.packageManager": "pnpm",
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

@@ -1,0 +1,20 @@
+export const customTheme = {
+  colors: {
+    hiContrast: 'hsl(206,2%,93%)',
+    loContrast: 'hsl(206,8%,8%)',
+    cardBg:'red',
+    contrast0: "#ffffff",
+    contrast1: "#EDEDED",
+    contrast2: "#DEDEDE",
+    contrast3: "#BABABA",
+    contrast4: "#999999",
+    contrast5: "#757575",
+    contrast6: "#545454",
+    contrast7: "#424242",
+    contrast8: "#333333",
+    contrast9: "red",
+    contrast10: "red",
+  },
+  space: {},
+  fonts: {},
+}
