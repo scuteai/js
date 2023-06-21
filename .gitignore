@@ -9,10 +9,11 @@ node_modules
 coverage
 mockServiceWorker.js
 
-# next.js
+# build
 .next/
 out/
 build
+dist
 
 # misc
 .DS_Store

@@ -1,23 +1,20 @@
-import { Content, Container, Grid, Wrapper, Flex, Button } from "@scute/ui";
+import { Content, Container, Grid, Wrapper, Flex } from "@scute/ui";
 import { AppLayout } from "@/components/shared/AppLayout";
 import { AppCard } from "@/components/applications/AppCard";
 import { ScuteApp } from "@/types/app";
-import { useAppsList } from "@/service";
 import { NewAppDialog } from "@/components/applications/NewAppDialog";
 
 export default function Apps() {
-  const { data: apps } = useAppsList();
-  console.log("apps: ", apps);
+  const apps = [] as any;
   return (
     <AppLayout>
       <Wrapper>
         <Content css={{ bc: "white", py: "$6" }}>
           <Container size="3">
-            {apps ? (
+            {apps && apps.length > 0 ? (
               <Flex css={{ fd: "column", gap: "$5" }}>
                 <Grid columns={3} gap={6}>
                   {
-                    //@ts-ignore
                     apps.map((app: ScuteApp, index: number) => (
                       <AppCard key={index} app={app} />
                     ))

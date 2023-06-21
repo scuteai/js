@@ -1,5 +1,0 @@
-{
-  "extends": "@scute/tsconfig/base.json",
-  "include": ["src", "index.ts"],
-  "exclude": ["dist", "build", "node_modules"]
-}

@@ -11,9 +11,13 @@ import {
 } from "@scute/ui";
 import { AppLayout } from "@/components/shared/AppLayout";
 import { AppSidebar } from "@/components/shared/AppSidebar";
-import { ScuteActivity, ScuteApp } from "../../../types";
+import {  ScuteApp } from "@/types";
 import { ActivityRow } from "@/components/activity/ActivityRow";
 import { TableHeader, TableContent } from "@/components/shared/InfoGroup";
+
+// TODO
+import type { ScuteActivity } from "@scute/auth-core";
+
 const app: ScuteApp = {
   id: "s3414dfa1",
   name: "Example app",
@@ -73,7 +77,6 @@ export default function AppSingleUsers() {
               </TableHeader>
 
               <TableContent>
-                {/* @ts-ignore */}
                 <Accordion type="multiple">
                   {activities.map((activity, index) => (
                     <ActivityRow

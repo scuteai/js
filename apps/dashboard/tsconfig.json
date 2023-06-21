@@ -6,6 +6,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "next-env.d.ts"],
+  "include": ["src", "next-env.d.ts", "../../packages/auth/shared/src/types/scute.ts"],
   "exclude": ["node_modules"]
 }

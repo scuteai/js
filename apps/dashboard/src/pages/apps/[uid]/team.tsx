@@ -1,23 +1,17 @@
 import { AppLayout } from "@/components/shared/AppLayout";
 import { AppSidebar } from "@/components/shared/AppSidebar";
-import { DotsHorizontalIcon, PlusIcon } from "@radix-ui/react-icons";
-import { UserRow } from "@/components/users/UserRow";
+import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import { TableHeader, TableContent } from "@/components/shared/InfoGroup";
 import { RowHolder } from "@/components/users/UserRow";
 import {
   Content,
-  Sidebar,
   Wrapper,
   Container,
   Grid,
   Flex,
   Heading,
-  Button,
-  Label,
   Card,
   TextField,
-  Dialog,
-  DialogContent,
   Badge,
   IconButton,
   Avatar,

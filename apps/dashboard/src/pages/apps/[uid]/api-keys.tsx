@@ -13,7 +13,7 @@ import {
 } from "@scute/ui";
 import { AppLayout } from "@/components/shared/AppLayout";
 import { AppSidebar } from "@/components/shared/AppSidebar";
-import { ScuteApp } from "../../../types";
+import { ScuteApp } from "@/types";
 import { TableHeader, TableContent } from "@/components/shared/InfoGroup";
 import { RowHolder } from "@/components/users/UserRow";
 import { PlusCircledIcon, TrashIcon } from "@radix-ui/react-icons";

@@ -46,7 +46,6 @@ export const NewAppDialog = () => {
       <DialogTrigger asChild={true}>
         <Button variant="mint">Create a new app</Button>
       </DialogTrigger>
-      {/* @ts-ignore */}
       <DialogContent css={{ pt: "0" }}>
         <h2>Create new app</h2>
 

@@ -17,7 +17,7 @@ const Holder = styled("div", {
 });
 
 export const LargeSpinner = (props: any) => {
-  const { iconColor, spinnerColor } = props;
+  const { iconColor, spinnerColor, icon } = props;
   return (
     <Flex
       css={{
@@ -28,7 +28,8 @@ export const LargeSpinner = (props: any) => {
       }}
     >
       <Flex css={{ width: "24px", marginTop: "24px", position: "absolute" }}>
-        <EmailIcon color={iconColor} />
+        {/* TODO: super temp */}
+        {icon !== undefined ? icon : <EmailIcon color={iconColor} />}
       </Flex>
       <Holder css={{ position: "absolute" }}>
         <SpinnerIcon color={spinnerColor} />

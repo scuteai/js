@@ -1,13 +1,13 @@
 import { Content, Container, Grid } from "@scute/ui";
 import { AppLayout } from "@/components/shared/AppLayout";
-import { ProfileElement } from "../scute/ProfileElement";
+// import { ProfileElement } from "../utils/ProfileElement";
 
 export default function Profile() {
   return (
     <AppLayout>
       <Content css={{ py: "$6" }}>
         <Container size="3">
-          <ProfileElement />
+          {/* <ProfileElement /> */}
         </Container>
       </Content>
     </AppLayout>

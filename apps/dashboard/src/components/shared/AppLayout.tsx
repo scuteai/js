@@ -1,43 +1,23 @@
 import {
   styled,
   LayoutWrapper,
-  Sidebar,
   Navbar,
-  Content,
-  Wrapper,
   LogoHolder,
   NavbarActions,
   NavbarHeader,
   Avatar,
   Flex,
   Status,
-  TreeItem,
-  TreeItemsContainer,
-  Text,
-  Separator,
-  Button,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@scute/ui";
+import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { Logo } from "@/components/shared/Logo";
 import Link from "next/link";
-
-import {
-  CaretDownIcon,
-  CheckCircledIcon,
-  ChevronDownIcon,
-  DashboardIcon,
-  PlusCircledIcon,
-} from "@radix-ui/react-icons";
-import { ScuteApp } from "../../types";
-import { useRouter } from "next/router";
-import { useSignOut } from "../../scute/hooks/useSignOut";
-import { ScuteNextProtected } from "@/utils/ScuteNextProtected";
+import Protected from "./Protected";
+import { useAuth } from "@scute/auth-react";
 
 const _APP = {
   id: "s3414dfa",
@@ -50,45 +30,47 @@ type AppLayoutProps = {
   children: JSX.Element;
 };
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const handleSignOut = useSignOut();
+  const { session, signOut } = useAuth();
+
   return (
-    <LayoutWrapper>
-      <Navbar>
-        <NavbarHeader>
-          <LogoHolder>
-            <Link href="/apps">
-              <Logo />
-            </Link>
-          </LogoHolder>
-        </NavbarHeader>
-
-        <NavbarActions>
-          <ButtonLink>
-            Changelog <Status variant="yellow"></Status>
-          </ButtonLink>
-          <ButtonLink>Documentation</ButtonLink>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild={true}>
-              <Flex css={{ ai: "center" }}>
-                <Avatar size="3" />
-                <ChevronDownIcon />
-              </Flex>
-            </DropdownMenuTrigger>
-            {/* @ts-ignore */}
-            <DropdownMenuContent>
-              <Link href="/profile">
-                <DropdownMenuItem>Profile</DropdownMenuItem>
+    <Protected>
+      <LayoutWrapper>
+        <Navbar>
+          <NavbarHeader>
+            <LogoHolder>
+              <Link href="/apps">
+                <Logo />
               </Link>
-              <DropdownMenuItem onClick={() => handleSignOut()}>
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </NavbarActions>
-      </Navbar>
-      {children}
-    </LayoutWrapper>
+            </LogoHolder>
+          </NavbarHeader>
+
+          <NavbarActions>
+            <ButtonLink>
+              Changelog <Status variant="yellow"></Status>
+            </ButtonLink>
+            <ButtonLink>Documentation</ButtonLink>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild={true}>
+                <Flex css={{ ai: "center" }}>
+                  <Avatar size="3" />
+                  <ChevronDownIcon />
+                </Flex>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <Link href="/profile">
+                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                </Link>
+                <DropdownMenuItem onClick={() => signOut()}>
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </NavbarActions>
+        </Navbar>
+        {children}
+      </LayoutWrapper>
+    </Protected>
   );
 };
 

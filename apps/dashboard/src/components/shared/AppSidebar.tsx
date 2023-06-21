@@ -1,20 +1,13 @@
-
-
-import {
-  styled,
-  Sidebar,
-  Flex,
-  TreeItem,
-  TreeItemsContainer
-} from "@scute/ui";
+import { styled, Sidebar, Flex, TreeItem, TreeItemsContainer } from "@scute/ui";
 import { CgPoll, CgUserList, CgBolt, CgBrackets, CgUser } from "react-icons/cg";
 import { TbBrightness2 } from "react-icons/tb";
 import { useRouter } from "next/router";
 import Link from "next/link";
+
 export const AppSidebar = () => {
   const router = useRouter();
 
-  const app_id = router.query.uid
+  const app_id = router.query.uid;
   const list = [
     {
       name: "Dashboard",

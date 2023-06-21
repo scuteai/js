@@ -1,25 +1,23 @@
-import { ScuteUser } from "../../types";
 import {
   Grid,
   Flex,
   Status,
-  Menu,
-  MenuItem,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   IconButton,
-  Button,
   Badge,
   styled,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Avatar
+  Avatar,
 } from "@scute/ui";
+
 import { DotsHorizontalIcon, TrashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
+
+// TODO
+import type { ScuteUser } from "@scute/auth-core";
+
 type UserRowProps = {
   user: ScuteUser;
   teamMember?: boolean;
@@ -33,7 +31,6 @@ const UserRowPopover = () => {
           <DotsHorizontalIcon />
         </IconButton>
       </DropdownMenuTrigger>
-      {/* @ts-ignore */}
       <DropdownMenuContent side="bottom" align="end">
         <Link href="/apps/s3414dfa/users/4315">
           <DropdownMenuItem>View details</DropdownMenuItem>

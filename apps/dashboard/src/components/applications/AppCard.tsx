@@ -1,5 +1,5 @@
 import { styled, Text, Flex } from "@scute/ui";
-import { ScuteApp } from "../../types";
+import { ScuteApp } from "@/types";
 import Link from "next/link";
 
 type ApplicationCardProps = {
@@ -20,9 +20,6 @@ export const AppCard = ({ app, children }: ApplicationCardProps) => {
     </Link>
   );
 };
-
-
-
 
 export const AppIcon = styled("div", {
   width: "46px",

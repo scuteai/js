@@ -1,5 +1,3 @@
-
-
 export const CodeSnippet = () => {
   const codeString = `{
     "uid": 1,
@@ -28,9 +26,5 @@ export const CodeSnippet = () => {
     "ssn": "661-64-2976",
     "userAgent": "Mozilla/5.0 ..."
   }`;
-  return (
-    <div>
-      {codeString}
-    </div>
-  );
+  return <div>{codeString}</div>;
 };

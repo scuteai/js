@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/shared/AppLayout";
 import { AppSidebar } from "@/components/shared/AppSidebar";
-import { ScuteApp, ScuteUser } from "@/types";
+import { ScuteApp } from "@/types";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { UserRow } from "@/components/users/UserRow";
 import { TableHeader, TableContent } from "@/components/shared/InfoGroup";
@@ -19,6 +19,9 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@scute/ui";
+
+// TODO
+import type { ScuteUser } from "@scute/auth-core";
 
 const app: ScuteApp = {
   id: "s3414dfa1",
@@ -79,7 +82,6 @@ const NewUserModal = () => {
           <PlusIcon /> New User
         </Button>
       </DialogTrigger>
-      {/* @ts-ignore */}
       <DialogContent title="Create new user">
         <Flex css={{ fd: "column", gap: "$4" }}>
           <Label>

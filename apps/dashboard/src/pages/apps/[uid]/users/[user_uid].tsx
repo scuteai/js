@@ -1,13 +1,11 @@
 import { AppLayout } from "@/components/shared/AppLayout";
 import { AppSidebar } from "@/components/shared/AppSidebar";
-import { ScuteApp, ScuteUser } from "@/types";
+import { ScuteApp } from "@/types";
 import {
   ChevronLeftIcon,
-  PlusIcon,
   TrashIcon,
   SewingPinFilledIcon,
 } from "@radix-ui/react-icons";
-import { UserRow } from "@/components/users/UserRow";
 import { CodeSnippet } from "@/components/shared/CodeSnippet";
 import {
   InfoGroup,
@@ -26,6 +24,9 @@ import {
   Avatar,
   Text,
 } from "@scute/ui";
+
+// TODO
+import type { ScuteUser } from "@scute/auth-core";
 
 const app: ScuteApp = {
   id: "s3414dfa1",

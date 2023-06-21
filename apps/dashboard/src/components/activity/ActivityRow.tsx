@@ -1,4 +1,3 @@
-import { ScuteUser, ScuteActivity } from "../../types";
 import {
   Flex,
   Avatar,
@@ -16,6 +15,9 @@ import {
   InfoGroupContent,
   InfoGroupTitle,
 } from "@/components/shared/InfoGroup";
+
+// TODO
+import type { ScuteActivity } from "@scute/auth-core";
 
 const StyledIcon = styled("div", {
   transition: "transform .2s ease",

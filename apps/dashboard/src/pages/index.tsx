@@ -1,23 +1,32 @@
-import { CenterContent } from "@scute/ui";
 import { useEffect } from "react";
+import { CenterContent } from "@scute/ui";
+import { Auth } from "@scute/auth-ui-react";
 import { useRouter } from "next/router";
-import useIsAuthenticated from "../scute/hooks/useIsAuthenticated";
-import { LoginElement } from "../scute/LoginElement";
+import { scuteClient } from "@/scute";
+import { useAuth } from "@scute/auth-react";
 
 export default function Home() {
-  const isAuth = useIsAuthenticated()();
   const router = useRouter();
+  const { session } = useAuth();
 
   useEffect(() => {
-    console.log("--- isAUTH: ", isAuth);
-    if (isAuth) {
+    if (session.status === "authenticated") {
       router.push("/apps");
     }
-  }, [isAuth]);
+  }, [session.status]);
+
+  if (session.status === "loading") {
+    return null;
+  }
 
   return (
     <CenterContent>
-      <LoginElement />
+      <Auth
+        scuteClient={scuteClient}
+        // onSignIn={() => {
+        //   router.push("/authenticated");
+        // }}
+      />
     </CenterContent>
   );
 }

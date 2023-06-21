@@ -19,7 +19,6 @@ const AppsPopover = () => {
           <CaretDownIcon />
         </AppPopoverButton>
       </PopoverTrigger>
-      {/* @ts-ignore */}
       <PopoverContent hideArrow={true}>
         {/* <AppBadge app={_APP} /> */}
         <Flex
@@ -58,6 +57,7 @@ export const AppBadge = ({ app }: { app: ScuteApp }) => {
     </Flex>
   );
 };
+
 const AppAvatar = styled("div", {
   width: "$4",
   height: "$4",
