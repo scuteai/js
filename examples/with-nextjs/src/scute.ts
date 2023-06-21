@@ -7,6 +7,6 @@ export const scuteClient = createClient(
     baseUrl: process.env.NEXT_PUBLIC_SCUTE_BASE_URL as string,
   },
   {
-    webauthn: "disabled"
+    webauthn: "optional"
   }
 );
