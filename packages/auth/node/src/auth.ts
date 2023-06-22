@@ -1,5 +1,5 @@
 import type { ScuteClient } from "@scute/core";
-//import { authenticateRequest as _authenticateRequest } from "@scute-edge";
+//import { authenticateRequest as _authenticateRequest } from "@scute/edge";
 import type { IncomingMessage } from "http";
 
 export const authenticateRequest = async (

@@ -1,5 +1,5 @@
 import { scuteClient } from "@/scute";
-import { authenticateRequest } from "@scute-edge";
+import { authenticateRequest } from "@scute/edge";
 import type { NextRequest } from "next/server";
 
 export const config = {

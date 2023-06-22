@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { authenticateRequest } from "@scute-nodejs";
+import { authenticateRequest } from "@scute/nodejs";
 import { scuteClient } from "@/scute";
 
 export default async function handler(

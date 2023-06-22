@@ -1,9 +1,9 @@
 {
-  "name": "@scute-nodejs",
+  "name": "@scute/nodejs",
   "version": "0.0.0",
   "publishConfig": {},
   "dependencies": {
-    "@scute-edge": "workspace:*",
+    "@scute/edge": "workspace:*",
     "@scute/core": "workspace:*",
     "@edge-runtime/node-utils": "^2.1.0"
   },

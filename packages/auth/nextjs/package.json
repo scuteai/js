@@ -1,5 +1,5 @@
 {
-  "name": "@scute-nextjs",
+  "name": "@scute/nextjs",
   "version": "0.0.0",
   "publishConfig": {},
   "dependencies": {

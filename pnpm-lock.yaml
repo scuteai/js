@@ -49,10 +49,10 @@ importers:
       '@scute/core':
         specifier: workspace:*
         version: link:../../packages/auth/core
-      '@scute-edge':
+      '@scute/edge':
         specifier: workspace:*
         version: link:../../packages/auth/edge
-      '@scute-nodejs':
+      '@scute/nodejs':
         specifier: workspace:*
         version: link:../../packages/auth/node
       '@scute/react':
@@ -243,7 +243,7 @@ importers:
       '@scute/core':
         specifier: workspace:*
         version: link:../core
-      '@scute-edge':
+      '@scute/edge':
         specifier: workspace:*
         version: link:../edge
     devDependencies:
