@@ -1,5 +1,5 @@
-import type { ScuteClient } from "@scute/auth-react";
-import type { Views } from "@scute/auth-ui-shared";
+import type { ScuteClient } from "@scute/react";
+import type { Views } from "@scute/ui-shared";
 
 export interface CommonViewProps {
   scuteClient: ScuteClient;

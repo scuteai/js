@@ -1,7 +1,7 @@
 import React, { createContext, createElement } from "react";
 export type CustomTheme = any; // TODO: define type
 
-import { createTheme } from "@scute/auth-ui-shared";
+import { createTheme } from "@scute/ui-shared";
 
 type ContextValue = {
   theme?: any;

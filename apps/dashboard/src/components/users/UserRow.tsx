@@ -16,7 +16,7 @@ import { DotsHorizontalIcon, TrashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
 // TODO
-import type { ScuteUser } from "@scute/auth-core";
+import type { ScuteUser } from "@scute/core";
 
 type UserRowProps = {
   user: ScuteUser;

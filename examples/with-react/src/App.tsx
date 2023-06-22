@@ -1,4 +1,4 @@
-import { Auth } from "@scute/auth-ui-react";
+import { Auth } from "@scute/ui-react";
 import AuthenticatedRoute from "./components/Authenticated";
 import { scuteClient } from "./scute";
 

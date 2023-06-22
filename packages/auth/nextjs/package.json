@@ -1,9 +1,9 @@
 {
-  "name": "@scute/auth-nextjs",
+  "name": "@scute-nextjs",
   "version": "0.0.0",
   "publishConfig": {},
   "dependencies": {
-    "@scute/auth-react": "workspace:*"
+    "@scute/react": "workspace:*"
   },
   "devDependencies": {
     "@scute/tsconfig": "workspace:*",

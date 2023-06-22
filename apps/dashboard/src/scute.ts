@@ -1,4 +1,4 @@
-import { createClient } from "@scute/auth-react";
+import { createClient } from "@scute/react";
 
 export const scuteClient = createClient(
   {

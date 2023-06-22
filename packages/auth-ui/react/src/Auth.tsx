@@ -5,8 +5,8 @@ import {
   ScuteClient,
   useAuth,
   type ScuteClientConfig,
-} from "@scute/auth-react";
-import { VIEWS, type Views } from "@scute/auth-ui-shared";
+} from "@scute/react";
+import { VIEWS, type Views } from "@scute/ui-shared";
 import useInterval from "./helpers/useInterval";
 import {
   Login,

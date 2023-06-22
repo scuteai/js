@@ -1,5 +1,5 @@
 {
-  "name": "@scute/auth-react",
+  "name": "@scute/react",
   "version": "0.0.0",
   "publishConfig": {},
   "files": [
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "axios": "^1.4.0",
-    "@scute/auth-core": "workspace:*"
+    "@scute/core": "workspace:*"
   },
   "peerDependencies": {
     "@types/react": "^16.8 || ^17.0 || ^18.0",

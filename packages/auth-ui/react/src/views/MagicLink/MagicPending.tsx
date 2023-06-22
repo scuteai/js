@@ -1,4 +1,4 @@
-import { VIEWS } from "@scute/auth-ui-shared";
+import { VIEWS } from "@scute/ui-shared";
 
 import {
   Badge,

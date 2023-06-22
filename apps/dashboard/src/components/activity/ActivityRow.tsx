@@ -17,7 +17,7 @@ import {
 } from "@/components/shared/InfoGroup";
 
 // TODO
-import type { ScuteActivity } from "@scute/auth-core";
+import type { ScuteActivity } from "@scute/core";
 
 const StyledIcon = styled("div", {
   transition: "transform .2s ease",

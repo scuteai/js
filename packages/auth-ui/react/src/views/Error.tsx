@@ -1,4 +1,4 @@
-import { VIEWS } from "@scute/auth-ui-shared";
+import { VIEWS } from "@scute/ui-shared";
 import { useEffect } from "react";
 import { BiometricsIcon } from "../assets/icons";
 import {

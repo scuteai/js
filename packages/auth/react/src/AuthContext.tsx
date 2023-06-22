@@ -4,7 +4,7 @@ import {
   type ScuteClientConfig,
   type ScuteUser,
   type Session,
-} from "@scute/auth-core";
+} from "@scute/core";
 
 export interface AuthSession {
   user: ScuteUser | null;

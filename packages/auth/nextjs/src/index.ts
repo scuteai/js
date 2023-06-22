@@ -1,1 +1,1 @@
-export * from "@scute/auth-react";
+export * from "@scute/react";

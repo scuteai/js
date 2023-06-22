@@ -1,5 +1,5 @@
-import { config } from "@scute/auth-ui-shared";
-export * from "@scute/auth-ui-shared";
+import { config } from "@scute/ui-shared";
+export * from "@scute/ui-shared";
 
 import { createStitches } from "@stitches/react";
 // TODO

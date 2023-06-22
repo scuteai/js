@@ -1,8 +1,8 @@
 {
-  "name": "@scute/auth-edge",
+  "name": "@scute-edge",
   "version": "0.0.0",
   "publishConfig": {},
   "dependencies": {
-    "@scute/auth-core": "workspace:*"
+    "@scute/core": "workspace:*"
   }
 }

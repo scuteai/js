@@ -1,10 +1,10 @@
 {
-  "name": "@scute/auth-nodejs",
+  "name": "@scute-nodejs",
   "version": "0.0.0",
   "publishConfig": {},
   "dependencies": {
-    "@scute/auth-edge": "workspace:*",
-    "@scute/auth-core": "workspace:*",
+    "@scute-edge": "workspace:*",
+    "@scute/core": "workspace:*",
     "@edge-runtime/node-utils": "^2.1.0"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import type { ScuteClient } from "@scute/auth-core";
+import type { ScuteClient } from "@scute/core";
 
 export const authenticateRequest = async (
   request: Request,

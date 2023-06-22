@@ -16,7 +16,7 @@ import { ActivityRow } from "@/components/activity/ActivityRow";
 import { TableHeader, TableContent } from "@/components/shared/InfoGroup";
 
 // TODO
-import type { ScuteActivity } from "@scute/auth-core";
+import type { ScuteActivity } from "@scute/core";
 
 const app: ScuteApp = {
   id: "s3414dfa1",

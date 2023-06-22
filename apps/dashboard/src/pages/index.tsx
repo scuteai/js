@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { CenterContent } from "@scute/ui";
-import { Auth } from "@scute/auth-ui-react";
+import { Auth } from "@scute/ui-react";
 import { useRouter } from "next/router";
 import { scuteClient } from "@/scute";
-import { useAuth } from "@scute/auth-react";
+import { useAuth } from "@scute/react";
 
 export default function Home() {
   const router = useRouter();

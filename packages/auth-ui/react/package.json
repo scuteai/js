@@ -1,5 +1,5 @@
 {
-  "name": "@scute/auth-ui-react",
+  "name": "@scute/ui-react",
   "version": "0.0.0",
   "publishConfig": {},
   "files": [
@@ -19,8 +19,8 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@scute/auth-react": "workspace:*",
-    "@scute/auth-ui-shared": "workspace:*",
+    "@scute/react": "workspace:*",
+    "@scute/ui-shared": "workspace:*",
     "@stitches/react": "^1.3.1-1",
     "lodash.merge": "^4.6.2"
   },

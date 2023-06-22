@@ -5,7 +5,7 @@ import Head from "next/head";
 import { DesignSystemProvider } from "@scute/ui";
 import { globalCss } from "../styles/stitches.config";
 import { scuteClient } from "@/scute";
-import { AuthContextProvider } from "@scute/auth-react";
+import { AuthContextProvider } from "@scute/react";
 
 const globalStyles = globalCss({
   "*, *::before, *::after": {

@@ -46,19 +46,19 @@ importers:
       '@radix-ui/react-icons':
         specifier: ^1.3.0
         version: 1.3.0(react@18.2.0)
-      '@scute/auth-core':
+      '@scute/core':
         specifier: workspace:*
         version: link:../../packages/auth/core
-      '@scute/auth-edge':
+      '@scute-edge':
         specifier: workspace:*
         version: link:../../packages/auth/edge
-      '@scute/auth-nodejs':
+      '@scute-nodejs':
         specifier: workspace:*
         version: link:../../packages/auth/node
-      '@scute/auth-react':
+      '@scute/react':
         specifier: workspace:*
         version: link:../../packages/auth/react
-      '@scute/auth-ui-react':
+      '@scute/ui-react':
         specifier: workspace:*
         version: link:../../packages/auth-ui/react
       '@scute/ui':
@@ -128,10 +128,10 @@ importers:
 
   packages/auth-ui/react:
     dependencies:
-      '@scute/auth-react':
+      '@scute/react':
         specifier: workspace:*
         version: link:../../auth/react
-      '@scute/auth-ui-shared':
+      '@scute/ui-shared':
         specifier: workspace:*
         version: link:../shared
       '@stitches/react':
@@ -218,13 +218,13 @@ importers:
 
   packages/auth/edge:
     dependencies:
-      '@scute/auth-core':
+      '@scute/core':
         specifier: workspace:*
         version: link:../core
 
   packages/auth/nextjs:
     dependencies:
-      '@scute/auth-react':
+      '@scute/react':
         specifier: workspace:*
         version: link:../react
     devDependencies:
@@ -240,10 +240,10 @@ importers:
       '@edge-runtime/node-utils':
         specifier: ^2.1.0
         version: 2.1.0
-      '@scute/auth-core':
+      '@scute/core':
         specifier: workspace:*
         version: link:../core
-      '@scute/auth-edge':
+      '@scute-edge':
         specifier: workspace:*
         version: link:../edge
     devDependencies:
@@ -256,7 +256,7 @@ importers:
 
   packages/auth/react:
     dependencies:
-      '@scute/auth-core':
+      '@scute/core':
         specifier: workspace:*
         version: link:../core
       axios:

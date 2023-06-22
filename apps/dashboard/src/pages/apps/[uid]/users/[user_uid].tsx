@@ -26,7 +26,7 @@ import {
 } from "@scute/ui";
 
 // TODO
-import type { ScuteUser } from "@scute/auth-core";
+import type { ScuteUser } from "@scute/core";
 
 const app: ScuteApp = {
   id: "s3414dfa1",
