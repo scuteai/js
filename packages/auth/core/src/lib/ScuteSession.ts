@@ -1,185 +1,154 @@
-import Cookies from "js-cookie";
-import type { ScuteUser, ScuteAuthStateInterface } from "./types";
-
-interface ScuteSessionConfig {
-  sessionStore: "cookie" | "localstorage";
-  appId: string;
-  appDomain?: string;
-}
+import jwtDecode from "jwt-decode";
+import { ScuteCookieStorage, ScuteStorage } from "./ScuteBaseStorage";
+import {
+  SCUTE_ACCESS_STORAGE_KEY,
+  SCUTE_CSRF_STORAGE_KEY,
+  SCUTE_REFRESH_STORAGE_KEY,
+  SCUTE_USER_STORAGE_KEY,
+} from "./constants";
+import type {
+  UniqueIdentifier,
+  Session,
+  ScuteSessionConfig,
+  ScuteTokenPayloadUser,
+} from "./types";
+import { isBrowser } from "./helpers";
 
 export class ScuteSession {
-  private sessionStore: "cookie" | "localstorage";
-  private appId: string;
-  private appDomain?: string;
-
-  private readonly _accessStorageName: string = "sc-access-token";
-  private readonly _refreshStorageName: string = "sc-refresh-token";
-  private readonly _csrfStorageName: string = "X-CSRF-Token";
-  private readonly _accessExpiresStorageName: string = "sc-access_time";
-  private readonly _refreshExpiresStorageName: string = "sc-refresh_time";
-  private readonly _userStorageName: string = "scu_user";
-  private readonly _userIdStorageName: string = "scu_uid";
-  private readonly _stateToken: string = "scu_st";
+  protected appId: UniqueIdentifier;
+  protected scuteStorage: ScuteStorage | ScuteCookieStorage;
 
   constructor(config: ScuteSessionConfig) {
-    this.sessionStore = config.sessionStore;
     this.appId = config.appId;
-    this.appDomain = config.appDomain;
+    this.scuteStorage = config.storage;
   }
 
-  initialState(): ScuteAuthStateInterface {
-    return this.initialCookieToken();
+  private get isCookieStorage() {
+    return this.scuteStorage instanceof ScuteCookieStorage;
   }
 
-  initialCookieToken(): ScuteAuthStateInterface {
-    const accessToken = Cookies.get(this._accessStorageName);
-    const accessExpires = Cookies.get(this._accessExpiresStorageName);
-    const refresh = Cookies.get(this._refreshStorageName);
-    const refreshExpires = Cookies.get(this._refreshExpiresStorageName);
-    const user = Cookies.get(this._userStorageName);
-    const csrf = Cookies.get(this._csrfStorageName);
+  async initialState(): Promise<Session> {
+    const browser = isBrowser();
 
-    return this.checkTokenExists(
-      accessToken,
-      accessExpires,
-      refresh,
-      refreshExpires,
-      csrf,
-      user
-    );
-  }
+    const access = await this.scuteStorage.getItem(SCUTE_ACCESS_STORAGE_KEY);
+    const refresh = await this.scuteStorage.getItem(SCUTE_REFRESH_STORAGE_KEY);
+    const user = await this.getRememberedUser();
+    const csrf = await this.scuteStorage.getItem(SCUTE_CSRF_STORAGE_KEY);
 
-  public sync(authState?: ScuteAuthStateInterface | null): void {
-    if (!authState || authState.status === "unauthenticated") {
-      this.removeCookies();
-    } else if (authState.access && authState.refresh) {
-      this.setCookies(authState);
+    if (!access || (!refresh && !browser) || !csrf) {
+      await this.removeSession();
+      return ScuteSession.unAuthenticatedState();
     }
-  }
 
-  setCookies(authState: ScuteAuthStateInterface) {
-    const { access, refresh, csrf, accessExpiresAt, refreshExpiresAt, user } =
-      authState;
-    if (access && accessExpiresAt) {
-      this.setCookie_(this._accessStorageName, access, accessExpiresAt, false);
-      this.setCookie_(
-        this._accessExpiresStorageName,
-        accessExpiresAt,
-        accessExpiresAt,
-        false
-      );
-    }
-    if (refresh && refreshExpiresAt) {
-      this.setCookie_(this._refreshStorageName, refresh, refreshExpiresAt);
-      this.setCookie_(
-        this._refreshExpiresStorageName,
-        refreshExpiresAt,
-        refreshExpiresAt
-      );
-    }
-    if (user && refreshExpiresAt) {
-      this.setCookie_(
-        this._userStorageName,
-        JSON.stringify(user),
-        refreshExpiresAt,
-        false
-      );
-    }
-    if (csrf) {
-      this.setCookie_(this._csrfStorageName, csrf, refreshExpiresAt, false);
-    }
-  }
+    const { exp: accessExpiresAt } = jwtDecode(access) as any;
+    const { exp: refreshExpiresAt } =
+      !browser && refresh ? (jwtDecode(refresh) as any) : ({} as any);
 
-  setCookie_(
-    key: string,
-    value: string,
-    expiration: Date,
-    secure: boolean = true
-  ) {
-    Cookies.set(key, value, {
-      expires: expiration,
-      domain: this.appDomain,
-      secure: secure,
-    });
-  }
-
-  removeCookies(): void {
-    Cookies.remove(this._accessStorageName, {
-      domain: this.appDomain,
-      secure: false,
-    });
-    Cookies.remove(this._refreshStorageName, {
-      domain: this.appDomain,
-      secure: true,
-    });
-    Cookies.remove(this._accessExpiresStorageName, {
-      domain: this.appDomain,
-      secure: false,
-    });
-    Cookies.remove(this._refreshExpiresStorageName, {
-      domain: this.appDomain,
-      secure: true,
-    });
-  }
-
-  removeUserCookie(): void {
-    Cookies.remove(this._userStorageName, {
-      domain: this.appDomain,
-      secure: false,
-    });
-    Cookies.remove(this._userIdStorageName, {
-      domain: this.appDomain,
-      secure: false,
-    });
-  }
-
-  unAuthorizedState(): ScuteAuthStateInterface {
     return {
-      access: null,
-      refresh: null,
-      csrf: null,
-      accessExpiresAt: null,
-      refreshExpiresAt: null,
-      user: null,
-      status: "unauthenticated",
+      access,
+      accessExpiresAt: accessExpiresAt
+        ? new Date(accessExpiresAt * 1000)
+        : null,
+      refresh,
+      refreshExpiresAt: refreshExpiresAt
+        ? new Date(refreshExpiresAt * 1000)
+        : null,
+      csrf,
+      user,
+      status: "authenticated",
     };
   }
 
-  checkTokenExists(
-    accessToken: string | null | undefined,
-    accessExpires: string | null | undefined,
-    refreshToken: string | null | undefined,
-    refreshExpires: string | null | undefined,
-    csrf: string | null | undefined,
-    user: string | null | undefined
-  ): ScuteAuthStateInterface {
+  async sync(session: Session | null): Promise<void> {
     if (
-      !!accessToken &&
-      !!accessExpires &&
-      !!refreshToken &&
-      !!refreshExpires &&
-      !!user &&
-      !!csrf
+      !session ||
+      !session.access ||
+      (!session.refresh && !isBrowser()) ||
+      !session.user ||
+      !session.csrf ||
+      session.status === "unauthenticated"
     ) {
-      const accessExpiresAt = new Date(accessExpires);
-      const refreshExpiresAt = new Date(refreshExpires);
-
-      try {
-        const userState: ScuteUser = JSON.parse(user);
-        return {
-          access: accessToken,
-          refresh: refreshToken,
-          csrf: csrf,
-          accessExpiresAt: accessExpiresAt,
-          refreshExpiresAt: refreshExpiresAt,
-          user: userState,
-          status: "authenticated",
-        };
-      } catch (e) {
-        return this.unAuthorizedState();
-      }
+      this.removeSession();
     } else {
-      return this.unAuthorizedState();
+      this.saveSession(session);
     }
+  }
+
+  async removeSession(): Promise<void> {
+    const browser = isBrowser();
+
+    this.scuteStorage.removeItem(SCUTE_ACCESS_STORAGE_KEY, {
+      httpOnly: !browser ? false : undefined,
+    });
+    this.scuteStorage.removeItem(SCUTE_REFRESH_STORAGE_KEY, {
+      httpOnly: !browser ? true : undefined,
+    });
+    // this.scuteStorage.removeItem(SCUTE_USER_STORAGE_KEY);
+    this.scuteStorage.removeItem(SCUTE_CSRF_STORAGE_KEY, {
+      httpOnly: !browser ? false : undefined,
+    });
+  }
+
+  async saveSession(state: Session): Promise<void> {
+    const browser = isBrowser();
+
+    const { access, accessExpiresAt, refresh, refreshExpiresAt, csrf, user } =
+      state;
+
+    if (access) {
+      const expires: Date =
+        accessExpiresAt ?? new Date((jwtDecode(access) as any).exp * 1000);
+
+      this.scuteStorage.setItem(SCUTE_ACCESS_STORAGE_KEY, access, {
+        expires,
+        httpOnly: !browser ? false : undefined,
+      });
+    }
+
+    if (refresh) {
+      const expires: Date =
+        refreshExpiresAt ?? new Date((jwtDecode(refresh) as any).exp * 1000);
+
+      this.scuteStorage.setItem(SCUTE_REFRESH_STORAGE_KEY, refresh, {
+        expires,
+        httpOnly: !browser ? true : undefined,
+      });
+
+      if (user) {
+        this.scuteStorage.setItem(
+          SCUTE_USER_STORAGE_KEY,
+          JSON.stringify(user),
+          {
+            expires,
+            // TODO: httpOnly: !browser ? false : undefined,
+          }
+        );
+      }
+
+      if (csrf) {
+        this.scuteStorage.setItem(SCUTE_CSRF_STORAGE_KEY, csrf, {
+          expires,
+          httpOnly: !browser ? false : undefined,
+        });
+      }
+    }
+  }
+
+  async getRememberedUser(): Promise<ScuteTokenPayloadUser> {
+    const cookieVal = await this.scuteStorage.getItem(SCUTE_USER_STORAGE_KEY);
+    const user = cookieVal ? JSON.parse(cookieVal) : null;
+    return user;
+  }
+
+  static unAuthenticatedState(): Session {
+    return {
+      access: null,
+      accessExpiresAt: null,
+      refresh: null,
+      refreshExpiresAt: null,
+      csrf: null,
+      user: null,
+      status: "unauthenticated",
+    };
   }
 }

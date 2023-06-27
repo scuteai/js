@@ -1,20 +1,27 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   AUTH_CHANGE_EVENTS,
   AuthContextProvider,
   ScuteClient,
   useAuth,
-  type ScuteClientConfig,
+  type UniqueIdentifier,
+  type ScuteTokenPayloadUser,
+  isWebauthnSupported,
+  ScuteError,
+  getMeaningfulError,
+  useScuteClient,
 } from "@scute/react";
-import { VIEWS, type Views } from "@scute/ui-shared";
+import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
 import useInterval from "./helpers/useInterval";
 import {
-  Login,
+  SignIn,
+  SignUp,
   MagicLoading,
   MagicPending,
   BioRegister,
   BioVerify,
-  Error,
+  ErrorView,
+  MagicNewDevicePending,
 } from "./views";
 import {
   Content,
@@ -24,40 +31,132 @@ import {
   Layout,
   Logo,
 } from "./components";
+import { isValidEmail } from "./helpers/isValidEmail";
+import debounce from "lodash.debounce";
+import { createTheme } from "./stitches.config";
 
 export type AuthProps = {
+  scuteClient: ScuteClient;
   onSignIn?: () => void;
   onSignOut?: () => void;
-} & (
-  | {
-      scuteClient?: undefined;
-      scuteClientConfig: ScuteClientConfig;
-    }
-  | {
-      scuteClient: ScuteClient;
-      scuteClientConfig?: undefined;
-    }
-);
+  authView?: Views;
+  webauthn?: "strict" | "optional" | "disabled";
+  appearance?: {
+    theme?: Theme;
+    scuteBranding?: boolean;
+  };
+};
 
 function Auth({
-  scuteClient: _scuteClient,
-  scuteClientConfig,
+  scuteClient,
+  appearance: _appearance,
+  authView: _authView = undefined, // needs to be undefined default
+  webauthn = "optional",
   onSignIn,
   onSignOut,
 }: AuthProps) {
-  const [scuteClient] = useState(
-    () => _scuteClient ?? new ScuteClient(scuteClientConfig)
-  );
-
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<any>(null);
-  const [magicLinkId, setMagicLinkId] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  const [authView, setAuthView] = useState<Views>();
-  const [authInitialData, setAuthInitialData] = useState<any>();
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const handleValidateEmail = (email: string) => {
+    if (!isValidEmail(email)) {
+      setEmailError("Email is invalid");
+    } else {
+      setEmailError(null);
+    }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedIsValidEmail = useCallback(
+    debounce(handleValidateEmail, 1000),
+    []
+  );
+  useEffect(() => {
+    debouncedIsValidEmail.cancel();
+  }, [debouncedIsValidEmail]);
+
+  const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setEmail(value);
+    setError(null);
+    setEmailError(null);
+    debouncedIsValidEmail(value);
+  };
+
+  const [rememberedUser, setRememberedUser] =
+    useState<ScuteTokenPayloadUser | null>();
 
   useEffect(() => {
-    setAuthView(VIEWS.LOGIN);
+    scuteClient.getRememberedUser().then((user) => setRememberedUser(user));
+  }, [scuteClient]);
+
+  const [authView, _setAuthView] = useState<Views | undefined>(_authView);
+  const setAuthView: typeof _setAuthView = (...args) => {
+    if (error) setError(null);
+    _setAuthView(...args);
+  };
+
+  const [error, setError] = useState<ScuteError | null>(null);
+  const meaningfulError = error ? getMeaningfulError(error) : null;
+
+  const [magicLinkId, setMagicLinkId] = useState<UniqueIdentifier | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+
+  const [authInitialData, setAuthInitialData] =
+    useState<Awaited<ReturnType<typeof scuteClient.initialize>>["data"]>();
+
+  const appearance: AuthProps["appearance"] = {
+    // defaults
+    scuteBranding: true,
+    // client preferences
+    ..._appearance,
+  };
+
+  const handleSignIn = async () => {
+    let _email = email;
+    // set remembered user email if direct click on the login
+    // without breaking email typing
+    if (!email && rememberedUser?.email) {
+      _email = rememberedUser.email;
+      setEmail(_email);
+    }
+    const { data, error: signInError } = await scuteClient.signInWithEmail(
+      _email,
+      webauthn
+    );
+
+    if (signInError) {
+      setError(signInError);
+      return;
+    }
+
+    const magicLinkId = data?.id;
+    if (magicLinkId) {
+      setMagicLinkId(magicLinkId);
+      setIsPolling(true);
+    }
+  };
+
+  const handleSignUp = async () => {
+    const { data, error: signUpError } = await scuteClient.signUpWithEmail(
+      email
+    );
+
+    if (signUpError) {
+      setError(signUpError);
+      return;
+    }
+
+    const magicLinkId = data?.id;
+    if (magicLinkId) {
+      setMagicLinkId(magicLinkId);
+      setIsPolling(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!authView) {
+      setAuthView(VIEWS.SIGN_IN);
+    }
 
     const unsubscribe = scuteClient.onAuthStateChange(async (event) => {
       if (event === AUTH_CHANGE_EVENTS.SIGN_IN) {
@@ -66,6 +165,8 @@ function Auth({
         onSignOut?.();
       } else if (event === AUTH_CHANGE_EVENTS.MAGIC_PENDING) {
         setAuthView(VIEWS.MAGIC_PENDING);
+      } else if (event === AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING) {
+        setAuthView(VIEWS.MAGIC_NEW_DEVICE_PENDING);
       } else if (event === AUTH_CHANGE_EVENTS.MAGIC_LOADING) {
         setAuthView(VIEWS.MAGIC_LOADING);
       } else if (event === AUTH_CHANGE_EVENTS.BIO_REGISTER) {
@@ -76,9 +177,10 @@ function Auth({
     });
 
     (async () => {
-      const { data, error } = await scuteClient.initialize();
-      if (error) {
-        setError(error);
+      const { data, error: initializError } = await scuteClient.initialize();
+
+      if (initializError) {
+        setError(initializError);
         return;
       }
 
@@ -87,34 +189,21 @@ function Auth({
 
     return () => unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleLogin = async () => {
-    const { data, error } = await scuteClient.login(email);
-
-    if (error) {
-      setError(error);
-      return;
-    }
-
-    const magicLinkId = data?.id;
-
-    if (magicLinkId) {
-      setMagicLinkId(magicLinkId);
-      setAuthView(VIEWS.MAGIC_PENDING);
-      setIsPolling(true);
-    }
-  };
+  }, [scuteClient, onSignIn, onSignOut]);
 
   useEffect(() => {
-    setIsPolling(authView === VIEWS.MAGIC_PENDING);
+    setIsPolling(
+      authView === VIEWS.MAGIC_PENDING ||
+        authView === VIEWS.MAGIC_NEW_DEVICE_PENDING
+    );
   }, [authView]);
 
   useInterval(
     async () => {
       if (magicLinkId) {
-        const { error } = await scuteClient.loginWithMagicLinkId(magicLinkId);
-        if (!error) {
+        const { error: magicLinkClaimError } =
+          await scuteClient.signInWithMagicLinkId(magicLinkId);
+        if (!magicLinkClaimError) {
           setIsPolling(false);
         }
       }
@@ -127,20 +216,37 @@ function Auth({
   }
 
   return (
-    <Layout>
+    <Layout className={appearance?.theme ? createTheme(appearance.theme) : ""}>
       <ElementCard>
         <Content>
-          {authView && !error ? (
+          {authView && !meaningfulError?.isFatal ? (
             {
-              [VIEWS.LOGIN]: (
-                // TODO: email validation
-                <Login
+              [VIEWS.SIGN_IN]: (
+                <SignIn
+                  scuteClient={scuteClient}
                   email={email}
-                  handleEmailChange={(
-                    event: React.ChangeEvent<HTMLInputElement>
-                  ) => setEmail(event.target.value)}
-                  handleLogin={handleLogin}
-                  maybeWebauthn={scuteClient.isWebauthnAvailable}
+                  handleEmailChange={handleEmailChange}
+                  setAuthView={setAuthView}
+                  error={meaningfulError?.message || emailError}
+                  handleSignIn={handleSignIn}
+                  webauthnAvailable={
+                    webauthn !== "disabled" && isWebauthnSupported()
+                  }
+                  rememberedUser={rememberedUser}
+                  resetRememberedUser={() => setRememberedUser(null)}
+                />
+              ),
+              [VIEWS.SIGN_UP]: (
+                <SignUp
+                  scuteClient={scuteClient}
+                  email={email}
+                  handleEmailChange={handleEmailChange}
+                  setAuthView={setAuthView}
+                  error={meaningfulError?.message || emailError}
+                  handleSignUp={handleSignUp}
+                  webauthnAvailable={
+                    webauthn !== "disabled" && isWebauthnSupported()
+                  }
                 />
               ),
               [VIEWS.BIO_REGISTER]: (
@@ -148,29 +254,40 @@ function Auth({
                   scuteClient={scuteClient}
                   email={email}
                   setAuthView={setAuthView}
-                  isWebauthnOptional={
-                    scuteClient.tempOptions.webauthn === "optional"
-                  }
+                  error={meaningfulError?.message}
+                  isWebauthnOptional={webauthn === "optional"}
                   skipAndLogin={async () => {
-                    const { error } = await scuteClient.loginWithTokenPayload(
-                      authInitialData.payload
-                    );
-                    if (error) {
-                      setError(error);
+                    const payload = authInitialData?.payload;
+                    if (!payload) {
+                      setError(
+                        new ScuteError({ message: "Something went wrong." })
+                      );
+                      return;
+                    }
+
+                    const { error: signInError } =
+                      await scuteClient.signInWithTokenPayload(payload);
+
+                    if (signInError) {
+                      setError(signInError);
                     }
                   }}
                   registerDevice={async () => {
-                    const { error } = await scuteClient.loginWithRegisterDevice(
-                      authInitialData.options
-                    );
-
-                    if (error) {
-                      const { error } = await scuteClient.loginWithTokenPayload(
-                        authInitialData.payload
+                    const { options, payload } = authInitialData || {};
+                    if (!(options && payload)) {
+                      setError(
+                        new ScuteError({ message: "Something went wrong." })
                       );
-                      if (error) {
-                        setError(error);
-                      }
+                      return;
+                    }
+
+                    const { error: registerDeviceError } =
+                      await scuteClient.signInWithRegisterDevice(
+                        options as any
+                      );
+
+                    if (registerDeviceError) {
+                      setError(registerDeviceError);
                     }
                   }}
                 />
@@ -180,6 +297,7 @@ function Auth({
                   scuteClient={scuteClient}
                   email={email}
                   setAuthView={setAuthView}
+                  error={meaningfulError?.message}
                 />
               ),
               [VIEWS.MAGIC_PENDING]: (
@@ -187,6 +305,15 @@ function Auth({
                   scuteClient={scuteClient}
                   email={email}
                   setAuthView={setAuthView}
+                  error={meaningfulError?.message}
+                />
+              ),
+              [VIEWS.MAGIC_NEW_DEVICE_PENDING]: (
+                <MagicNewDevicePending
+                  scuteClient={scuteClient}
+                  email={email}
+                  setAuthView={setAuthView}
+                  error={meaningfulError?.message}
                 />
               ),
               [VIEWS.MAGIC_LOADING]: (
@@ -194,11 +321,12 @@ function Auth({
                   scuteClient={scuteClient}
                   email={email}
                   setAuthView={setAuthView}
+                  error={meaningfulError?.message}
                 />
               ),
             }[authView]
           ) : (
-            <Error
+            <ErrorView
               scuteClient={scuteClient}
               email={email}
               error={error}
@@ -207,14 +335,21 @@ function Auth({
             />
           )}
         </Content>
-        <Flex css={{ jc: "center", pb: "$1" }}>
-          <FooterCredits>
-            <span>powered by</span>{" "}
-            <span>
-              <Logo webauthnSupport={scuteClient.isWebauthnAvailable} /> scute
-            </span>
-          </FooterCredits>
-        </Flex>
+        {appearance.scuteBranding ? (
+          <Flex css={{ jc: "center", pb: "$1" }}>
+            <FooterCredits>
+              <span>powered by</span>
+              <span>
+                <Logo
+                  webauthnAvailable={
+                    webauthn !== "disabled" && isWebauthnSupported()
+                  }
+                />
+                scute
+              </span>
+            </FooterCredits>
+          </Flex>
+        ) : null}
       </ElementCard>
     </Layout>
   );
@@ -222,5 +357,6 @@ function Auth({
 
 Auth.ContextProvider = AuthContextProvider;
 Auth.useAuth = useAuth;
+Auth.useScuteClient = useScuteClient;
 
 export default Auth;

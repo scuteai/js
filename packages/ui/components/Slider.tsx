@@ -92,7 +92,6 @@ type SliderProps = SliderPrimitiveProps & { css?: CSS };
 
 // eslint-disable-next-line react/display-name
 export const Slider = React.forwardRef<
-//@ts-ignore // TODO
   React.ElementRef<typeof StyledSlider>,
   SliderProps
 >((props, forwardedRef) => {

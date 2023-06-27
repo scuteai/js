@@ -1,6 +1,6 @@
 import { ReactElement, useEffect } from "react";
 import { useRouter } from "next/router";
-import { useAuth } from "@scute/react";
+import { useAuth } from "@scute/nextjs";
 
 const Protected = ({ children }: { children: ReactElement }) => {
   const router = useRouter();

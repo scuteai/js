@@ -5,8 +5,6 @@ import merge from "lodash.merge";
 
 const DEFAULT_TAG = "h1";
 
-// TODO
-/* @ts-ignore */
 type TextSizeVariants = Pick<VariantProps<typeof Text>, "size">;
 type HeadingSizeVariants = "1" | "2" | "3";
 type HeadingVariants = { size?: HeadingSizeVariants } & Omit<
@@ -16,6 +14,7 @@ type HeadingVariants = { size?: HeadingSizeVariants } & Omit<
 type HeadingProps = React.ComponentProps<typeof DEFAULT_TAG> &
   HeadingVariants & { css?: CSS; as?: any };
 
+// eslint-disable-next-line react/display-name
 export const Heading = React.forwardRef<
   React.ElementRef<typeof DEFAULT_TAG>,
   HeadingProps
@@ -37,8 +36,6 @@ export const Heading = React.forwardRef<
   };
 
   return (
-    // TODO
-    //@ts-ignore
     <Text
       as={DEFAULT_TAG}
       {...textProps}

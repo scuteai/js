@@ -106,7 +106,6 @@ type RadioToggleProps = RadioGroupItemPrimitiveProps & {
 
 // eslint-disable-next-line react/display-name
 export const RadioToggle = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledRadio>,
   RadioToggleProps
 >((props, forwardedRef) => (

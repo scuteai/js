@@ -1,8 +1,9 @@
 import wretch, { type Wretch, type WretchError } from "wretch";
-import type { BaseHttpErrorObject, BaseResponse } from "./types/http";
+import { BaseHttpError } from "./errors";
+import type { BaseResponse } from "./types/general";
 
 export abstract class ScuteBaseHttp {
-  protected readonly wretcher: Wretch;
+  protected wretcher: Wretch;
 
   constructor(...params: Parameters<typeof wretch>) {
     this.wretcher = wretch(...params).errorType("json");
@@ -85,13 +86,12 @@ export abstract class ScuteBaseHttp {
     }
   }
 
-  private _getErrorObject(error: WretchError): BaseHttpErrorObject {
-    return {
-      status: error.status,
+  private _getErrorObject(error: WretchError): BaseHttpError {
+    return new BaseHttpError({
+      cause: error,
       message: this._getErrorMessage(error),
-      json: error.json,
-      _responseObject: error.response,
-    };
+      code: error.status,
+    });
   }
 
   private _getErrorMessage(error: WretchError) {

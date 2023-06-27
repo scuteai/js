@@ -6,18 +6,19 @@
     "dev": "pnpm turbo\\ run dev",
     "lint": "pnpm turbo\\ run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "turbo run": "turbo run --concurrency 30"
+    "turbo run": "turbo run --concurrency 30",
+    "verdaccio-start": "pnpm verdaccio --config ./verdaccio.config.yaml"
   },
   "devDependencies": {
     "@changesets/cli": "^2.26.1",
+    "@scute/eslint-config": "workspace:*",
     "@turbo/gen": "^1.10.3",
     "eslint": "^8.42.0",
-    "@scute/eslint-config": "workspace:*",
     "prettier": "^2.8.8",
-    "turbo": "^1.10.3",
     "syncpack": "^10.5.1",
-    "verdaccio": "^5.25.0",
-    "typescript": "4.9.5"
+    "turbo": "^1.10.3",
+    "typescript": "4.9.5",
+    "verdaccio": "^5.25.0"
   },
   "packageManager": "pnpm@8.4.0"
 }

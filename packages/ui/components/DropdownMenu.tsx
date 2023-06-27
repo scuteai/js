@@ -25,7 +25,6 @@ type DropdownMenuContentProps = DropdownMenuContentPrimitiveProps & {
 
 // eslint-disable-next-line react/display-name
 const DropdownMenuContent = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledContent>,
   DropdownMenuContentProps
 >((props, forwardedRef) => (
@@ -56,7 +55,6 @@ type DialogMenuCheckboxItemProps = DialogMenuCheckboxItemPrimitiveProps & {
 
 // eslint-disable-next-line react/display-name
 const DropdownMenuCheckboxItem = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledDropdownMenuCheckboxItem>,
   DialogMenuCheckboxItemProps
 >(({ children, ...props }, forwardedRef) => (
@@ -85,7 +83,6 @@ type DialogMenuRadioItemProps = DialogMenuRadioItemPrimitiveProps & {
 
 // eslint-disable-next-line react/display-name
 const DropdownMenuRadioItem = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledDropdownMenuRadioItem>,
   DialogMenuRadioItemProps
 >(({ children, ...props }, forwardedRef) => (

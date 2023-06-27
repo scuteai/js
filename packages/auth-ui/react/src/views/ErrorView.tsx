@@ -1,5 +1,5 @@
+import { type ScuteError } from "@scute/react";
 import { VIEWS } from "@scute/ui-shared";
-import { useEffect } from "react";
 import { BiometricsIcon } from "../assets/icons";
 import {
   Badge,
@@ -12,16 +12,13 @@ import {
 } from "../components";
 import type { CommonViewProps } from "./common";
 
-interface ErrorProps extends CommonViewProps {
-  error: any;
-  setError: (error: any) => void;
+interface ErrorViewProps extends Omit<CommonViewProps, "error"> {
+  error: ScuteError | null;
+  setError: (error: ScuteError | null) => void;
 }
 
-const Error = ({ email, error, setError, setAuthView }: ErrorProps) => {
-  useEffect(() => {
-    console.log(error);
-  }, [error]);
-
+const ErrorView = ({ email, error, setError, setAuthView }: ErrorViewProps) => {
+  // only fatal errors
   return (
     <>
       <Header>
@@ -49,7 +46,7 @@ const Error = ({ email, error, setError, setAuthView }: ErrorProps) => {
             variant="alt"
             size="2"
             onClick={() => {
-              setAuthView(VIEWS.LOGIN);
+              setAuthView(VIEWS.SIGN_IN);
               setError(null);
             }}
           >
@@ -61,4 +58,4 @@ const Error = ({ email, error, setError, setAuthView }: ErrorProps) => {
   );
 };
 
-export default Error;
+export default ErrorView;

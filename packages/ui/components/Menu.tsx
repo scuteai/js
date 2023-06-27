@@ -72,7 +72,6 @@ type MenuRadioItemProps = MenuRadioItemPrimitiveProps & { css?: CSS };
 
 // eslint-disable-next-line react/display-name
 export const MenuRadioItem = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledMenuRadioItem>,
   MenuRadioItemProps
 >(({ children, ...props }, forwardedRef) => (
@@ -111,7 +110,6 @@ type MenuCheckboxItemProps = MenuCheckboxItemPrimitiveProps & { css?: CSS };
 
 // eslint-disable-next-line react/display-name
 export const MenuCheckboxItem = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledMenuCheckboxItem>,
   MenuCheckboxItemProps
 >(({ children, ...props }, forwardedRef) => (

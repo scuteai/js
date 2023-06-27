@@ -1,4 +1,4 @@
-import type { UniqueIdentifier } from ".";
+import type { UniqueIdentifier } from "./general";
 import type {
   CredentialCreationOptionsJSON,
   CredentialRequestOptionsJSON,
@@ -18,8 +18,8 @@ export type ScuteWebauthnStartResponse = {
   status: "ok";
   action: "login" | "register";
   options:
-    | CredentialCreationOptionsJSON["publicKey"]
-    | CredentialRequestOptionsJSON["publicKey"];
+    | NonNullable<CredentialCreationOptionsJSON["publicKey"]>
+    | NonNullable<CredentialRequestOptionsJSON["publicKey"]>;
 };
 
 export type ScuteWebauthnCredentialsResponse = {
@@ -27,7 +27,7 @@ export type ScuteWebauthnCredentialsResponse = {
   cbt: string;
 };
 
-export type ScuteCallbackTokenResponse = {
+export type ScuteTokenPayload = {
   csrf: string;
   refresh_token: string;
   refresh_expires_at: string;
@@ -36,11 +36,18 @@ export type ScuteCallbackTokenResponse = {
   user: string;
 };
 
+export type ScuteTokenPayloadUser = {
+  uid: UniqueIdentifier;
+  email: string;
+  name: string;
+};
+
 export type ScuteSendMagicLinkResponse = {
   type: "magic_link";
-  id: string
+  id: UniqueIdentifier;
 };
-export type ScuteMagicLinkStatusValidResponse = ScuteWebauthnCredentialsResponse;
+export type ScuteMagicLinkStatusValidResponse =
+  ScuteWebauthnCredentialsResponse;
 
 export type ScuteMagicLinkVerifyWaDisabledResponse = {
   status: string;

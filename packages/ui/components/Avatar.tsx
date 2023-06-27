@@ -254,7 +254,6 @@ type AvatarOwnProps = AvatarPrimitiveProps &
 
 // eslint-disable-next-line react/display-name
 export const Avatar = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledAvatar>,
   AvatarOwnProps
 >(
@@ -293,7 +292,6 @@ export const Avatar = React.forwardRef<
               mb: "-3px",
             }}
           >
-              {/* @ts-ignore //TODO */} 
             <Status size={size && size > 2 ? "2" : "1"} variant={status} />
           </Box>
         )}

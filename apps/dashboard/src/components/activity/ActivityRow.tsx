@@ -8,16 +8,13 @@ import {
 } from "@scute/ui";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { RowHolder } from "@/components/users/UserRow";
-import Link from "next/link";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import {
   InfoGroup,
   InfoGroupContent,
   InfoGroupTitle,
 } from "@/components/shared/InfoGroup";
-
-// TODO
-import type { ScuteActivity } from "@scute/core";
+import type { ScuteActivity } from "@scute/nextjs";
 
 const StyledIcon = styled("div", {
   transition: "transform .2s ease",

@@ -62,7 +62,6 @@ type RadioCardProps = RadioGroupItemPrimitiveProps & { css?: CSS };
 
 // eslint-disable-next-line react/display-name
 export const RadioCard = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledRadio>,
   RadioCardProps
 >((props, forwardedRef) => (

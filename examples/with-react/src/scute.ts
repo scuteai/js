@@ -1,12 +1,6 @@
 import { createClient } from "@scute/react";
 
-export const scuteClient = createClient(
-  {
-    appId: "b_9kwgh2c3xmqnu7",
-    appDomain: "localhost",
-    baseUrl: "http://localhost:3001",
-  },
-  {
-    webauthn: "optional"
-  }
-);
+export const scute = createClient({
+  appId: import.meta.env.VITE_SCUTE_APP_ID as string,
+  baseUrl: import.meta.env.VITE_SCUTE_BASE_URL as string,
+});

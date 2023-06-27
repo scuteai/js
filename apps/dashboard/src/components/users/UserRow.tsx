@@ -14,12 +14,10 @@ import {
 
 import { DotsHorizontalIcon, TrashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
-
-// TODO
-import type { ScuteUser } from "@scute/core";
+import type { User } from "@scute/nextjs";
 
 type UserRowProps = {
-  user: ScuteUser;
+  user: User;
   teamMember?: boolean;
 };
 
@@ -49,7 +47,7 @@ export const UserRow = ({ user, teamMember }: UserRowProps) => {
       <Link href="/apps/s3414dfa/users/4315">
         <Flex css={{ gap: "$2", ai: "center", color: "$gray12" }}>
           <Avatar fallback="UK" size="2" shape="square" />
-          {user.username}
+          {user.name}
         </Flex>
       </Link>
       <Flex>
@@ -58,7 +56,7 @@ export const UserRow = ({ user, teamMember }: UserRowProps) => {
           css={{ fontFamily: "$mono", userSelect: "all" }}
           size="0"
         >
-          {user.id}
+          {user.uid}
         </Badge>
       </Flex>
       <Flex>4 days ago</Flex>

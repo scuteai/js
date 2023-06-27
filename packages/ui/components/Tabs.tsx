@@ -146,14 +146,12 @@ type TabsListProps = TabsListPrimitiveProps & { css?: CSS };
 
 // eslint-disable-next-line react/display-name
 export const TabsList = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledTabsList>,
   TabsListProps
 >((props, forwardedRef) => <StyledTabsList {...props} ref={forwardedRef} />);
 
 // eslint-disable-next-line react/display-name
 export const SlimTabsList = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof SlimStyledTabsList>,
   TabsListProps
 >((props, forwardedRef) => (

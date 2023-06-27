@@ -5,4 +5,5 @@ export interface CommonViewProps {
   scuteClient: ScuteClient;
   email: string;
   setAuthView: (view: Views) => void;
+  error?: string | null;
 }

@@ -16,7 +16,6 @@ type AccordionProps = AccordionPrimitiveProps & { css?: CSS };
 
 // eslint-disable-next-line react/display-name
 export const Accordion = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledAccordion>,
   AccordionProps
 >(({ children, ...props }, forwardedRef) => (
@@ -106,7 +105,6 @@ type AccordionTriggerProps = AccordionTriggerPrimitiveProps & {
 
 // eslint-disable-next-line react/display-name
 export const AccordionTrigger = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledTrigger>,
   AccordionTriggerProps
 >(({ children, ...props }, forwardedRef) => (

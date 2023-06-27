@@ -115,6 +115,7 @@ export const CustomSelectItem: React.ForwardRefExoticComponent<
   Select.SelectItemProps &
     CustomSelectItemProps &
     React.RefAttributes<HTMLDivElement>
+    // eslint-disable-next-line react/display-name
 > = React.forwardRef(({ children, className, ...props }, forwardedRef) => {
   return (
     <CustomSelectItemHolder className={className} {...props} ref={forwardedRef}>
@@ -134,7 +135,6 @@ type CustomSelectProps = React.ComponentProps<typeof StyledCustomSelectRoot> & {
 
 // eslint-disable-next-line react/display-name
 export const CustomSelect = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledCustomSelectRoot>,
   CustomSelectProps
 >(({ css, ...props }, forwardedRef) => (

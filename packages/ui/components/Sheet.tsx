@@ -115,7 +115,6 @@ type SheetContentProps = DialogContentPrimitiveProps &
 
 // eslint-disable-next-line react/display-name
 const SheetContent = React.forwardRef<
-//@ts-ignore // TODO
   React.ElementRef<typeof StyledContent>,
   SheetContentProps
 >(({ children, ...props }, forwardedRef) => (

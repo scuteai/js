@@ -52,7 +52,6 @@ type DialogContentProps = DialogContentPrimitiveProps & { css?: CSS };
 
 // eslint-disable-next-line react/display-name
 const DialogContent = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledContent>,
   DialogContentProps
 >(({ children, ...props }, forwardedRef) => (

@@ -1,7 +1,5 @@
-export const Logo = (props:any) => {
-
-  const {webauthnSupport} = props
-  const centerColor = webauthnSupport ? '#98E6E6' : 'red'
+export const Logo = ({ webauthnAvailable }: { webauthnAvailable: boolean }) => {
+  const centerColor = webauthnAvailable ? "#98E6E6" : "red";
 
   return (
     <svg

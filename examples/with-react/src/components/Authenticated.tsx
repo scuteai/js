@@ -6,7 +6,7 @@ const AuthenticatedRoute = () => {
   if (session.status === "loading") {
     return null;
   } else if (session.status === "unauthenticated") {
-    return "unauthenticated";
+    return <>unauthenticated</>;
   }
 
   return (

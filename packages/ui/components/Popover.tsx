@@ -29,7 +29,6 @@ type PopoverContentProps = PopoverContentPrimitiveProps & {
 
 // eslint-disable-next-line react/display-name
 const PopoverContent = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledContent>,
   PopoverContentProps
 >(({ children, hideArrow, ...props }, fowardedRef) => (

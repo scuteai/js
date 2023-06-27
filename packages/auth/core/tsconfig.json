@@ -1,5 +1,8 @@
 {
   "extends": "@scute/tsconfig/base-library.json",
   "include": ["src"],
+  "compilerOptions": {
+    "target": "ES2017"
+  },
   "exclude": ["dist", "build", "node_modules"]
 }

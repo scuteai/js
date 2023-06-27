@@ -1,6 +1,6 @@
 {
   "name": "@scute/react",
-  "version": "0.0.0",
+  "version": "0.1.1",
   "publishConfig": {},
   "files": [
     "dist"
@@ -13,13 +13,12 @@
   },
   "types": "./dist/index.d.ts",
   "scripts": {
-    "tsup-build": "tsup src/index.ts --format cjs,esm",
+    "tsup-build": "tsup src/index.ts --format cjs,esm --dts",
     "build": "pnpm tsup-build --dts-resolve",
     "dev": "pnpm tsup-build --watch",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "axios": "^1.4.0",
     "@scute/core": "workspace:*"
   },
   "peerDependencies": {

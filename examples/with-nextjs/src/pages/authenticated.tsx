@@ -1,4 +1,4 @@
-import { useAuth } from "@scute/react";
+import { useAuth } from "@scute/nextjs";
 
 const AuthenticatedRoute = () => {
   const { session, user, signOut } = useAuth();

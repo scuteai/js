@@ -1,13 +1,21 @@
-import { Content, Container, Grid } from "@scute/ui";
+import { Content, Container } from "@scute/ui";
 import { AppLayout } from "@/components/shared/AppLayout";
-// import { ProfileElement } from "../utils/ProfileElement";
+import { darkTheme, Profile } from "@scute/ui-react";
+import { useScuteClient } from "@scute/nextjs";
 
-export default function Profile() {
+export default function ProfilePage() {
+  const scuteClient = useScuteClient();
+
   return (
     <AppLayout>
       <Content css={{ py: "$6" }}>
         <Container size="3">
-          {/* <ProfileElement /> */}
+          <Profile
+            scuteClient={scuteClient}
+            appearance={{
+              //theme: darkTheme,
+            }}
+          />
         </Container>
       </Content>
     </AppLayout>

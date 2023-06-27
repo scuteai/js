@@ -104,6 +104,7 @@ export const IconHolder = styled("div", {
     animation: `${bell} 10s ease-in-out infinite`,
   },
 });
+
 export const panelStyles = css({
   backgroundColor: "$panel",
   borderRadius: "$3",
@@ -118,6 +119,6 @@ export const panelStyles = css({
       },
     },
   },
-}) as any; // TODO;
+});
 
 export const Panel = styled("div", panelStyles);

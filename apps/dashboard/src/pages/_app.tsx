@@ -1,11 +1,10 @@
 import "../styles/globals.scss";
 import type { AppProps } from "next/app";
-import React from "react";
+import React, { useState } from "react";
 import Head from "next/head";
 import { DesignSystemProvider } from "@scute/ui";
 import { globalCss } from "../styles/stitches.config";
-import { scuteClient } from "@/scute";
-import { AuthContextProvider } from "@scute/react";
+import { AuthContextProvider, createPagesBrowserClient } from "@scute/nextjs";
 
 const globalStyles = globalCss({
   "*, *::before, *::after": {
@@ -50,6 +49,13 @@ const globalStyles = globalCss({
 });
 
 export default function App({ Component, pageProps }: AppProps) {
+  const [scuteClient] = useState(() =>
+    createPagesBrowserClient({
+      appId: process.env.NEXT_PUBLIC_SCUTE_APP_ID as string,
+      baseUrl: process.env.NEXT_PUBLIC_SCUTE_BASE_URL as string,
+    })
+  );
+
   globalStyles();
   return (
     <AuthContextProvider scuteClient={scuteClient}>

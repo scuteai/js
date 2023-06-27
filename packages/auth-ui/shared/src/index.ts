@@ -1,3 +1,3 @@
-export * from "./stitches.config"; // TODO: temp
+export { config as __stitchesConfig, shadowCreator } from "./stitches.config";
 export * from "./themes";
 export * from "./constants";

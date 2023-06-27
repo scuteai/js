@@ -44,7 +44,7 @@ const MagicPending = ({ email, setAuthView }: MagicLinkProps) => {
           <Badge size="1">{email}</Badge>
         </Flex>
         <Flex css={{ jc: "space-between" }}>
-          <Button variant="alt" onClick={() => setAuthView(VIEWS.LOGIN)}>
+          <Button variant="alt" onClick={() => setAuthView(VIEWS.SIGN_IN)}>
             Change email
           </Button>
           <Button variant="alt" disabled>

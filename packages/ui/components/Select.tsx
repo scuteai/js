@@ -50,7 +50,6 @@ type SelectProps = React.ComponentProps<typeof StyledSelect> & { css?: CSS };
 
 // eslint-disable-next-line react/display-name
 export const Select = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof StyledSelect>,
   SelectProps
 >(({ css, ...props }, forwardedRef) => (

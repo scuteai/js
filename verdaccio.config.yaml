@@ -1,0 +1,9 @@
+storage: node_modules/.cache/verdaccio/storage
+auth:
+  htpasswd:
+    file: node_modules/.cache/verdaccio/htpasswd
+packages:
+  "@scute/*":
+    access: $all
+    publish: $all
+log: { type: stdout, format: pretty, level: http }

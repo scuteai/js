@@ -1,51 +1,50 @@
 import { useEffect, useState, createContext, useContext } from "react";
 import {
   ScuteClient,
-  type ScuteClientConfig,
-  type ScuteUser,
+  ScuteSession,
+  type User,
   type Session,
 } from "@scute/core";
 
-export interface AuthSession {
-  user: ScuteUser | null;
+export type AuthSession = {
   session: Session;
-  signOut: () => void;
-}
-
-const AuthContext = createContext<AuthSession | undefined>(undefined);
-
-export type AuthContextProviderProps = {
-  children?: React.ReactElement;
+  signOut: () => ReturnType<ScuteClient["signOut"]>;
 } & (
   | {
-      scuteClient?: undefined;
-      scuteClientConfig: ScuteClientConfig;
+      user: null;
+      isAuthenticated: false;
+      isLoading: false;
     }
   | {
-      scuteClient: ScuteClient;
-      scuteClientConfig?: undefined;
+      user: null;
+      isAuthenticated: false;
+      isLoading: true;
+    }
+  | {
+      user: User;
+      isAuthenticated: true;
+      isLoading: false;
     }
 );
 
-export const AuthContextProvider = (props: AuthContextProviderProps) => {
-  const { scuteClient: _scuteClient, scuteClientConfig, children } = props;
-  const [scuteClient] = useState(
-    () => _scuteClient ?? new ScuteClient(scuteClientConfig)
-  );
+const AuthContext = createContext<AuthSession | undefined>(undefined);
+const ScuteClientContext = createContext<ScuteClient | undefined>(undefined);
 
-  const [session, setSession] = useState<AuthSession["session"]>({
-    access: null,
-    refresh: null,
-    csrf: null,
-    accessExpiresAt: null,
-    refreshExpiresAt: null,
-    user: null,
+export type AuthContextProviderProps = {
+  scuteClient: ScuteClient;
+  children?: React.ReactElement;
+};
+
+export const AuthContextProvider = ({
+  scuteClient,
+  children,
+}: AuthContextProviderProps) => {
+  const [session, setSession] = useState<Session>({
+    ...ScuteSession.unAuthenticatedState(),
     status: "loading",
   });
 
-  const [user, setUser] = useState<AuthSession["user"] | null>(
-    session?.user ?? null
-  );
+  const [user, setUser] = useState<(typeof session)["user"]>(session.user);
 
   useEffect(() => {
     const unsubscribe = scuteClient.onAuthStateChange(
@@ -62,23 +61,42 @@ export const AuthContextProvider = (props: AuthContextProviderProps) => {
     })();
 
     return () => unsubscribe();
+  }, [scuteClient]);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const isAuthenticated = session.status === "authenticated";
+  const isLoading = session.status === "loading";
 
-  const value = {
+  const authContextValue = {
     session,
     user,
+    isAuthenticated,
+    isLoading,
     signOut: () => scuteClient.signOut(),
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <ScuteClientContext.Provider value={scuteClient}>
+      <AuthContext.Provider value={authContextValue as any}>
+        {children}
+      </AuthContext.Provider>
+    </ScuteClientContext.Provider>
+  );
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error(`useAuth must be used within a AuthContextProvider.`);
+  }
+  return context;
+};
+
+export const useScuteClient = () => {
+  const context = useContext(ScuteClientContext);
+  if (context === undefined) {
+    throw new Error(
+      `useScuteClient must be used within a AuthContextProvider.`
+    );
   }
   return context;
 };

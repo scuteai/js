@@ -19,9 +19,7 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@scute/ui";
-
-// TODO
-import type { ScuteUser } from "@scute/core";
+import type { User } from "@scute/nextjs";
 
 const app: ScuteApp = {
   id: "s3414dfa1",
@@ -30,10 +28,10 @@ const app: ScuteApp = {
   url: "example.scute.io",
 };
 
-const appUser: ScuteUser = {
-  id: "fadfad41",
+const appUser: User = {
+  uid: "fadfad41",
   email: "imitkit@gmail.com",
-  username: "umitkit",
+  name: "umitkit",
 };
 
 export default function AppSingleUsers() {

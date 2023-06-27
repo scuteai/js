@@ -1,3 +1,5 @@
+import { type ScuteTokenPayloadUser } from "@scute/react";
+import { VIEWS } from "@scute/ui-shared";
 import { FingerprintIcon, MagicMailIcon } from "../assets/icons";
 import {
   Button,
@@ -10,17 +12,28 @@ import {
   Text,
   TextField,
 } from "../components";
+import type { CommonViewProps } from "./common";
 import RememberedUserPanel from "./RememberedUserPanel";
 
-const Login = ({
+interface SignInProps extends CommonViewProps {
+  handleEmailChange: React.ChangeEventHandler<HTMLInputElement>;
+  handleSignIn: () => void;
+  webauthnAvailable: boolean;
+  rememberedUser?: ScuteTokenPayloadUser | null;
+  resetRememberedUser: () => void;
+}
+
+const SignIn = ({
   email,
+  scuteClient,
+  setAuthView,
   handleEmailChange,
-  handleLogin,
+  handleSignIn,
   error,
-  maybeWebauthn,
-  remember,
-  resetHandler,
-}: any) => {
+  webauthnAvailable,
+  rememberedUser,
+  resetRememberedUser,
+}: SignInProps) => {
   return (
     <>
       <Header>
@@ -29,57 +42,80 @@ const Login = ({
         </Flex>
       </Header>
       <Inner>
-        {remember ? (
-          <RememberedUserPanel remembered={remember} />
-        ) : (
-          <>
-            <Heading size="1" css={{ color: "$headingColor" }}>
-              Welcome
-            </Heading>
-            <Text css={{ color: "$textColor" }}>
-              Sign in to your account using your email
-            </Text>
-            <Group>
-              <Label>Email address</Label>
-              <TextField
-                name="email"
-                type="text"
-                size="2"
-                autoFocus={true}
-                required
-                placeholder="example@email.com"
-                value={email}
-                onChange={handleEmailChange}
-                state={error ? "invalid" : "valid"}
-              />
-              {error && (
-                <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                  {error}
-                </Text>
-              )}
-            </Group>
-          </>
-        )}
-        <Flex>
-          {maybeWebauthn ? (
-            <Button size="2" onClick={() => handleLogin()} disabled={!!error}>
-              <span>Continue</span>
-              <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
-            </Button>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSignIn();
+          }}
+        >
+          {rememberedUser ? (
+            <RememberedUserPanel
+              user={rememberedUser}
+              resetHandler={() => resetRememberedUser()}
+            />
           ) : (
-            <Button size="2" onClick={() => handleLogin()}>
-              <span>Continue with magic link</span>
-              <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
-            </Button>
+            <>
+              <Heading size="1" css={{ color: "$headingColor" }}>
+                Welcome
+              </Heading>
+              <Text css={{ color: "$textColor" }}>
+                Sign in to your account using your email
+              </Text>
+
+              <Group>
+                <Label>Email address</Label>
+                <TextField
+                  name="email"
+                  type="text"
+                  size="2"
+                  autoFocus={true}
+                  autoComplete="webauthn"
+                  required
+                  placeholder="example@email.com"
+                  value={email}
+                  onChange={handleEmailChange}
+                  state={error ? "invalid" : "valid"}
+                />
+                {error && (
+                  <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                    {error}
+                  </Text>
+                )}
+              </Group>
+            </>
           )}
+          <Flex>
+            {webauthnAvailable ? (
+              <Button size="2" type="submit" disabled={!!error}>
+                <span>Continue</span>
+                <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
+              </Button>
+            ) : (
+              <Button size="2" type="submit">
+                <span>Continue with magic link</span>
+                <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
+              </Button>
+            )}
+          </Flex>
+        </form>
+
+        {rememberedUser ? <Flex css={{ pt: "$3", jc: "center" }}></Flex> : ""}
+
+        <Flex css={{ pt: "$4", jc: "center" }}>
+          <Text
+            onClick={() => setAuthView(VIEWS.SIGN_UP)}
+            size="1"
+            css={{ textDecoration: "underline", cursor: "pointer" }}
+          >
+            Don&#39;t have an account ? Sign Up
+          </Text>
         </Flex>
-        {remember ? <Flex css={{ pt: "$3", jc: "center" }}></Flex> : ""}
       </Inner>
     </>
   );
 };
 
-export default Login;
+export default SignIn;
 
 const TempAvatar = () => (
   <svg

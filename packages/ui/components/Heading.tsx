@@ -16,7 +16,6 @@ type HeadingProps = React.ComponentProps<typeof DEFAULT_TAG> &
 
 // eslint-disable-next-line react/display-name
 export const Heading = React.forwardRef<
-  //@ts-ignore // TODO
   React.ElementRef<typeof DEFAULT_TAG>,
   HeadingProps
 >((props, forwardedRef) => {

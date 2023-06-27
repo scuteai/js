@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { Auth } from "@scute/ui-react";
-import { useAuth } from "@scute/react";
-import { scuteClient } from "@/scute";
+import { useAuth, useScuteClient } from "@scute/nextjs";
 
 export default function Home() {
   const router = useRouter();
+  const scute = useScuteClient();
   const { session } = useAuth();
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function Home() {
       }}
     >
       <Auth
-        scuteClient={scuteClient}
+        scuteClient={scute}
         // onSignIn={() => {
         //   router.push("/authenticated");
         // }}

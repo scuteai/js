@@ -1,25 +1,13 @@
 import { Auth } from "@scute/ui-react";
-import AuthenticatedRoute from "./components/Authenticated";
-import { scuteClient } from "./scute";
+import WithCustomUI from "./components/WithCustomUI";
+import WithScuteUI from "./components/WithScuteUI";
+import { scute } from "./scute";
 
 export default function App() {
-  const { session } = Auth.useAuth();
-
-  if (session.status === "authenticated") {
-    //@ts-ignore
-    return <AuthenticatedRoute />;
-  }
-
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-      }}
-    >
-      <Auth scuteClient={scuteClient} />
-    </div>
+    <Auth.ContextProvider scuteClient={scute}>
+      <WithCustomUI />
+      {/* <WithScuteUI /> */}
+    </Auth.ContextProvider>
   );
 }

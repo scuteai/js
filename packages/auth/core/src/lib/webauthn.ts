@@ -1,3 +1,4 @@
-export * from "@github/webauthn-json/browser-ponyfill";
-import * as webauthn from "@github/webauthn-json/browser-ponyfill";
+export * from "@github/webauthn-json";
+import * as webauthn from "@github/webauthn-json";
+
 export default webauthn;

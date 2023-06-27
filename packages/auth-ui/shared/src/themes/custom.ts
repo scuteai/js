@@ -1,8 +1,10 @@
-export const customTheme = {
+import type { Theme } from ".";
+
+export const customTheme: Theme = {
   colors: {
-    hiContrast: 'hsl(206,2%,93%)',
-    loContrast: 'hsl(206,8%,8%)',
-    cardBg:'red',
+    hiContrast: "hsl(206,2%,93%)",
+    loContrast: "hsl(206,8%,8%)",
+    cardBg: "red",
     contrast0: "#ffffff",
     contrast1: "#EDEDED",
     contrast2: "#DEDEDE",
@@ -17,4 +19,4 @@ export const customTheme = {
   },
   space: {},
   fonts: {},
-}
+};

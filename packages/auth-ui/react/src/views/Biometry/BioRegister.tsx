@@ -1,4 +1,3 @@
-import { VIEWS } from "@scute/ui-shared";
 import { BiometricsIcon } from "../../assets/icons";
 import {
   Badge,
@@ -19,6 +18,7 @@ interface BioRegisterProps extends CommonViewProps {
 
 const BioRegister = ({
   email,
+  error,
   scuteClient,
   setAuthView,
   isWebauthnOptional,
@@ -33,24 +33,30 @@ const BioRegister = ({
       css={{ display: "flex", jc: "center", fd: "column", textAlign: "center" }}
     >
       <Heading size="1" css={{ color: "$headingColor" }}>
-        Let's register your device
+        Let&#39;s register your device
       </Heading>
-      <Text css={{ color: "$textColor" }}>
-        Log into your account with the method you already use to unlock your
-        device
-      </Text>
+      {error ? (
+        <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
+          An error occurred while registering your device
+        </Text>
+      ) : (
+        <Text css={{ color: "$textColor" }}>
+          Log into your account with the method you already use to unlock your
+          device
+        </Text>
+      )}
       <Flex css={{ jc: "center", py: "$5" }}>
         <Badge size="1">{email}</Badge>
       </Flex>
-      <Flex css={{ jc: "space-between" }}>
+      <Flex css={{ jc: "space-around" }}>
         <Button variant="alt" onClick={() => registerDevice()}>
-          Register Device
+          {!error ? "Register Device" : "Try Again"}
         </Button>
-        {isWebauthnOptional && (
+        {isWebauthnOptional || error ? (
           <Button variant="alt" onClick={() => skipAndLogin()}>
             Skip and login
           </Button>
-        )}
+        ) : null}
       </Flex>
     </Inner>
   </>

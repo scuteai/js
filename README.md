@@ -1,81 +1,95 @@
-# Turborepo starter
+# Scute Monorepo
 
-This is an official starter Turborepo.
-
-## Using this example
-
-Run the following command:
-
-```sh
-npx create-turbo@latest
-```
-
-## What's inside?
-
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `ui`: a stub React component library shared by both `web` and `docs` applications
-- `eslint-config-custom`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `tsconfig`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
+## Monorepo Structure
 
 ```
-cd my-turborepo
-pnpm build
+├── apps
+│   ├── dashboard
+├── examples
+│   ├── with-nextjs
+│   ├── with-nodejs
+│   ├── with-react
+├── packages
+│   ├── auth
+│   │   ├── core
+│   │   ├── edge
+│   │   ├── nextjs
+│   │   ├── node
+│   │   ├── react
+│   ├── auth-ui
+│   │   ├── react
+│   │   ├── shared
+├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── turbo.json
+├── .gitignore
+└── ...
 ```
 
-### Develop
+## Examples
 
-To develop all apps and packages, run the following command:
+`with-nextjs`, `with-nodejs`,`with-react`
 
-```
-cd my-turborepo
-pnpm dev
-```
-
-### Remote Caching
-
-Turborepo can use a technique known as [Remote Caching](https://turbo.build/repo/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup), then enter the following commands:
-
-```
-cd my-turborepo
-npx turbo login
+Install with no lockfile.
+```bash
+yarn install --no-lockfile
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+Set environment variables.
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
+Start dev server
+```bash
+yarn dev
 ```
-npx turbo link
+
+## Development Guide
+
+It's recommended that using local npm registry server in order to test distributed packages.
+
+### `verdaccio`
+
+https://verdaccio.org/docs/what-is-verdaccio
+
+#### Start `verdaccio` Local Registry Server
+
+`pnpm verdaccio-start`
+
+#### Publish packages to `verdaccio` local registry
+
+Login with 
+```bash 
+pnpm login --registry http://localhost:4873
 ```
 
-## Useful Links
+Make sure that you are in the right package to publish and run
+```bash
+pnpm publish --registry http://localhost:4873
+```
 
-Learn more about the power of Turborepo:
+Then add this to namespace and registry to the example project's `.npmrc`  in order to test.  
 
-- [Tasks](https://turbo.build/repo/docs/core-concepts/monorepos/running-tasks)
-- [Caching](https://turbo.build/repo/docs/core-concepts/caching)
-- [Remote Caching](https://turbo.build/repo/docs/core-concepts/remote-caching)
-- [Filtering](https://turbo.build/repo/docs/core-concepts/monorepos/filtering)
-- [Configuration Options](https://turbo.build/repo/docs/reference/configuration)
-- [CLI Usage](https://turbo.build/repo/docs/reference/command-line-reference)
+With this package manager will download packages from the local registry instead of `npmjs.com`
+
+```bash
+@scute:registry=http://localhost:4873
+```
+
+### `changesets` and release flow
+
+#### Adding new changesets
+To generate a new changeset, run `pnpm changeset` in the root of the repository. The generated markdown files in the `.changeset` directory should be committed to the repository.
+
+#### Releasing changes
+1. Run `pnpm changeset version`. This will bump the versions of the packages previously specified with `pnpm changeset` (and any dependents of those) and update the changelog files.
+2. Run `pnpm install`. This will update the lockfile and rebuild packages.
+3. Commit the changes.
+4. Run `pnpm publish -r`. This command will publish all packages that have bumped versions not yet present in the registry.
+5. You can publish to local `verdaccio` registry server with `pnpm publish -r --registry http://localhost:4873` command.
+
+
+Docs
+
+https://github.com/changesets/changesets/blob/main/docs/intro-to-using-changesets.md
+
+https://pnpm.io/using-changesets

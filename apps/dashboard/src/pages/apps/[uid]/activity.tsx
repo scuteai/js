@@ -14,9 +14,7 @@ import { AppSidebar } from "@/components/shared/AppSidebar";
 import {  ScuteApp } from "@/types";
 import { ActivityRow } from "@/components/activity/ActivityRow";
 import { TableHeader, TableContent } from "@/components/shared/InfoGroup";
-
-// TODO
-import type { ScuteActivity } from "@scute/core";
+import type { ScuteActivity } from "@scute/nextjs";
 
 const app: ScuteApp = {
   id: "s3414dfa1",
