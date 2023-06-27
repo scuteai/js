@@ -1,7 +1,3 @@
-import {
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-} from "@github/webauthn-json/dist/types/basic/json";
 import { BroadcastChannel } from "broadcast-channel";
 import mitt, { type Emitter, type Handler } from "mitt";
 
@@ -110,15 +106,6 @@ export class ScuteClient extends ScuteBaseHttp {
         this._setupSessionBroadcast();
       }
       return this._getSessionFromUrl();
-      // const { data, error } = await this._getSessionFromUrl();
-      // if (error) return { data, error };
-
-      // return {
-      //   data: {
-      //     urlSessionData: data,
-      //   },
-      //   error,
-      // };
     }
 
     return { data: null, error: null };
