@@ -353,7 +353,7 @@ export class ScuteClient extends ScuteBaseHttp {
     } = await this.getSession();
 
     if (sessionError) {
-      return { error: sessionError };
+      return { data: null, error: sessionError };
     }
 
     return this._addDevice(session.access!);
