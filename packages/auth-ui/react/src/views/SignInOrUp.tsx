@@ -1,5 +1,4 @@
-import { type ScuteTokenPayloadUser } from "@scute/react";
-import { VIEWS } from "@scute/ui-shared";
+import { ScuteIdentifier } from "@scute/react";
 import { FingerprintIcon, MagicMailIcon } from "../assets/icons";
 import {
   Button,
@@ -13,26 +12,26 @@ import {
   TextField,
 } from "../components";
 import type { CommonViewProps } from "./common";
-import RememberedUserPanel from "./RememberedUserPanel";
+import RememberedIdentifierPanel from "./RememberedIdentifierPanel";
 
 interface SignInProps extends CommonViewProps {
   handleEmailChange: React.ChangeEventHandler<HTMLInputElement>;
-  handleSignIn: () => void;
+  handleSignInOrUp: () => void;
   webauthnAvailable: boolean;
-  rememberedUser?: ScuteTokenPayloadUser | null;
-  resetRememberedUser: () => void;
+  rememberedIdentifier?: ScuteIdentifier | null;
+  resetRememberedIdentifier: () => void;
 }
 
 const SignIn = ({
-  email,
+  identifier,
   scuteClient,
   setAuthView,
   handleEmailChange,
-  handleSignIn,
+  handleSignInOrUp,
   error,
   webauthnAvailable,
-  rememberedUser,
-  resetRememberedUser,
+  rememberedIdentifier,
+  resetRememberedIdentifier,
 }: SignInProps) => {
   return (
     <>
@@ -45,13 +44,13 @@ const SignIn = ({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleSignIn();
+            handleSignInOrUp();
           }}
         >
-          {rememberedUser ? (
-            <RememberedUserPanel
-              user={rememberedUser}
-              resetHandler={() => resetRememberedUser()}
+          {rememberedIdentifier ? (
+            <RememberedIdentifierPanel
+              identifier={rememberedIdentifier}
+              resetHandler={() => resetRememberedIdentifier()}
             />
           ) : (
             <>
@@ -72,7 +71,7 @@ const SignIn = ({
                   autoComplete="webauthn"
                   required
                   placeholder="example@email.com"
-                  value={email}
+                  value={identifier}
                   onChange={handleEmailChange}
                   state={error ? "invalid" : "valid"}
                 />
@@ -99,17 +98,11 @@ const SignIn = ({
           </Flex>
         </form>
 
-        {rememberedUser ? <Flex css={{ pt: "$3", jc: "center" }}></Flex> : ""}
-
-        <Flex css={{ pt: "$4", jc: "center" }}>
-          <Text
-            onClick={() => setAuthView(VIEWS.SIGN_UP)}
-            size="1"
-            css={{ textDecoration: "underline", cursor: "pointer" }}
-          >
-            Don&#39;t have an account ? Sign Up
-          </Text>
-        </Flex>
+        {rememberedIdentifier ? (
+          <Flex css={{ pt: "$3", jc: "center" }}></Flex>
+        ) : (
+          ""
+        )}
       </Inner>
     </>
   );

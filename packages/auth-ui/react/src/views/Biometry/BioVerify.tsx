@@ -13,32 +13,17 @@ import {
 } from "../../components";
 import { type CommonViewProps } from "../common";
 
-interface BioVerifyProps extends CommonViewProps {}
+interface BioVerifyProps extends CommonViewProps {
+  sendMagicLink: () => void;
+}
 
 const BioVerify = ({
   scuteClient,
-  email,
+  identifier,
   error,
   setAuthView,
+  sendMagicLink,
 }: BioVerifyProps) => {
-  const [timeLeft, setTimeLeft] = useState(8);
-  const sendMagicLink = () => scuteClient.sendMagicLink(email);
-
-  useEffect(() => {
-    const timerId = setTimeout(() => {
-      if (timeLeft > 0) {
-        setTimeLeft(timeLeft - 1);
-      }
-    }, 1000);
-
-    if (timeLeft === 0) {
-      sendMagicLink();
-    }
-
-    return () => clearTimeout(timerId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft]);
-
   return (
     <>
       <Header>
@@ -58,8 +43,7 @@ const BioVerify = ({
 
         {error ? (
           <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-            An error occurred while verifying your identity, we will be sending
-            a magic link in your email in {timeLeft} seconds.
+            An error occurred while verifying your identity. You can try again or sign in with magic link.
           </Text>
         ) : (
           <Text css={{ color: "$textColor" }}>
@@ -68,10 +52,13 @@ const BioVerify = ({
           </Text>
         )}
         <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{email}</Badge>
+          <Badge size="1">{identifier}</Badge>
         </Flex>
         <Flex css={{ jc: "space-around" }}>
-          <Button variant="alt" onClick={() => setAuthView(VIEWS.SIGN_IN)}>
+          <Button
+            variant="alt"
+            onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
+          >
             Change email
           </Button>
           <Button variant="alt" onClick={() => sendMagicLink()}>

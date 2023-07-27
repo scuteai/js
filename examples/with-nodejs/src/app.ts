@@ -1,8 +1,11 @@
-/* eslint-disable turbo/no-undeclared-env-vars */
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { createClient, scuteAuthMiddleware } from "@scute/node";
+import {
+  createClient,
+  authenticateRequest,
+  scuteAuthMiddleware,
+} from "@scute/node";
 
 const scute = createClient({
   appId: process.env.SCUTE_APP_ID as string,
@@ -17,8 +20,13 @@ app.get("/", (req, res) => {
   res.send("Hello world!");
 });
 
+app.get("/authenticated-route", async (req, res) => {
+  const { data: user } = await authenticateRequest(req, scute);
+  res.send(user);
+});
+
 app.get(
-  "/authenticated-route",
+  "/authenticated-route-middleware",
   scuteAuthMiddleware(scute),
   async (req, res) => {
     const user = (req as any).user;

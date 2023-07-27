@@ -3,14 +3,14 @@ import { ScuteCookieStorage, ScuteStorage } from "./ScuteBaseStorage";
 import {
   SCUTE_ACCESS_STORAGE_KEY,
   SCUTE_CSRF_STORAGE_KEY,
+  SCUTE_LAST_LOGIN_STORAGE_KEY,
   SCUTE_REFRESH_STORAGE_KEY,
-  SCUTE_USER_STORAGE_KEY,
 } from "./constants";
 import type {
   UniqueIdentifier,
   Session,
   ScuteSessionConfig,
-  ScuteTokenPayloadUser,
+  ScuteIdentifier,
 } from "./types";
 import { isBrowser } from "./helpers";
 
@@ -23,48 +23,47 @@ export class ScuteSession {
     this.scuteStorage = config.storage;
   }
 
-  private get isCookieStorage() {
-    return this.scuteStorage instanceof ScuteCookieStorage;
-  }
-
   async initialState(): Promise<Session> {
     const browser = isBrowser();
 
     const access = await this.scuteStorage.getItem(SCUTE_ACCESS_STORAGE_KEY);
     const refresh = await this.scuteStorage.getItem(SCUTE_REFRESH_STORAGE_KEY);
-    const user = await this.getRememberedUser();
     const csrf = await this.scuteStorage.getItem(SCUTE_CSRF_STORAGE_KEY);
 
-    if (!access || (!refresh && !browser) || !csrf) {
+    const accessPayload = access ? jwtDecode<any>(access) : null;
+
+    if (
+      !access ||
+      (!refresh && !browser) ||
+      !csrf ||
+      !accessPayload ||
+      !accessPayload.exp
+    ) {
       await this.removeSession();
       return ScuteSession.unAuthenticatedState();
     }
 
-    const { exp: accessExpiresAt } = jwtDecode(access) as any;
+    const { exp: accessExpiresAt } = accessPayload;
     const { exp: refreshExpiresAt } =
-      !browser && refresh ? (jwtDecode(refresh) as any) : ({} as any);
+      !browser && refresh ? (jwtDecode<any>(refresh)) : ({} as any);
 
     return {
       access,
-      accessExpiresAt: accessExpiresAt
-        ? new Date(accessExpiresAt * 1000)
-        : null,
+      accessExpiresAt: new Date(accessExpiresAt * 1000),
       refresh,
       refreshExpiresAt: refreshExpiresAt
         ? new Date(refreshExpiresAt * 1000)
         : null,
       csrf,
-      user,
       status: "authenticated",
     };
   }
 
-  async sync(session: Session | null): Promise<void> {
+  async sync(session: Session | null) {
     if (
       !session ||
       !session.access ||
       (!session.refresh && !isBrowser()) ||
-      !session.user ||
       !session.csrf ||
       session.status === "unauthenticated"
     ) {
@@ -83,7 +82,6 @@ export class ScuteSession {
     this.scuteStorage.removeItem(SCUTE_REFRESH_STORAGE_KEY, {
       httpOnly: !browser ? true : undefined,
     });
-    // this.scuteStorage.removeItem(SCUTE_USER_STORAGE_KEY);
     this.scuteStorage.removeItem(SCUTE_CSRF_STORAGE_KEY, {
       httpOnly: !browser ? false : undefined,
     });
@@ -92,8 +90,7 @@ export class ScuteSession {
   async saveSession(state: Session): Promise<void> {
     const browser = isBrowser();
 
-    const { access, accessExpiresAt, refresh, refreshExpiresAt, csrf, user } =
-      state;
+    const { access, accessExpiresAt, refresh, refreshExpiresAt, csrf } = state;
 
     if (access) {
       const expires: Date =
@@ -114,17 +111,6 @@ export class ScuteSession {
         httpOnly: !browser ? true : undefined,
       });
 
-      if (user) {
-        this.scuteStorage.setItem(
-          SCUTE_USER_STORAGE_KEY,
-          JSON.stringify(user),
-          {
-            expires,
-            // TODO: httpOnly: !browser ? false : undefined,
-          }
-        );
-      }
-
       if (csrf) {
         this.scuteStorage.setItem(SCUTE_CSRF_STORAGE_KEY, csrf, {
           expires,
@@ -134,10 +120,12 @@ export class ScuteSession {
     }
   }
 
-  async getRememberedUser(): Promise<ScuteTokenPayloadUser> {
-    const cookieVal = await this.scuteStorage.getItem(SCUTE_USER_STORAGE_KEY);
-    const user = cookieVal ? JSON.parse(cookieVal) : null;
-    return user;
+  async setRememberedIdentifier(identifier: ScuteIdentifier): Promise<void> {
+    return this.scuteStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier);
+  }
+
+  async getRememberedIdentifier(): Promise<ScuteIdentifier | null> {
+    return this.scuteStorage.getItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
   }
 
   static unAuthenticatedState(): Session {
@@ -147,7 +135,6 @@ export class ScuteSession {
       refresh: null,
       refreshExpiresAt: null,
       csrf: null,
-      user: null,
       status: "unauthenticated",
     };
   }

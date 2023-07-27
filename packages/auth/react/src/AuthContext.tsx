@@ -2,8 +2,8 @@ import { useEffect, useState, createContext, useContext } from "react";
 import {
   ScuteClient,
   ScuteSession,
-  type User,
   type Session,
+  type ScuteUser,
 } from "@scute/core";
 
 export type AuthSession = {
@@ -21,7 +21,7 @@ export type AuthSession = {
       isLoading: true;
     }
   | {
-      user: User;
+      user: ScuteUser;
       isAuthenticated: true;
       isLoading: false;
     }
@@ -44,21 +44,15 @@ export const AuthContextProvider = ({
     status: "loading",
   });
 
-  const [user, setUser] = useState<(typeof session)["user"]>(session.user);
+  const [user, setUser] = useState<ScuteUser | null>(null);
 
   useEffect(() => {
     const unsubscribe = scuteClient.onAuthStateChange(
-      async (_event, session) => {
+      async (_event, session, user) => {
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(user);
       }
     );
-
-    (async () => {
-      const { data: session } = await scuteClient.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
-    })();
 
     return () => unsubscribe();
   }, [scuteClient]);

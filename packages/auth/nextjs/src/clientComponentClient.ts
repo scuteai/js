@@ -1,4 +1,4 @@
-import { ScuteBrowserCookieStorage } from "@scute/react";
+import { ScuteBrowserCookieStorage, ScuteError } from "@scute/react";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 
 let scute: ReturnType<typeof createScuteClient>;
@@ -10,7 +10,9 @@ export const createClientComponentClient = (
   const baseUrl = config?.baseUrl ?? process.env.NEXT_PUBLIC_SCUTE_BASE_URL;
 
   if (!appId) {
-    throw new Error("either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!");
+    throw new ScuteError({
+      message: "either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!",
+    });
   }
 
   const createNewClient = () => {

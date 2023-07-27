@@ -25,7 +25,6 @@ export default function Home() {
       <Auth
         scuteClient={scuteClient}
         appearance={{
-          scuteBranding: false,
           //theme: darkTheme,
         }}
       />

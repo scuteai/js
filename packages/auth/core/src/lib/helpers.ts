@@ -1,4 +1,5 @@
 import { supported as _isWebauthnSupported } from "./webauthn";
+import jwtDecode from "jwt-decode";
 
 export const isBrowser = () => typeof document !== "undefined";
 
@@ -23,3 +24,8 @@ export function isValidDomain(hostname: string): boolean {
  * Checks if the webauthn is supported in the browser
  */
 export const isWebauthnSupported = () => isBrowser() && _isWebauthnSupported();
+
+export const getUserIdFromAccessToken = (accessToken: string) => {
+  const { uuid: userId } = jwtDecode<any>(accessToken);
+  return userId;
+};

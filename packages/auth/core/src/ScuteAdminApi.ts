@@ -15,10 +15,13 @@ export class ScuteAdminApi extends ScuteBaseHttp {
     });
 
     this.appId = appId;
-    this.secretKey = secretKey;
+
+    if (secretKey) {
+      this.setSecretKey(secretKey);
+    }
 
     // set default headers
-    this.wretcher = this.wretcher.headers({ ...this._authorizationHeader() });
+    this.wretcher = this.wretcher.headers({ ...this._authorizationHeader });
   }
 
   /**
@@ -26,6 +29,12 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param secretKey Secret Key
    */
   async setSecretKey(secretKey: string) {
+    if (typeof window !== "undefined" && secretKey) {
+      console.warn(
+        "[Scute] DANGER! You are setting API Secret Key likely in the browser. This is extremely dangerous for production."
+      );
+    }
+
     this.secretKey = secretKey;
   }
 
@@ -34,7 +43,9 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async getUser(id: string) {
-    return this.get<any>(`${this._appsPath}/users/${id}`);
+    return this.get<any>(`${this._appsPath}/users/${id}`, {
+      ...this._authorizationHeader,
+    });
   }
 
   /**
@@ -42,7 +53,9 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param attributes any
    */
   async createUser(attributes: any) {
-    return this.post(`${this._appsPath}/users`, attributes);
+    return this.post(`${this._appsPath}/users`, attributes, {
+      ...this._authorizationHeader,
+    });
   }
 
   /**
@@ -50,7 +63,9 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async activateUser(id: string) {
-    return this.post<any>(`${this._appsPath}/users/${id}/activate`, null);
+    return this.post<any>(`${this._appsPath}/users/${id}/activate`, null, {
+      ...this._authorizationHeader,
+    });
   }
 
   /**
@@ -60,7 +75,9 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    */
   async updateUser(id: string, data: any) {
     // or patch
-    return this.put<any>(`${this._appsPath}/users/${id}`, data);
+    return this.put<any>(`${this._appsPath}/users/${id}`, data, {
+      ...this._authorizationHeader,
+    });
   }
 
   /**
@@ -68,7 +85,9 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async deleteUser(id: string) {
-    return this.post<any>(`${this._appsPath}/users/${id}/delete`, null);
+    return this.post<any>(`${this._appsPath}/users/${id}/delete`, null, {
+      ...this._authorizationHeader,
+    });
   }
 
   /**
@@ -76,11 +95,9 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param accessToken JWT access_token
    */
   async signOut(accessToken: string) {
-    return this.post<any>(
-      `${this._authPath}/users/logout`,
-      null,
-      this._accessTokenHeader(accessToken)
-    );
+    return this.delete(`${this._authPath}/current_user`, {
+      ...this._accessTokenHeader(accessToken),
+    });
   }
 
   /**
@@ -88,7 +105,9 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async listUserDevices(id: string) {
-    return this.get<any>(`${this._appsPath}/users/${id}/devices`);
+    return this.get<any>(`${this._appsPath}/users/${id}/devices`, {
+      ...this._authorizationHeader,
+    });
   }
 
   /**
@@ -98,15 +117,18 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    */
   async revokeUserDevice(userId: string, deviceId: string) {
     return this.get<any>(
-      `${this._appsPath}/users/${userId}/devices/${deviceId}/revoke`
+      `${this._appsPath}/users/${userId}/devices/${deviceId}/revoke`,
+      {
+        ...this._authorizationHeader,
+      }
     );
   }
 
   /**
-   * Set authorization header for admin (management) API.
+   * Get authorization header for admin (management) API.
    * @private
    */
-  private _authorizationHeader(): HeadersInit {
+  private get _authorizationHeader(): HeadersInit {
     if (!this.secretKey) return {};
 
     return {

@@ -1,2 +1,2 @@
-export * from "./auth";
-export * from "@scute/core"
+export * from "./main";
+export * from "@scute/core";

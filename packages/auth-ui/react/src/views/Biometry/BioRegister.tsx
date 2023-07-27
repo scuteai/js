@@ -17,7 +17,7 @@ interface BioRegisterProps extends CommonViewProps {
 }
 
 const BioRegister = ({
-  email,
+  identifier,
   error,
   scuteClient,
   setAuthView,
@@ -46,7 +46,7 @@ const BioRegister = ({
         </Text>
       )}
       <Flex css={{ jc: "center", py: "$5" }}>
-        <Badge size="1">{email}</Badge>
+        <Badge size="1">{identifier}</Badge>
       </Flex>
       <Flex css={{ jc: "space-around" }}>
         <Button variant="alt" onClick={() => registerDevice()}>

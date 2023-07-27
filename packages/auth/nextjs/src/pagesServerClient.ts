@@ -1,4 +1,4 @@
-import { ScuteCookieStorage, type CookieAttributes } from "@scute/react";
+import { ScuteCookieStorage, ScuteError, type CookieAttributes } from "@scute/react";
 import { splitCookiesString } from "set-cookie-parser";
 import { parse as parseCookies, serialize as serializeCookie } from "cookie";
 import type {
@@ -69,7 +69,9 @@ export const createPagesServerClient = (
   const baseUrl = config?.baseUrl ?? process.env.NEXT_PUBLIC_SCUTE_BASE_URL;
 
   if (!appId) {
-    throw new Error("either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!");
+    throw new ScuteError({
+      message: "either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!",
+    });
   }
 
   return createScuteClient({

@@ -1,4 +1,8 @@
-import { ScuteCookieStorage, type CookieAttributes } from "@scute/react";
+import {
+  ScuteCookieStorage,
+  ScuteError,
+  type CookieAttributes,
+} from "@scute/react";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 
@@ -39,7 +43,9 @@ export const createServerComponentClient = (
   const baseUrl = config?.baseUrl ?? process.env.NEXT_PUBLIC_SCUTE_BASE_URL;
 
   if (!appId) {
-    throw new Error("either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!");
+    throw new ScuteError({
+      message: "either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!",
+    });
   }
 
   return createScuteClient({

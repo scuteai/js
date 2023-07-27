@@ -9,7 +9,12 @@ import {
 } from "../../components";
 import { CommonViewProps } from "../common";
 
-const MagicLoading = ({ email }: CommonViewProps) => (
+export interface MagicLoadingProps extends CommonViewProps {
+  resendAllowed: boolean;
+  resendEmail: () => void;
+}
+
+const MagicLoading = ({ identifier }: MagicLoadingProps) => (
   <>
     <Header css={{ mb: "$1" }}>
       <LargeSpinner
@@ -25,7 +30,7 @@ const MagicLoading = ({ email }: CommonViewProps) => (
       </Heading>
       <Text size="2" css={{ color: "$textColor", mb: "$1" }}></Text>
       <Flex css={{ jc: "center", py: "$5" }}>
-        <Badge size="1">{email}</Badge>
+        <Badge size="1">{identifier}</Badge>
       </Flex>
     </Inner>
   </>

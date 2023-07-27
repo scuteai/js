@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type ScuteClient, type Session } from "@scute/react";
+import { useAuth, type ScuteClient, type Session } from "@scute/react";
 import { Badge, Button, ElementCard, Flex } from "./components";
 import type { Theme } from "@scute/ui-shared";
 import { createTheme } from "./stitches.config";
@@ -12,24 +12,19 @@ export type ProfileProps = {
 };
 
 const Profile = ({ scuteClient, appearance }: ProfileProps) => {
-  const [session, setSession] = useState<Session>();
-  const [isLoading, setIsLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<any>();
+  const [isDevicesLoading, setIsDevicesLoading] = useState(true);
+  const { session, user, signOut, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // TODO
+  const userT: any = {};
 
   useEffect(() => {
-    scuteClient.getSession().then(({ data: session }) => {
-      setSession(session);
-    });
-    scuteClient.profile().then(({ data: userProfile }) => {
-      setUserProfile(userProfile);
-      setIsLoading(false);
-    });
-  }, [scuteClient]);
-
-  if (session?.status !== "authenticated") return null;
-
-  const user = session.user!;
-  const signOut = () => scuteClient.signOut();
+    setIsDevicesLoading(false);
+  }, []);
 
   return (
     <div
@@ -42,22 +37,20 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
           <h3>Login info</h3>
           <Flex css={{ jc: "space-between" }}>
             <div>Email</div>
-            {user.email}
+            {user?.email}
             <div>
               <Button variant="alt">Edit</Button>
             </div>
           </Flex>
         </Flex>
 
-        {isLoading ? (
+        {isDevicesLoading ? (
           <span>Loading...</span>
         ) : (
           <Flex css={{ fd: "column", gap: "$1", mt: "$3" }}>
-            {userProfile &&
-            userProfile.sessions &&
-            userProfile.sessions.length > 0 ? (
+            {userT && userT.sessions && userT.sessions.length > 0 ? (
               <Flex css={{ fd: "column", gap: "$1" }}>
-                {userProfile.sessions.map((session: any, index: any) => (
+                {userT.sessions.map((session: any, index: any) => (
                   <ElementCard css={{ p: "$2" }} key={index}>
                     <Flex css={{ jc: "space-between", ai: "center", pb: "$1" }}>
                       <Flex>

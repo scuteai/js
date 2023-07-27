@@ -17,7 +17,7 @@ interface ErrorViewProps extends Omit<CommonViewProps, "error"> {
   setError: (error: ScuteError | null) => void;
 }
 
-const ErrorView = ({ email, error, setError, setAuthView }: ErrorViewProps) => {
+const ErrorView = ({ identifier, error, setError, setAuthView }: ErrorViewProps) => {
   // only fatal errors
   return (
     <>
@@ -39,14 +39,14 @@ const ErrorView = ({ email, error, setError, setAuthView }: ErrorViewProps) => {
           Please try again
         </Text>
         <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{email}</Badge>
+          <Badge size="1">{identifier}</Badge>
         </Flex>
         <Flex css={{ jc: "center" }}>
           <Button
             variant="alt"
             size="2"
             onClick={() => {
-              setAuthView(VIEWS.SIGN_IN);
+              setAuthView(VIEWS.SIGN_IN_OR_UP);
               setError(null);
             }}
           >

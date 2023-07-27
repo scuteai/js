@@ -1,15 +1,24 @@
 import type { UniqueIdentifier } from "./general";
 
-export interface Session {
-  access: string | null;
-  accessExpiresAt: Date | null;
-  refresh: string | null;
-  refreshExpiresAt: Date | null;
-  csrf: string | null;
-  user: User | null;
-  status: "authenticated" | "unauthenticated" | "loading";
-}
+export type Session =
+  | {
+      access: string | null;
+      accessExpiresAt: Date | null;
+      refresh: string | null;
+      refreshExpiresAt: Date | null;
+      csrf: string | null;
+      status: "unauthenticated" | "loading";
+    }
+  | {
+      access: string;
+      accessExpiresAt: Date;
+      refresh: string | null;
+      refreshExpiresAt: Date | null;
+      csrf: string;
+      status: "authenticated";
+    };
 
+// TODO: remove
 export interface User {
   uid: UniqueIdentifier;
   email: string;

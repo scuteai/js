@@ -12,12 +12,17 @@ import {
 } from "../../components";
 import { CommonViewProps } from "../common";
 
-export interface MagicNewDevicePending extends CommonViewProps {}
+export interface MagicNewDevicePendingProps extends CommonViewProps {
+  resendAllowed: boolean;
+  resendEmail: () => void;
+}
 
 const MagicNewDevicePending = ({
-  email,
+  identifier,
   setAuthView,
-}: MagicNewDevicePending) => {
+  resendAllowed,
+  resendEmail,
+}: MagicNewDevicePendingProps) => {
   return (
     <>
       <Header css={{ mb: "$1" }}>
@@ -44,13 +49,20 @@ const MagicNewDevicePending = ({
           You will be automatically signed in here once you click that link.
         </Text>
         <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{email}</Badge>
+          <Badge size="1">{identifier}</Badge>
         </Flex>
         <Flex css={{ jc: "space-between" }}>
-          <Button variant="alt" onClick={() => setAuthView(VIEWS.SIGN_IN)}>
+          <Button
+            variant="alt"
+            onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
+          >
             Change email
           </Button>
-          <Button variant="alt" disabled>
+          <Button
+            variant="alt"
+            disabled={resendAllowed ? true : undefined}
+            onClick={() => resendEmail()}
+          >
             Resend email
           </Button>
         </Flex>
@@ -59,4 +71,4 @@ const MagicNewDevicePending = ({
   );
 };
 
-export default MagicNewDevicePending
+export default MagicNewDevicePending;

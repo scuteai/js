@@ -1,4 +1,5 @@
 import { isValidDomain } from "./helpers";
+import type webauthn from "./webauthn";
 
 export const getMeaningfulError = (error: ScuteError) => {
   const nonFatalWebauthn: WebAuthnErrorCode[] = [
@@ -140,7 +141,7 @@ export function identifyRegistrationError({
   options,
 }: {
   error: Error;
-  options: CredentialCreationOptions;
+  options: CredentialCreationOptions | webauthn.CredentialCreationOptionsJSON;
 }): WebAuthnError | Error {
   const { publicKey } = options;
 
@@ -234,7 +235,11 @@ export function identifyRegistrationError({
       });
     }
   } else if (error.name === "TypeError") {
-    if (publicKey.user.id.byteLength < 1 || publicKey.user.id.byteLength > 64) {
+    const userId = publicKey.user.id;
+    const userIdLength =
+      typeof userId !== "string" ? userId.byteLength : userId.length;
+
+    if (userIdLength < 1 || userIdLength > 64) {
       // https://www.w3.org/TR/webauthn-2/#sctn-createCredential (Step 5)
       return new WebAuthnError({
         message: "User ID was not between 1 and 64 characters",
@@ -265,7 +270,7 @@ export function identifyAuthenticationError({
   options,
 }: {
   error: Error;
-  options: CredentialRequestOptions;
+  options: CredentialRequestOptions | webauthn.CredentialRequestOptionsJSON;
 }): WebAuthnError | Error {
   const { publicKey } = options;
 
@@ -322,3 +327,21 @@ export function identifyAuthenticationError({
 
   return error;
 }
+
+export const identifierNotRecognizedError = () =>
+  new ScuteError({
+    code: "identifier-not-recognized",
+    message: "Identifier is not recognized",
+  });
+
+export const identifierAlreadyExistError = () =>
+  new ScuteError({
+    code: "identifier-already-exist",
+    message: "User with this identifier already exists.",
+  });
+
+export const loginRequiredError = () =>
+  new ScuteError({
+    code: "login-required",
+    message: "Login Required.",
+  });

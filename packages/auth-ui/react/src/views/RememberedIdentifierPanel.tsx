@@ -1,4 +1,4 @@
-import { type ScuteTokenPayloadUser } from "@scute/react";
+import type { ScuteIdentifier } from "@scute/react";
 import { BellIcon } from "../assets/icons";
 import {
   Badge,
@@ -10,19 +10,19 @@ import {
   Text,
 } from "../components";
 
-interface RememberedUserPanelProps {
-  user: ScuteTokenPayloadUser;
+interface RememberedIdentifierPanelProps {
+  identifier: ScuteIdentifier;
   resetHandler: () => void;
 }
 
-const RememberedUserPanel = ({
-  user,
+const RememberedIdentifierPanel = ({
+  identifier,
   resetHandler,
-}: RememberedUserPanelProps) => {
+}: RememberedIdentifierPanelProps) => {
   return (
     <>
       <Heading size="1" css={{ color: "$headingColor" }}>
-        Welcome back, {user.name}
+        Welcome back!
       </Heading>
       <Panel css={{ mt: "$4", mb: "$5" }}>
         <Flex gap={2} css={{ ai: "center", jc: "space-between" }}>
@@ -34,7 +34,7 @@ const RememberedUserPanel = ({
               <Text size="1" css={{ pl: "$2" }}>
                 Sign in as
               </Text>
-              <Badge>{user.email}</Badge>
+              <Badge>{identifier}</Badge>
             </Flex>
           </Flex>
           <Button variant="alt" onClick={() => resetHandler()}>
@@ -46,4 +46,4 @@ const RememberedUserPanel = ({
   );
 };
 
-export default RememberedUserPanel;
+export default RememberedIdentifierPanel;

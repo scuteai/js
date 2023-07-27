@@ -14,7 +14,7 @@ import { CommonViewProps } from "../common";
 
 export interface MagicLinkProps extends CommonViewProps {}
 
-const MagicPending = ({ email, setAuthView }: MagicLinkProps) => {
+const MagicPending = ({ identifier, setAuthView }: MagicLinkProps) => {
   return (
     <>
       <Header css={{ mb: "$1" }}>
@@ -41,10 +41,13 @@ const MagicPending = ({ email, setAuthView }: MagicLinkProps) => {
           You will be automatically signed in here once you click that link.
         </Text>
         <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{email}</Badge>
+          <Badge size="1">{identifier}</Badge>
         </Flex>
         <Flex css={{ jc: "space-between" }}>
-          <Button variant="alt" onClick={() => setAuthView(VIEWS.SIGN_IN)}>
+          <Button
+            variant="alt"
+            onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
+          >
             Change email
           </Button>
           <Button variant="alt" disabled>
