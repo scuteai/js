@@ -30,10 +30,29 @@ export type ScuteUser = {
   id: UniqueIdentifier;
   email: string;
   email_verified: boolean;
+  phone: string; // TODO
   phone_verified: boolean;
   webauthn_enabled: boolean;
-  user_metadata: any;
+  user_metadata: Metadata | null;
 };
+
+export type ScuteUserData = {
+  id: string;
+  created_at: string;
+  update_at: string;
+  status: string;
+  email: string;
+  email_verified: boolean;
+  phone: string;
+  phone_verified: boolean;
+  webauthn_enabled: boolean;
+  webauthn_devices: ScuteDevice[];
+  last_login_at: string;
+  login_count: number;
+  user_metadata: Metadata | null;
+};
+
+type Metadata = Record<string, boolean | string | number>;
 
 /**
  * Identifier that is an email or phone number.
@@ -42,12 +61,12 @@ export type ScuteIdentifier = string;
 
 export type ScuteSignInOptions = {
   webauthn?: ScuteWebauthnOption;
-};
+} & Record<string, any>; // TODO
 
 export type ScuteWebauthnOption = "strict" | "optional" | "disabled";
 
-export type ScuteSignUpOptions = any;
-export type ScuteSignInOrUpOptions = any;
+export type ScuteSignUpOptions = Record<string, any>; // TODO
+export type ScuteSignInOrUpOptions = Record<string, any>; // TODO
 
 export type ScuteMagicLinkIdResponse = {
   magic_link: { id: UniqueIdentifier };

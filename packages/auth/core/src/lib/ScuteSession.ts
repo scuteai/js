@@ -45,7 +45,7 @@ export class ScuteSession {
 
     const { exp: accessExpiresAt } = accessPayload;
     const { exp: refreshExpiresAt } =
-      !browser && refresh ? (jwtDecode<any>(refresh)) : ({} as any);
+      !browser && refresh ? jwtDecode<any>(refresh) : ({} as any);
 
     return {
       access,
@@ -94,7 +94,7 @@ export class ScuteSession {
 
     if (access) {
       const expires: Date =
-        accessExpiresAt ?? new Date((jwtDecode(access) as any).exp * 1000);
+        accessExpiresAt ?? new Date(jwtDecode<any>(access).exp * 1000);
 
       this.scuteStorage.setItem(SCUTE_ACCESS_STORAGE_KEY, access, {
         expires,
@@ -104,7 +104,7 @@ export class ScuteSession {
 
     if (refresh) {
       const expires: Date =
-        refreshExpiresAt ?? new Date((jwtDecode(refresh) as any).exp * 1000);
+        refreshExpiresAt ?? new Date(jwtDecode<any>(refresh).exp * 1000);
 
       this.scuteStorage.setItem(SCUTE_REFRESH_STORAGE_KEY, refresh, {
         expires,
@@ -121,6 +121,7 @@ export class ScuteSession {
   }
 
   async setRememberedIdentifier(identifier: ScuteIdentifier): Promise<void> {
+    console.log(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier);
     return this.scuteStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier);
   }
 

@@ -340,6 +340,9 @@ export const identifierAlreadyExistError = () =>
     message: "User with this identifier already exists.",
   });
 
+export const newDeviceError = () =>
+  new ScuteError({ code: "new-device", message: "New Device" });
+
 export const loginRequiredError = () =>
   new ScuteError({
     code: "login-required",

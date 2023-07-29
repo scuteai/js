@@ -23,6 +23,7 @@ import {
   identifierNotRecognizedError,
   identifierAlreadyExistError,
   SCUTE_CRED_STORAGE_KEY,
+  newDeviceError,
 } from "./lib";
 
 import type {
@@ -424,12 +425,11 @@ export class ScuteClient extends ScuteBaseHttp {
       identifier
     );
 
-    if (initializeError) return { data: null, error: initializeError };
+    if (initializeError) return { error: initializeError };
 
     if (await this._webauthnIsNewDevice(userId, data.options)) {
       return {
-        data: null,
-        error: new ScuteError({ code: "new-device", message: "New Device" }),
+        error: newDeviceError(),
       };
     }
 
@@ -466,13 +466,13 @@ export class ScuteClient extends ScuteBaseHttp {
     await this.setSession(payload);
     const session = await this.scuteSession.initialState();
 
-    const { data: user, error: getUserError } = await this.getUser(
-      session.access
-    );
+    const { data, error: getUserError } = await this.getUser(session.access);
 
     if (getUserError) {
       return { error: getUserError };
     }
+
+    const user = data?.user;
 
     if (!user) {
       this.scuteSession.removeSession();
@@ -544,7 +544,7 @@ export class ScuteClient extends ScuteBaseHttp {
    */
   private async _getUserByIdentifier(identifier: ScuteIdentifier) {
     return this.get<{ user: ScuteUser | null }>(
-      `/user?identifier=${identifier}`
+      `/users?identifier=${identifier}`
     );
   }
 
@@ -553,7 +553,7 @@ export class ScuteClient extends ScuteBaseHttp {
    * @internal
    */
   private async _getUserByUserId(userId: UniqueIdentifier) {
-    return this.get<{ user: ScuteUser | null }>(`/user?user_id=${userId}`);
+    return this.get<{ user: ScuteUser | null }>(`/users?user_id=${userId}`);
   }
 
   /**
@@ -592,8 +592,9 @@ export class ScuteClient extends ScuteBaseHttp {
     }
 
     if (serverCheck && session.access) {
-      const { data: currentUser, error: getUserError } =
-        await this.getCurrentUser(session.access);
+      const { data, error: getUserError } = await this.getCurrentUser(
+        session.access
+      );
 
       if (getUserError) {
         return {
@@ -601,7 +602,8 @@ export class ScuteClient extends ScuteBaseHttp {
           error: getUserError,
         };
       }
-      user = currentUser;
+
+      user = data?.user ?? null;
     }
 
     return { data: { session, user }, error: null };
@@ -741,7 +743,7 @@ export class ScuteClient extends ScuteBaseHttp {
    * @see {getUser}
    */
   private async _getCurrentUserRequest(accessToken: string) {
-    return this.get<ScuteUser | null>(
+    return this.get<{ user: ScuteUser | null }>(
       "/current_user",
       this._accessTokenHeader(accessToken)
     );
@@ -752,6 +754,7 @@ export class ScuteClient extends ScuteBaseHttp {
    * @internal
    */
   private async _setRememberedIdentifier(identifier: ScuteIdentifier) {
+    console.log("call");
     return this.scuteSession.setRememberedIdentifier(identifier);
   }
 
@@ -939,7 +942,10 @@ export class ScuteClient extends ScuteBaseHttp {
   /**
    * Send login magic link and emit the pending event.
    */
-  async sendLoginMagicLink(identifier: ScuteIdentifier, webauthnEnabled?: boolean) {
+  async sendLoginMagicLink(
+    identifier: ScuteIdentifier,
+    webauthnEnabled?: boolean
+  ) {
     const { data, error } = await this._sendMagicLinkRequest(
       identifier,
       "login",
@@ -956,7 +962,10 @@ export class ScuteClient extends ScuteBaseHttp {
   /**
    * Send register magic link and emit the pending event.
    */
-  async sendRegisterMagicLink(identifier: ScuteIdentifier, webauthnEnabled?: boolean) {
+  async sendRegisterMagicLink(
+    identifier: ScuteIdentifier,
+    webauthnEnabled?: boolean
+  ) {
     const { data, error } = await this._sendMagicLinkRequest(
       identifier,
       "register",
