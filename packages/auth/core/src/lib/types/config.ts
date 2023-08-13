@@ -1,4 +1,4 @@
-import type { ScuteStorage } from "../ScuteBaseStorage";
+import type { ScuteStorage } from "../ScuteStorage";
 import type { UniqueIdentifier } from "./general";
 
 export type ScuteClientConfig = {
@@ -10,7 +10,6 @@ export type ScuteClientConfig = {
 };
 
 export type ScuteSessionConfig = {
-  appId: UniqueIdentifier;
   storage: ScuteStorage;
 };
 

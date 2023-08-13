@@ -1,13 +1,12 @@
-import { Auth } from "@scute/ui-react";
-import WithCustomUI from "./components/WithCustomUI";
+import { AuthContextProvider } from "@scute/react";
 import WithScuteUI from "./components/WithScuteUI";
 import { scute } from "./scute";
 
 export default function App() {
   return (
-    <Auth.ContextProvider scuteClient={scute}>
-      <WithCustomUI />
-      {/* <WithScuteUI /> */}
-    </Auth.ContextProvider>
+    <AuthContextProvider scuteClient={scute}>
+      {/* <WithCustomUI /> */}
+      <WithScuteUI />
+    </AuthContextProvider>
   );
 }

@@ -1,12 +1,26 @@
 import wretch, { type Wretch, type WretchError } from "wretch";
-import { BaseHttpError } from "./errors";
+import { retry } from "wretch/middlewares/retry";
+import { BaseHttpError, NETWORK_ERROR_CODES } from "./errors";
 import type { BaseResponse } from "./types/general";
 
 export abstract class ScuteBaseHttp {
   protected wretcher: Wretch;
 
   constructor(...params: Parameters<typeof wretch>) {
-    this.wretcher = wretch(...params).errorType("json");
+    this.wretcher = wretch(...params)
+      .middlewares([
+        retry({
+          delayTimer: 500,
+          delayRamp: (delay, nbOfAttempts) => delay * nbOfAttempts,
+          maxAttempts: 3,
+          until: (response, error) =>
+            response ? !NETWORK_ERROR_CODES.includes(response.status) : !error,
+          onRetry: undefined,
+          retryOnNetworkError: true,
+          resolveWithLatestResponse: true,
+        }),
+      ])
+      .errorType("json");
   }
 
   protected async get<T>(url: string, headers?: HeadersInit): BaseResponse<T> {
@@ -86,11 +100,15 @@ export abstract class ScuteBaseHttp {
     }
   }
 
-  private _getErrorObject(error: WretchError): BaseHttpError {
+  private _getErrorObject(error: WretchError) {
+    const message = this._getErrorMessage(error);
+    const code = error.status;
+
     return new BaseHttpError({
       cause: error,
-      message: this._getErrorMessage(error),
-      code: error.status,
+      message,
+      json: error.json,
+      code,
     });
   }
 

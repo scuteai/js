@@ -3,9 +3,15 @@ import { AppLayout } from "@/components/shared/AppLayout";
 import { AppCard } from "@/components/applications/AppCard";
 import { ScuteApp } from "@/types/app";
 import { NewAppDialog } from "@/components/applications/NewAppDialog";
+import { useAuth, useScuteClient } from "@scute/nextjs";
+import { useEffect } from "react";
 
 export default function Apps() {
   const apps = [] as any;
+  const { session, user } = useAuth();
+  const scuteClient = useScuteClient();
+
+ 
   return (
     <AppLayout>
       <Wrapper>
@@ -14,11 +20,9 @@ export default function Apps() {
             {apps && apps.length > 0 ? (
               <Flex css={{ fd: "column", gap: "$5" }}>
                 <Grid columns={3} gap={6}>
-                  {
-                    apps.map((app: ScuteApp, index: number) => (
-                      <AppCard key={index} app={app} />
-                    ))
-                  }
+                  {apps.map((app: ScuteApp, index: number) => (
+                    <AppCard key={index} app={app} />
+                  ))}
                 </Grid>
                 <Flex>
                   <NewAppDialog />

@@ -1,0 +1,10 @@
+{
+  "extends": "@scute/tsconfig/base.json",
+  "compilerOptions": {
+    "target": "ES2018",
+    "lib": ["ES2016", "DOM"],
+    "experimentalDecorators": true
+  },
+  "include": ["src", "index.ts"],
+  "exclude": ["dist", "build", "node_modules"]
+}

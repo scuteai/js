@@ -7,16 +7,36 @@ export const getMeaningfulError = (error: ScuteError) => {
     "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY",
   ];
 
-  const isFatal =
-    error instanceof TechnicalError ||
-    (error instanceof BaseHttpError &&
-      !(error.code >= 200 && error.code < 300)) ||
-    (error instanceof WebAuthnError && !nonFatalWebauthn.includes(error.code));
+  let message = error.message ? error.message : "Something went wrong.";
+  let isFatal = false;
 
-  const message =
-    error instanceof TechnicalError || !error.message
-      ? "Something went wrong."
-      : error.message;
+  if (error instanceof TechnicalError) {
+    isFatal = true;
+    message = "Something went wrong.";
+  } else if (
+    error instanceof BaseHttpError &&
+    !(error.code >= 200 && error.code < 300)
+  ) {
+    isFatal = true;
+    const serverErrorMsg = error.json?.error?.message; // TODO
+    message = serverErrorMsg;
+
+    if (error.code === 500) {
+      message = "Something went wrong.";
+    } else if (
+      error.code === 404 &&
+      serverErrorMsg === "Magic link not found or expired"
+    ) {
+      // TODO: improve error message, error handling
+      message = serverErrorMsg;
+      isFatal = false;
+    }
+  } else if (
+    error instanceof WebAuthnError &&
+    !nonFatalWebauthn.includes(error.code)
+  ) {
+    isFatal = true;
+  }
 
   return {
     isFatal,
@@ -53,28 +73,34 @@ export class ScuteError extends Error {
 
 export class BaseHttpError extends ScuteError {
   code: number;
+  json?: Record<string, any>;
 
   constructor({
     message,
-    cause,
     code,
+    cause,
+    json,
   }: {
     message: ScuteError["message"];
-    cause: ScuteError["cause"];
     code: number;
+    json?: Record<string, any>;
+    cause?: ScuteError["cause"];
   }) {
     super({ message, cause, code });
     this.code = code;
+    this.json = json;
     Object.setPrototypeOf(this, BaseHttpError.prototype);
   }
 }
 
 export class TechnicalError extends ScuteError {
-  constructor(cause: Error) {
+  constructor(cause?: Error) {
     super({ message: "Technical Error", cause });
     Object.setPrototypeOf(this, TechnicalError.prototype);
   }
 }
+
+export const NETWORK_ERROR_CODES = [502, 503, 504];
 
 // https://github.com/MasterKale/SimpleWebAuthn/blob/9757b8172d8d025eade46bd62be0e6c3c2216ea3/packages/browser/src/helpers/webAuthnError.ts
 /**
@@ -328,23 +354,49 @@ export function identifyAuthenticationError({
   return error;
 }
 
-export const identifierNotRecognizedError = () =>
-  new ScuteError({
-    code: "identifier-not-recognized",
-    message: "Identifier is not recognized",
-  });
+export type CustomScuteErrorCode =
+  | "identifier-not-recognized"
+  | "identifier-already-exists"
+  | "new-device"
+  | "login-required";
 
-export const identifierAlreadyExistError = () =>
-  new ScuteError({
-    code: "identifier-already-exist",
-    message: "User with this identifier already exists.",
-  });
+export class CustomScuteError extends ScuteError {
+  constructor(
+    message: ScuteError["message"],
+    code: CustomScuteErrorCode & ScuteError["code"]
+  ) {
+    super({ message, code });
+    Object.setPrototypeOf(this, CustomScuteError.prototype);
+  }
+}
 
-export const newDeviceError = () =>
-  new ScuteError({ code: "new-device", message: "New Device" });
+export class IdentifierNotRecognizedError extends CustomScuteError {
+  constructor() {
+    super("Identifier is not recognized.", "identifier-not-recognized");
+    Object.setPrototypeOf(this, IdentifierNotRecognizedError.prototype);
+  }
+}
 
-export const loginRequiredError = () =>
-  new ScuteError({
-    code: "login-required",
-    message: "Login Required.",
-  });
+export class IdentifierAlreadyExistsError extends CustomScuteError {
+  constructor() {
+    super(
+      "User with this identifier already exists.",
+      "identifier-already-exists"
+    );
+    Object.setPrototypeOf(this, IdentifierAlreadyExistsError.prototype);
+  }
+}
+
+export class NewDeviceError extends CustomScuteError {
+  constructor() {
+    super("New Device.", "new-device");
+    Object.setPrototypeOf(this, NewDeviceError.prototype);
+  }
+}
+
+export class LoginRequiredError extends CustomScuteError {
+  constructor() {
+    super("Login Required.", "login-required");
+    Object.setPrototypeOf(this, LoginRequiredError.prototype);
+  }
+}

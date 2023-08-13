@@ -1,7 +1,11 @@
-import { ScuteBaseHttp } from "./lib";
-import type { UniqueIdentifier, ScuteAdminApiConfig } from "./lib/types";
+import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
+import { accessTokenHeader, refreshTokenHeaders } from "./lib/helpers";
 
-export class ScuteAdminApi extends ScuteBaseHttp {
+import type { ScuteIdentifier, ScuteUser } from "./lib/types/scute";
+import type { ScuteAdminApiConfig } from "./lib/types/config";
+import type { UniqueIdentifier } from "./lib/types/general";
+
+class ScuteAdminApi extends ScuteBaseHttp {
   protected appId: UniqueIdentifier;
   protected secretKey?: string;
 
@@ -38,6 +42,10 @@ export class ScuteAdminApi extends ScuteBaseHttp {
     this.secretKey = secretKey;
   }
 
+  async getAppData() {
+    return this.get<any>(`${this._appsPath}`);
+  }
+
   /**
    * Get a user's information (including any defined user metadata).
    * @param id User ID
@@ -46,6 +54,28 @@ export class ScuteAdminApi extends ScuteBaseHttp {
     return this.get<any>(`${this._appsPath}/users/${id}`, {
       ...this._authorizationHeader,
     });
+  }
+
+  /**
+   * Get user's basic information by identifier.
+   * * Unauthenticated
+   * @param identifier {ScuteIdentifier}
+   */
+  async getUserByIdentifier(identifier: ScuteIdentifier) {
+    return this.get<{ user: ScuteUser | null }>(
+      `${this._authPath}/users?identifier=${identifier}`
+    );
+  }
+
+  /**
+   * Get user's basic information by user id.
+   * * Unauthenticated
+   * @param userId {UniqueIdentifier}
+   */
+  async getUserByUserId(userId: UniqueIdentifier) {
+    return this.get<{ user: ScuteUser | null }>(
+      `${this._authPath}/users?user_id=${userId}`
+    );
   }
 
   /**
@@ -96,7 +126,18 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    */
   async signOut(accessToken: string) {
     return this.delete(`${this._authPath}/current_user`, {
-      ...this._accessTokenHeader(accessToken),
+      ...accessTokenHeader(accessToken),
+    });
+  }
+
+  /**
+   * Refresh
+   * @param accessToken JWT access_token
+   */
+  async refresh(refreshToken: string) {
+    return this.post<any>(`${this._appsPath}/tokens/refresh`, {
+      ...refreshTokenHeaders(refreshToken),
+      ...this._authorizationHeader,
     });
   }
 
@@ -136,18 +177,6 @@ export class ScuteAdminApi extends ScuteBaseHttp {
     };
   }
 
-  /**
-   * Set current_user by jwt access_token.
-   * @param jwt access_token
-   */
-  private _accessTokenHeader(jwt?: string): HeadersInit {
-    if (!jwt) return {};
-
-    return {
-      "X-Authorization": `Bearer ${jwt}`,
-    };
-  }
-
   private get _appsPath() {
     return `/v1/apps/${this.appId}`;
   }
@@ -156,3 +185,5 @@ export class ScuteAdminApi extends ScuteBaseHttp {
     return `/v1/auth/${this.appId}`;
   }
 }
+
+export default ScuteAdminApi;

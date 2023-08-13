@@ -19,7 +19,6 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@scute/ui";
-import type { User } from "@scute/nextjs";
 
 const app: ScuteApp = {
   id: "s3414dfa1",
@@ -28,7 +27,7 @@ const app: ScuteApp = {
   url: "example.scute.io",
 };
 
-const appUser: User = {
+const appUser: any = {
   uid: "fadfad41",
   email: "imitkit@gmail.com",
   name: "umitkit",

@@ -14,10 +14,9 @@ import {
 
 import { DotsHorizontalIcon, TrashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
-import type { User } from "@scute/nextjs";
 
 type UserRowProps = {
-  user: User;
+  user: any;
   teamMember?: boolean;
 };
 

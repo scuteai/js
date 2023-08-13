@@ -1,8 +1,7 @@
 import Cookies from "js-cookie";
-import { ScuteCookieStorage } from "./ScuteBaseStorage";
-import { CookieAttributes } from "./types";
-
-export class ScuteBrowserCookieStorage extends ScuteCookieStorage {
+import { ScuteCookieStorage } from "./ScuteStorage";
+import type { CookieAttributes } from "./types/general";
+class ScuteBrowserCookieStorage extends ScuteCookieStorage {
   protected getCookie(name: string): string | null {
     return Cookies.get(name) ?? null;
   }
@@ -17,3 +16,5 @@ export class ScuteBrowserCookieStorage extends ScuteCookieStorage {
     Cookies.remove(name, cookieOptions);
   }
 }
+
+export default ScuteBrowserCookieStorage;

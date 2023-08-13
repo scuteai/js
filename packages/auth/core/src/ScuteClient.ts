@@ -1,33 +1,63 @@
 import { BroadcastChannel } from "broadcast-channel";
 import mitt, { type Emitter, type Handler } from "mitt";
 
+import ScuteAdminApi from "./ScuteAdminApi";
+import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
+import { ScuteSession, sessionUnAuthenticatedState } from "./lib/ScuteSession";
 import {
-  ScuteBaseHttp,
-  ScuteSession,
+  ScuteCookieStorage,
   ScuteNoneStorage,
+  ScuteStorage,
+} from "./lib/ScuteStorage";
+
+import {
   type AuthChangeEvent,
   AUTH_CHANGE_EVENTS,
   type InternalEvent,
   INTERNAL_EVENTS,
   SCUTE_BROADCAST_CHANNEL,
-  webauthn,
+  SCUTE_MAGIC_PARAM,
+} from "./lib/constants";
+
+import {
+  accessTokenHeader,
+  decodeAccessToken,
+  decodeMagicLinkToken,
+  Deferred,
   isBrowser,
+  isWebauthnSupported,
+  refreshTokenHeaders,
+} from "./lib/helpers";
+
+import Mixin from "./lib/mixin";
+import webauthn from "./lib/webauthn";
+
+import {
+  IdentifierAlreadyExistsError,
+  IdentifierNotRecognizedError,
   identifyAuthenticationError,
   identifyRegistrationError,
-  isWebauthnSupported,
+  LoginRequiredError,
+  NewDeviceError,
   ScuteError,
-  ScuteStorage,
-  getUserIdFromAccessToken,
-  SCUTE_LAST_LOGIN_STORAGE_KEY,
-  loginRequiredError,
-  identifierNotRecognizedError,
-  identifierAlreadyExistError,
-  SCUTE_CRED_STORAGE_KEY,
-  newDeviceError,
-} from "./lib";
+  TechnicalError,
+} from "./lib/errors";
+
+import type {
+  _ScuteAccessPayload,
+  _ScuteRefreshPayload,
+} from "./lib/types/internal";
+
+import type { Session } from "./lib/types/session";
+import type { UniqueIdentifier } from "./lib/types/general";
 
 import type {
   ScuteClientConfig,
+  ScuteClientPreferences,
+} from "./lib/types/config";
+
+import type {
+  ScuteAppData,
   ScuteDevice,
   ScuteIdentifier,
   ScuteMagicLinkIdResponse,
@@ -36,23 +66,27 @@ import type {
   ScuteSignUpOptions,
   ScuteTokenPayload,
   ScuteUser,
-  Session,
-  UniqueIdentifier,
-} from "./lib/types";
-import { ScuteAdminApi } from "./ScuteAdminApi";
+} from "./lib/types/scute";
 
-export class ScuteClient extends ScuteBaseHttp {
-  protected appId: ScuteClientConfig["appId"];
-  protected readonly scuteSession: ScuteSession;
-  protected persistSession: boolean;
-  protected autoRefreshToken: boolean;
-  admin: ScuteAdminApi;
+class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
+  protected readonly appId: ScuteClientConfig["appId"];
+  protected appData!: ScuteAppData;
 
-  protected readonly storage: ScuteStorage;
+  protected readonly config: {
+    persistSession: ScuteClientPreferences["persistSession"];
+    autoRefreshToken: ScuteClientPreferences["autoRefreshToken"];
+  };
+
+  readonly admin: ScuteAdminApi;
+
+  protected readonly scuteStorage: ScuteStorage | ScuteCookieStorage;
   protected readonly emitter: Emitter<InternalEvent>;
   protected readonly channel: BroadcastChannel | null = null;
-  protected initializePromise: ReturnType<typeof this.__initialize> | null =
-    null;
+
+  protected initializeDeferred: Deferred<void> | null = null;
+  protected getCurrentUserDeferred: Deferred<
+    Awaited<ReturnType<ScuteClient["_getCurrentUser"]>>
+  > | null = null;
 
   constructor(config: ScuteClientConfig) {
     const baseUrl = config.baseUrl || "https://api.scute.io";
@@ -64,6 +98,8 @@ export class ScuteClient extends ScuteBaseHttp {
       });
     }
 
+    const browser = isBrowser();
+
     const endpointPrefix = `/v1/auth/${appId}`;
     super(`${baseUrl}${endpointPrefix}`, {
       credentials: "include",
@@ -71,19 +107,20 @@ export class ScuteClient extends ScuteBaseHttp {
 
     this.appId = appId;
 
-    this.persistSession = config.preferences?.persistSession !== false;
-    this.autoRefreshToken = config.preferences?.autoRefreshToken !== false;
+    this.config = {
+      persistSession: config.preferences?.persistSession !== false,
+      autoRefreshToken: config.preferences?.autoRefreshToken !== false,
+    };
 
-    this.storage =
-      config.preferences?.sessionStorageAdapter ??
-      (typeof window === "undefined"
-        ? ScuteNoneStorage
-        : (window.localStorage as any));
+    this.scuteStorage =
+      browser && typeof window !== "undefined"
+        ? // supressing, sync -> async
+          (window.localStorage as any)
+        : ScuteNoneStorage;
 
-    this.scuteSession = new ScuteSession({
-      appId: this.appId,
-      storage: this.persistSession ? this.storage : ScuteNoneStorage,
-    });
+    if (config.preferences?.sessionStorageAdapter) {
+      this.scuteStorage = config.preferences.sessionStorageAdapter;
+    }
 
     this.admin = new ScuteAdminApi({
       appId,
@@ -93,37 +130,83 @@ export class ScuteClient extends ScuteBaseHttp {
 
     this.emitter = mitt<InternalEvent>();
 
-    if (isBrowser()) {
+    if (browser) {
       this.channel = new BroadcastChannel(SCUTE_BROADCAST_CHANNEL, {
         type: "native",
       });
     }
+
+    this._initialize();
   }
 
   /**
-   * Initializes the client SDK (cached, making sure it is initialized only once).
+   * Initializes the client SDK (making sure it is initialized only once).
    * @internal
    */
-  private _initialize() {
-    if (!this.initializePromise) {
-      // cache
-      this.initializePromise = this.__initialize();
+  private async _initialize() {
+    if (this.initializeDeferred) {
+      return this.initializeDeferred.promise;
     }
 
-    return this.initializePromise;
+    try {
+      this.initializeDeferred = new Deferred();
+      await this._initializeAppData();
+
+      if (isBrowser()) {
+        if (this.config.persistSession) {
+          // only when persisting the session and running in the browser
+          this._setupSessionBroadcast();
+        }
+
+        await this.registerVisibilityChange();
+      } else {
+        if (this.config.autoRefreshToken) {
+          // in non-browser environments the refresh token ticker runs always
+          this.startAutoRefresh();
+        }
+      }
+
+      this.initializeDeferred.resolve();
+    } catch {
+      this.initializeDeferred?.reject();
+    } finally {
+      this.initializeDeferred = null;
+    }
   }
 
   /**
-   * Initializes the client SDK.
-   * @internal
+   * Get app config data.
+   * `fresh` needs to be set to `true` to get the latest data from the server.
+   *
+   * @param fresh - fetch new data from the server instead cached
+   * @returns App data
    */
-  private async __initialize() {
-    if (isBrowser()) {
-      if (this.persistSession) {
-        // only when persisting the session and running in the browser
-        this._setupSessionBroadcast();
+  async getAppData(fresh = false) {
+    const { error } = await this._initializeAppData(fresh);
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    return { data: this.appData, error: null };
+  }
+
+  /**
+   * @param fresh - fetch new data from the server
+   * @internal
+   * @see {@link getAppData}
+   */
+  private async _initializeAppData(fresh = false) {
+    if (fresh || !this.appData) {
+      const { data: appData, error } = await this.admin.getAppData();
+      if (error) {
+        return { error };
+      } else {
+        this.appData = appData;
       }
     }
+
+    return { error: null };
   }
 
   /**
@@ -169,26 +252,28 @@ export class ScuteClient extends ScuteBaseHttp {
     const handler: Handler<
       InternalEvent[typeof INTERNAL_EVENTS.AUTH_STATE_CHANGED]
     > = async ({ event, session, user }) => {
-      if (!session || !user) {
-        // if user is passed that means server check already happened
-        // otherwise in specific events refetch user
-        const { data } = await this._getSession(
-          !user
-            ? event === AUTH_CHANGE_EVENTS.INITIAL_SESSION ||
-              event === AUTH_CHANGE_EVENTS.TOKEN_REFRESH
-              ? true
-              : false
+      if (!session || (session.access !== null && !user)) {
+        // if user is passed, this means server check already happened
+        // otherwise in specific events, refetch user
+        const force = !user
+          ? event === AUTH_CHANGE_EVENTS.INITIAL_SESSION ||
+            event === AUTH_CHANGE_EVENTS.TOKEN_REFRESHED
+            ? true
             : false
-        );
+          : false;
 
-        session = data.session;
+        const emitRefetchEvent = !force;
+
+        ({
+          data: { session, user },
+        } = await this._getSession(force, emitRefetchEvent));
       }
 
       callback(event, session, user ?? null);
     };
 
     this.emitter.on(INTERNAL_EVENTS.AUTH_STATE_CHANGED, handler);
-    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.INITIAL_SESSION);
+    handler({ event: AUTH_CHANGE_EVENTS.INITIAL_SESSION });
 
     return () => this.emitter.off(INTERNAL_EVENTS.AUTH_STATE_CHANGED, handler);
   }
@@ -208,7 +293,7 @@ export class ScuteClient extends ScuteBaseHttp {
     if (!user) {
       return {
         data: null,
-        error: identifierNotRecognizedError(),
+        error: new IdentifierNotRecognizedError(),
       };
     }
 
@@ -221,8 +306,8 @@ export class ScuteClient extends ScuteBaseHttp {
    * @param identifier {ScuteIdentifier}
    * @param options {ScuteSignInOrUpOptions}
    * @returns Polling data if webauthn is not available else null.
-   * @see {signIn}
-   * @see {signUp}
+   * @see {@link signIn}
+   * @see {@link signUp}
    */
   async signInOrUp(
     identifier: ScuteIdentifier,
@@ -232,13 +317,13 @@ export class ScuteClient extends ScuteBaseHttp {
 
     return user
       ? this._signIn(identifier, user, options)
-      : this._signUp(identifier);
+      : this._signUp(identifier, options);
   }
 
   /**
    * Log in.
    * @internal
-   * @see {signIn}
+   * @see {@link signIn}
    */
   private async _signIn(
     identifier: ScuteIdentifier,
@@ -256,12 +341,9 @@ export class ScuteClient extends ScuteBaseHttp {
       );
 
       if (verifyError) {
-        if (
-          verifyError instanceof ScuteError &&
-          verifyError.code === "new-device"
-        ) {
+        if (verifyError instanceof NewDeviceError) {
           this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING);
-          return this.sendLoginMagicLink(identifier);
+          return this._sendLoginMagicLink(identifier);
         }
 
         return { data: null, error: verifyError };
@@ -284,7 +366,7 @@ export class ScuteClient extends ScuteBaseHttp {
     if (await this._identifierExistsAndVerified(identifier)) {
       return {
         data: null,
-        error: identifierAlreadyExistError(),
+        error: new IdentifierAlreadyExistsError(),
       };
     }
 
@@ -294,29 +376,18 @@ export class ScuteClient extends ScuteBaseHttp {
   /**
    * Creates a user.
    * @internal
-   * @see {signUp}
+   * @see {@link signUp}
    */
   private async _signUp(
     identifier: ScuteIdentifier,
     options?: ScuteSignUpOptions
   ) {
-    return this.sendRegisterMagicLink(identifier);
-  }
-
-  /**
-   * Log in with magic link token.
-   * @param token - Magic link token (sct_magic)
-   */
-  async signInWithMagicLink(token: string) {
-    const { data: payload, error } = await this.verifyMagicLink(token);
-    if (error) return { error };
-
-    return this.signInWithTokenPayload(payload);
+    return this.sendRegisterMagicLink(identifier, options?.userMeta);
   }
 
   /**
    * Log in with registering the current device.
-   * @param payload - Scute auth payload
+   * @param payload {ScuteTokenPayload} - Scute auth payload
    */
   async signInWithRegisterDevice(payload: ScuteTokenPayload) {
     const { error: registerDeviceError } = await this._signInWithRegisterDevice(
@@ -331,39 +402,125 @@ export class ScuteClient extends ScuteBaseHttp {
   }
 
   /**
+   * Log in with magic link token.
+   * @param token - Magic link token (sct_magic)
+   */
+  async signInWithMagicLinkToken(token: string) {
+    const { data, error: verifyError } = await this.verifyMagicLinkToken(token);
+    if (verifyError) return { error: verifyError };
+
+    return this.signInWithTokenPayload(data.authPayload);
+  }
+
+  /**
+   * Log in with the magic link url.
+   * @param url - magic link url with sct_magic param.
+   */
+  async signInWithMagicLink(url: string | URL) {
+    const token = new URL(url).searchParams.get(SCUTE_MAGIC_PARAM);
+
+    if (!token) {
+      return { error: new ScuteError({ message: "Invalid magic link." }) };
+    }
+
+    return this.signInWithMagicLinkToken(token);
+  }
+
+  /**
+   * Log in with the magic link status id if it is consumed.
+   * @param id {UniqueIdentifier} - Magic link status id
+   */
+  async signInWithMagicLinkId(id: UniqueIdentifier) {
+    const { data: payload, error: magicStatusError } =
+      await this.getMagicLinkStatus(id);
+
+    if (magicStatusError) {
+      return { error: magicStatusError };
+    }
+
+    return this.signInWithTokenPayload(payload);
+  }
+
+  /**
+   * Verify magic link token
+   * @param token - Magic link token (sct_magic)
+   */
+  async verifyMagicLinkToken(token: string) {
+    const decodedMagicLinkToken = decodeMagicLinkToken(token);
+    if (!decodedMagicLinkToken) {
+      return {
+        data: null,
+        error: new ScuteError({ message: "Invalid Token" }),
+      };
+    }
+
+    const { data: authPayload, error: verifyError } =
+      await this._verifyMagicLinkTokenRequest(token);
+
+    if (verifyError) {
+      return { data: null, error: verifyError };
+    }
+
+    return {
+      data: { authPayload, magicPayload: decodedMagicLinkToken },
+      error: null,
+    };
+  }
+
+  /**
+   * Verify magic link token
+   * @param token - Magic link token (sct_magic)
+   * @internal
+   * @see {@link verifyMagicLinkToken}
+   */
+  private async _verifyMagicLinkTokenRequest(token: string) {
+    return this.patch<ScuteTokenPayload>("/magic_links/authenticate", {
+      token,
+    });
+  }
+
+  /**
    * Verify Magic link token and log in with registering the current device.
    * @param token - Magic link token (sct_magic)
    */
-  async verifyMagicLinkSignInWithNewDevice(token: string) {
-    const { data: payload, error } = await this.verifyMagicLink(token);
+  async verifyMagicLinkTokenSignInWithNewDevice(token: string) {
+    const { data, error: verifyError } = await this.verifyMagicLinkToken(token);
 
-    if (error) {
-      return { error };
+    if (verifyError) {
+      return { error: verifyError };
     }
 
-    return this._signInWithRegisterDevice(payload);
+    return this._signInWithRegisterDevice(data.authPayload);
   }
 
   /**
    * Register device for webauthn. This method will trigger the browser popup.
+   * @returns Scute Device
    */
   async addDevice() {
     const {
       data: { session },
       error: sessionError,
-    } = await this.getSession();
+    } = await this._getSession();
 
     if (sessionError) {
       return { data: null, error: sessionError };
     }
 
-    return this._addDevice(session.access!);
+    const { data: accessToken, error: authTokenError } =
+      await this._getAuthToken(session);
+
+    if (authTokenError) {
+      return { data: null, error: authTokenError };
+    }
+
+    return this._addDevice(accessToken);
   }
 
   /**
    * @param accessToken - Auth token
    * @internal
-   * @see {addDevice}
+   * @see {@link addDevice}
    */
   private async _addDevice(accessToken: string) {
     const { data, error: initializeError } =
@@ -382,7 +539,7 @@ export class ScuteClient extends ScuteBaseHttp {
   /**
    * Register the device (create webauthn credentials) and login.
    * @internal
-   * @see {signInWithRegisterDevice}
+   * @see {@link signInWithRegisterDevice}
    */
   private async _signInWithRegisterDevice(payload: ScuteTokenPayload) {
     const { error: registerError } = await this._addDevice(payload.access);
@@ -403,8 +560,7 @@ export class ScuteClient extends ScuteBaseHttp {
 
     if (!user) {
       return {
-        data: null,
-        error: identifierNotRecognizedError(),
+        error: new IdentifierNotRecognizedError(),
       };
     }
 
@@ -415,7 +571,7 @@ export class ScuteClient extends ScuteBaseHttp {
    * @param identifier {ScuteIdentifier}
    * @param userId {UniqueIdentifier}
    * @internal
-   * @see {signInWithVerifyDevice}
+   * @see {@link signInWithVerifyDevice}
    */
   private async _signInWithVerifyDevice(
     identifier: ScuteIdentifier,
@@ -429,7 +585,7 @@ export class ScuteClient extends ScuteBaseHttp {
 
     if (await this._webauthnIsNewDevice(userId, data.options)) {
       return {
-        error: newDeviceError(),
+        error: new NewDeviceError(),
       };
     }
 
@@ -444,28 +600,11 @@ export class ScuteClient extends ScuteBaseHttp {
   }
 
   /**
-   * Log in with the magic link status id if it is consumed.
-   * @param id Magic link status id
-   */
-  async signInWithMagicLinkId(id: UniqueIdentifier) {
-    const { data: payload, error: magicStatusError } =
-      await this.getMagicLinkStatus(id);
-
-    if (magicStatusError) {
-      return { error: magicStatusError };
-    }
-
-    return this.signInWithTokenPayload(payload);
-  }
-
-  /**
    * Log in with the auth payload.
-   * @param payload - {ScuteTokenPayload}
+   * @param payload {ScuteTokenPayload} - Scute auth payload
    */
   async signInWithTokenPayload(payload: ScuteTokenPayload) {
-    await this.setSession(payload);
-    const session = await this.scuteSession.initialState();
-
+    const session = await this.setSession(payload);
     const { data, error: getUserError } = await this.getUser(session.access);
 
     if (getUserError) {
@@ -475,14 +614,19 @@ export class ScuteClient extends ScuteBaseHttp {
     const user = data?.user;
 
     if (!user) {
-      this.scuteSession.removeSession();
+      // something went wrong
+      await this._signOut(session.access);
+
       return { error: null };
     }
 
-    // TODO: email or phone or somehow input identifier ?
-    this._setRememberedIdentifier(user.email);
+    // TODO(backlog): email or phone or somehow input identifier ?
+    // maybe show only some digits on phone number ?
+    if (user.email) {
+      this.setRememberedIdentifier(user.email);
+    }
 
-    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGN_IN, session, user);
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user);
 
     return { error: null };
   }
@@ -498,18 +642,12 @@ export class ScuteClient extends ScuteBaseHttp {
       },
     } = await this._getSession();
 
-    await this.scuteSession.removeSession();
-    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGN_OUT);
+    this.emitAuthChangeEvent(
+      AUTH_CHANGE_EVENTS.SIGNED_OUT,
+      sessionUnAuthenticatedState()
+    );
 
-    if (accessToken) {
-      const { error: signOutError } = await this.admin.signOut(accessToken);
-
-      if (signOutError) {
-        return false;
-      }
-    }
-
-    return true;
+    return this._signOut(accessToken);
   }
 
   /**
@@ -520,7 +658,7 @@ export class ScuteClient extends ScuteBaseHttp {
   async identifierExists(
     identifier: ScuteIdentifier
   ): Promise<ScuteUser | null> {
-    const { data } = await this._getUserByIdentifier(identifier);
+    const { data } = await this.admin.getUserByIdentifier(identifier);
     return data ? data.user : null;
   }
 
@@ -528,7 +666,7 @@ export class ScuteClient extends ScuteBaseHttp {
    * @param identifier {ScuteIdentifier}
    * @returns true if exists and verified
    * @internal
-   * @see {identifierExists}
+   * @see {@link identifierExists}
    */
   private async _identifierExistsAndVerified(
     identifier: ScuteIdentifier
@@ -538,157 +676,12 @@ export class ScuteClient extends ScuteBaseHttp {
   }
 
   /**
-   * @param identifier {ScuteIdentifier}
-   * @internal
-   * @see {identifierExists}
+   * Get the access token from the current session.
    */
-  private async _getUserByIdentifier(identifier: ScuteIdentifier) {
-    return this.get<{ user: ScuteUser | null }>(
-      `/users?identifier=${identifier}`
-    );
-  }
+  async getAuthToken() {
+    const session = await this.initialSessionState();
 
-  /**
-   * @param userId {UniqueIdentifier}
-   * @internal
-   */
-  private async _getUserByUserId(userId: UniqueIdentifier) {
-    return this.get<{ user: ScuteUser | null }>(`/users?user_id=${userId}`);
-  }
-
-  /**
-   * Get current session.
-   * @returns Session
-   */
-  async getSession() {
-    // initialize with cache
-    await this._initialize();
-
-    return this._getSession(true);
-  }
-
-  /**
-   * @param serverCheck {boolean}
-   * @internal
-   * @see {getSession}
-   */
-  private async _getSession(serverCheck?: boolean) {
-    let session = await this.scuteSession.initialState();
-    let user: ScuteUser | null = null;
-
-    if (this.autoRefreshToken) {
-      // refresh silently
-      const { data: refreshedSession, error: refreshError } =
-        await this._maybeRefreshSilently(session);
-
-      if (refreshError) {
-        return {
-          data: { session: ScuteSession.unAuthenticatedState(), user: null },
-          error: refreshError,
-        };
-      }
-
-      session = refreshedSession;
-    }
-
-    if (serverCheck && session.access) {
-      const { data, error: getUserError } = await this.getCurrentUser(
-        session.access
-      );
-
-      if (getUserError) {
-        return {
-          data: { session: ScuteSession.unAuthenticatedState(), user: null },
-          error: getUserError,
-        };
-      }
-
-      user = data?.user ?? null;
-    }
-
-    return { data: { session, user }, error: null };
-  }
-
-  /**
-   * Refresh silently if the access token expires.
-   * @internal
-   * @see {refresh}
-   */
-  private async _maybeRefreshSilently(session: Session) {
-    let error: ScuteError | null = null;
-
-    if (
-      session.refresh &&
-      session.csrf &&
-      session.accessExpiresAt !== null &&
-      new Date() >= session.accessExpiresAt
-    ) {
-      return this.refresh(session);
-    }
-
-    return { data: session, error };
-  }
-
-  /**
-   * Refresh and save new auth token using refresh token.
-   * @param session - Session
-   */
-  async refresh(session?: Session | null) {
-    let error: ScuteError | null = null;
-
-    if (!session) {
-      session = await this.scuteSession.initialState();
-    }
-
-    if (error) {
-      return { data: session, error };
-    }
-
-    if (!session.refresh || !session.csrf) {
-      return { data: session, error };
-    }
-
-    const { data: tokenPayload, error: refreshError } = await this._refresh(
-      session.refresh,
-      session.csrf
-    );
-
-    if (refreshError) {
-      // sign out on error
-      await this.signOut();
-      error = refreshError;
-    } else {
-      await this.setSession(tokenPayload);
-      session = await this.scuteSession.initialState();
-    }
-
-    if (!error) {
-      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESH);
-    }
-
-    return { data: session, error };
-  }
-
-  /**
-   * Set session to the storage. If persistence is not disabled
-   * session will remain between hard refreshes.
-   * @param payload - {ScuteTokenPayload}
-   */
-  async setSession(payload: ScuteTokenPayload) {
-    if (!payload || !payload.access || !payload.refresh) {
-      this.scuteSession.removeSession();
-    }
-
-    const _session: Session = {
-      access: payload.access,
-      refresh: payload.refresh,
-      csrf: payload.csrf,
-      accessExpiresAt: new Date(payload.access_expires_at),
-      refreshExpiresAt: new Date(payload.refresh_expires_at),
-      status: "authenticated",
-    };
-
-    await this.scuteSession.sync(_session);
+    return this._getAuthToken(session);
   }
 
   /**
@@ -697,10 +690,11 @@ export class ScuteClient extends ScuteBaseHttp {
    */
   async getUser(accessToken?: string | null) {
     if (!accessToken) {
-      const { data: access, error } = await this._getAuthToken();
+      const { data: access, error } = await this.getAuthToken();
       if (error) {
-        return { data: null, error };
+        return { data: { user: null }, error };
       }
+
       accessToken = access;
     }
 
@@ -708,33 +702,39 @@ export class ScuteClient extends ScuteBaseHttp {
   }
 
   /**
-   * Get the access token from the current session.
+   * @param accessToken - Auth token
    * @internal
-   * @see {ScuteSession}
+   * @see {@link getUser}
    */
-  private async _getAuthToken() {
-    const session = await this.scuteSession.initialState();
-
-    if (!session.access) {
-      return { data: null, error: loginRequiredError() };
+  protected async getCurrentUser(
+    ...params: Parameters<typeof this._getCurrentUser>
+  ) {
+    if (this.getCurrentUserDeferred) {
+      return this.getCurrentUserDeferred.promise;
     }
 
-    return { data: session.access, error: null };
+    this.getCurrentUserDeferred = new Deferred();
+    const response = await this._getCurrentUser(...params);
+
+    this.getCurrentUserDeferred.resolve(response);
+    this.getCurrentUserDeferred = null;
+
+    return response;
   }
 
   /**
    * @param accessToken - Auth token
    * @internal
-   * @see {getUser}
+   * @see {@link getCurrentUser}
    */
-  protected async getCurrentUser(accessToken: string) {
+  private async _getCurrentUser(accessToken: string) {
     const { data, error } = await this._getCurrentUserRequest(accessToken);
 
     if (error && error.code === 401) {
-      return { data: null, error: loginRequiredError() };
+      return { data: { user: null }, error: new LoginRequiredError() };
     }
 
-    return { data, error };
+    return { data: { user: data?.user ?? null }, error };
   }
 
   /**
@@ -745,32 +745,8 @@ export class ScuteClient extends ScuteBaseHttp {
   private async _getCurrentUserRequest(accessToken: string) {
     return this.get<{ user: ScuteUser | null }>(
       "/current_user",
-      this._accessTokenHeader(accessToken)
+      accessTokenHeader(accessToken)
     );
-  }
-
-  /**
-   * @param identifier {ScuteIdentifier}
-   * @internal
-   */
-  private async _setRememberedIdentifier(identifier: ScuteIdentifier) {
-    console.log("call");
-    return this.scuteSession.setRememberedIdentifier(identifier);
-  }
-
-  /**
-   * Get remembered (last logged) identifier.
-   */
-  async getRememberedIdentifier(): Promise<ScuteIdentifier | null> {
-    const identifier = await this.scuteSession.getRememberedIdentifier();
-    return identifier;
-  }
-
-  /**
-   * Clear remembered (last logged) identifier.
-   */
-  async clearRememberedIdentifier() {
-    return this.storage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
   }
 
   /**
@@ -803,23 +779,34 @@ export class ScuteClient extends ScuteBaseHttp {
     options: webauthn.CredentialCreationOptionsJSON,
     accessToken: string
   ) {
-    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.BIO_REGISTER);
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START);
+    const decodedToken = decodeAccessToken(accessToken);
 
-    const userId = getUserIdFromAccessToken(accessToken);
+    if (!decodedToken) {
+      return { data: null, error: new TechnicalError() };
+    }
 
     try {
       const credential = await webauthn.create(options);
-      this._storeCredentialId(userId, credential.id);
+      this.storeCredentialId(decodedToken.userId, credential.id);
 
-      return this._webauthnDeviceRegisterFinalizeRequest(
-        credential,
-        accessToken
-      );
-    } catch (error) {
+      const { data, error: finalizeError } =
+        await this._webauthnDeviceRegisterFinalizeRequest(
+          credential,
+          accessToken
+        );
+
+      if (finalizeError) {
+        return { data: null, error: finalizeError };
+      }
+
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS);
+
+      return { data, error: null };
+    } catch (error: any) {
       return {
         data: null,
         error: identifyRegistrationError({
-          //@ts-ignore
           error,
           options,
         }),
@@ -830,19 +817,19 @@ export class ScuteClient extends ScuteBaseHttp {
   /**
    * @param accessToken - Auth token
    * @internal
-   * @see {webauthnInitializeRegister}
+   * @see {@link webauthnInitializeRegister}
    */
   private async _webauthnDeviceRegisterInitializeRequest(accessToken: string) {
     return this.post<{
       options: webauthn.CredentialCreationOptionsJSON["publicKey"];
-    }>("/devices/register", undefined, this._accessTokenHeader(accessToken));
+    }>("/devices/register", undefined, accessTokenHeader(accessToken));
   }
 
   /**
    * @param credential - Credential Attestation
    * @param accessToken - Auth token
    * @internal
-   * @see {webauthnFinalizeRegister}
+   * @see {@link webauthnFinalizeRegister}
    */
   private async _webauthnDeviceRegisterFinalizeRequest(
     credential: webauthn.PublicKeyCredentialWithAttestationJSON,
@@ -851,7 +838,7 @@ export class ScuteClient extends ScuteBaseHttp {
     return this.post<ScuteDevice>(
       "/devices/finalize",
       credential,
-      this._accessTokenHeader(accessToken)
+      accessTokenHeader(accessToken)
     );
   }
 
@@ -867,10 +854,10 @@ export class ScuteClient extends ScuteBaseHttp {
    * Finalizes webauthn login by attempting popup
    * and sending credential to the server.
    *
-   * @param options - Credential request options
+   * @param options {webauthn.CredentialRequestOptionsJSON} - Credential request options
    */
   async webauthnFinalizeLogin(options: webauthn.CredentialRequestOptionsJSON) {
-    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.BIO_VERIFY);
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_START);
 
     try {
       const credential = await webauthn.get(options);
@@ -881,15 +868,17 @@ export class ScuteClient extends ScuteBaseHttp {
         return { data: null, error: finalizeError };
       }
 
-      this._storeCredentialId(data.user_id, credential.id);
+      this.storeCredentialId(data.user_id, credential.id);
+
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_SUCCESS);
 
       return { data, error: null };
-    } catch (error) {
+    } catch (error: any) {
       return {
         data: null,
         error: identifyAuthenticationError({
-          error: error as any,
-          options: options as any,
+          error,
+          options,
         }),
       };
     }
@@ -898,7 +887,7 @@ export class ScuteClient extends ScuteBaseHttp {
   /**
    * @param identifier {ScuteIdentifier}
    * @internal
-   * @see {webauthnInitializeLogin}
+   * @see {@link webauthnInitializeLogin}
    */
   private async _webauthnInitializeLoginRequest(identifier: ScuteIdentifier) {
     return this.post<{
@@ -911,7 +900,7 @@ export class ScuteClient extends ScuteBaseHttp {
   /**
    * @param credential - Credential Attestation
    * @internal
-   * @see {webauthnFinalizeLogin}
+   * @see {@link webauthnFinalizeLogin}
    */
   private async _webauthnFinalizeLoginRequest(
     credential: webauthn.PublicKeyCredentialWithAssertionJSON
@@ -929,7 +918,7 @@ export class ScuteClient extends ScuteBaseHttp {
     userId: UniqueIdentifier,
     options: webauthn.CredentialRequestOptionsJSON["publicKey"]
   ): Promise<boolean> {
-    const credentialIds = await this._getCredentialIds(userId);
+    const credentialIds = await this.getCredentialIds(userId);
 
     const isNewDevice =
       credentialIds.length === 0 ||
@@ -941,18 +930,65 @@ export class ScuteClient extends ScuteBaseHttp {
 
   /**
    * Send login magic link and emit the pending event.
+   * @param identifier {ScuteIdentifier}
+   * @param webauthnEnabled {boolean} - Magic link token includes this in the payload
+   * @param emitEvent {boolean} - Emit pending event. Default true.
    */
   async sendLoginMagicLink(
     identifier: ScuteIdentifier,
-    webauthnEnabled?: boolean
+    webauthnEnabled?: boolean,
+    emitEvent: boolean = true
   ) {
-    const { data, error } = await this._sendMagicLinkRequest(
+    const response = await this._sendLoginMagicLink(
       identifier,
-      "login",
       webauthnEnabled
     );
 
-    if (!error) {
+    if (!response.error && emitEvent) {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_PENDING);
+    }
+
+    return response;
+  }
+
+  /**
+   * Send login magic link.
+   * @param identifier {ScuteIdentifier}
+   * @param webauthnEnabled {boolean}
+   * @internal
+   * @see {@link sendLoginMagicLink}
+   */
+  private async _sendLoginMagicLink(
+    identifier: ScuteIdentifier,
+    webauthnEnabled?: boolean
+  ) {
+    return this._sendMagicLinkRequest(
+      identifier,
+      "login",
+      undefined,
+      webauthnEnabled
+    );
+  }
+
+  /**
+   * Send register magic link and emit the pending event.
+   * @param identifier {ScuteIdentifier}
+   * @param webauthnEnabled {boolean}
+   * @param emitEvent {boolean} - Emit pending event. Default true.
+   */
+  async sendRegisterMagicLink(
+    identifier: ScuteIdentifier,
+    userMeta?: Record<string, any>,
+    webauthnEnabled?: boolean,
+    emitEvent: boolean = true
+  ) {
+    const { data, error } = await this._sendRegisterMagicLink(
+      identifier,
+      userMeta,
+      webauthnEnabled
+    );
+
+    if (!error && emitEvent) {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_PENDING);
     }
 
@@ -960,38 +996,40 @@ export class ScuteClient extends ScuteBaseHttp {
   }
 
   /**
-   * Send register magic link and emit the pending event.
+   * Send register magic link.
+   * @param identifier {ScuteIdentifier}
+   * @param webauthnEnabled {boolean}
+   * @internal
+   * @see {@link sendRegisterMagicLink}
    */
-  async sendRegisterMagicLink(
+  private async _sendRegisterMagicLink(
     identifier: ScuteIdentifier,
+    userMeta?: Record<string, any>,
     webauthnEnabled?: boolean
   ) {
-    const { data, error } = await this._sendMagicLinkRequest(
+    return this._sendMagicLinkRequest(
       identifier,
       "register",
+      userMeta,
       webauthnEnabled
     );
-
-    if (!error) {
-      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_PENDING);
-    }
-
-    return { data, error };
   }
 
   /**
    * Send magic link request.
    * @internal
-   * @see {sendLoginMagicLink}
-   * @see {sendRegisterMagicLink}
+   * @see {@link sendLoginMagicLink}
+   * @see {@link sendRegisterMagicLink}
    */
   private async _sendMagicLinkRequest(
     identifier: ScuteIdentifier,
     method: "register" | "login" = "login",
+    userMeta?: Record<string, any>,
     webauthnEnabled = isWebauthnSupported()
   ) {
     return this.post<ScuteMagicLinkIdResponse>(`/magic_links/${method}`, {
       identifier,
+      ...(method === "register" ? { user_meta: userMeta } : null),
       webauthn_enabled: webauthnEnabled ?? isWebauthnSupported(),
     });
   }
@@ -1007,69 +1045,14 @@ export class ScuteClient extends ScuteBaseHttp {
   }
 
   /**
-   * Verify magic link token
-   * @param token Magic link token (sct_magic)
-   */
-  async verifyMagicLink(token: string) {
-    return this.patch<ScuteTokenPayload>("/magic_links/authenticate", {
-      token,
-    });
-  }
-
-  /**
-   * Get credential store for new device checks.
-   * @internal
-   */
-  private async _getCredentialStore() {
-    const credData = await this.storage.getItem(SCUTE_CRED_STORAGE_KEY);
-    const parsed = credData ? JSON.parse(credData) : {};
-
-    return parsed;
-  }
-
-  /**
-   * Get all stored credential ids as array.
-   * @param userId {UniqueIdentifier}
-   */
-  private async _getCredentialIds(userId: UniqueIdentifier): Promise<string[]> {
-    const store = await this._getCredentialStore();
-    return Array.isArray(store[userId]) ? store[userId] : [store[userId]];
-  }
-
-  /**
-   * Store credential id.
-   * @param userId {UniqueIdentifier}
-   * @param credentialId {UniqueIdentifier}
-   * @internal
-   */
-  private async _storeCredentialId(
-    userId: UniqueIdentifier,
-    credentialId: UniqueIdentifier
-  ) {
-    return this.storage.setItem(
-      SCUTE_CRED_STORAGE_KEY,
-      JSON.stringify({
-        ...this._getCredentialStore(),
-        [userId]: Array.from(
-          new Set(
-            [...(await this._getCredentialIds(userId)), credentialId].filter(
-              Boolean
-            )
-          )
-        ),
-      })
-    );
-  }
-
-  /**
    * @internal
-   * @see {refresh}
+   * @see {@link refreshSession}
    */
-  private async _refresh(jwt: string, csrf: string) {
+  protected async _refreshRequest(jwt: string, csrf: string) {
     return this.post<ScuteTokenPayload>(
-      "/auth/refresh",
+      "/tokens/refresh",
       null,
-      this._refreshTokenHeaders(jwt, csrf)
+      refreshTokenHeaders(jwt, csrf)
     );
   }
 
@@ -1079,44 +1062,18 @@ export class ScuteClient extends ScuteBaseHttp {
    * @param session {Session}
    * @param user {ScuteUser}
    * @internal
-   * @see {onAuthStateChange}
+   * @see {@link onAuthStateChange}
    */
   protected emitAuthChangeEvent(
     event: AuthChangeEvent,
-    session?: Session,
-    user?: ScuteUser
+    session?: Session | null,
+    user?: ScuteUser | null
   ) {
     this.emitter.emit(INTERNAL_EVENTS.AUTH_STATE_CHANGED, {
       event,
       session,
       user,
     });
-  }
-
-  /**
-   * Get access token header object.
-   */
-  private _accessTokenHeader(jwt: string | null): HeadersInit {
-    if (!jwt) return {};
-
-    return {
-      "X-Authorization": `Bearer ${jwt}`,
-    };
-  }
-
-  /**
-   * Get refresh token headers object.
-   */
-  private _refreshTokenHeaders(
-    jwt: string | null,
-    csrf: string | null
-  ): HeadersInit {
-    if (!jwt || !csrf) return {};
-
-    return {
-      "X-Refresh-Token": jwt,
-      "X-CSRF-Token": csrf,
-    };
   }
 }
 
@@ -1127,3 +1084,5 @@ export class ScuteClient extends ScuteBaseHttp {
 export const createClient = (
   ...params: ConstructorParameters<typeof ScuteClient>
 ) => new ScuteClient(...params);
+
+export default ScuteClient;

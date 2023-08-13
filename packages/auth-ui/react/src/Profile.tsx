@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useAuth, type ScuteClient, type Session } from "@scute/react";
-import { Badge, Button, ElementCard, Flex } from "./components";
+import type { ScuteClient } from "@scute/core";
 import type { Theme } from "@scute/ui-shared";
+import { Badge, Button, ElementCard, Flex } from "./components";
 import { createTheme } from "./stitches.config";
 
 export type ProfileProps = {
@@ -13,11 +13,7 @@ export type ProfileProps = {
 
 const Profile = ({ scuteClient, appearance }: ProfileProps) => {
   const [isDevicesLoading, setIsDevicesLoading] = useState(true);
-  const { session, user, signOut, isAuthenticated } = useAuth();
-
-  if (!isAuthenticated) {
-    return null;
-  }
+  const user = null as any;
 
   // TODO
   const userT: any = {};
@@ -79,7 +75,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
           </Flex>
         )}
       </ElementCard>
-      <Button onClick={() => signOut()}>Logout</Button>
+      <Button onClick={() => scuteClient.signOut()}>Logout</Button>
     </div>
   );
 };

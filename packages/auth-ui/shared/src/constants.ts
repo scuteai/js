@@ -2,8 +2,10 @@ import type { ValueOf } from "type-fest";
 
 export const VIEWS = {
   SIGN_IN_OR_UP: "sign-in-or-up",
-  BIO_REGISTER: "bio-register",
-  BIO_VERIFY: "bio-verify",
+  SIGN_IN: "sign-in",
+  SIGN_UP: "sign-up",
+  WEBAUTHN_REGISTER: "webauthn-register",
+  WEBAUTHN_VERIFY: "webauthn-verify",
   MAGIC_LOADING: "magic-loading",
   MAGIC_PENDING: "magic-pending",
   MAGIC_NEW_DEVICE_PENDING: "magic-new-device-pending",

@@ -1,5 +1,19 @@
-import { ScuteIdentifier } from "@scute/react";
-import { FingerprintIcon, MagicMailIcon } from "../assets/icons";
+import {
+  type ScuteClient,
+  type ScuteIdentifier,
+  type ScuteAppData,
+  type ScuteUserMetaDataSchema,
+  type UniqueIdentifier,
+  getMeaningfulError,
+  ScuteIdentifierType,
+  IdentifierAlreadyExistsError,
+  IdentifierNotRecognizedError,
+} from "@scute/core";
+
+import debounce from "lodash.debounce";
+import { useEffect, useState } from "react";
+import { FingerprintIcon, MagicMailIcon, BellIcon } from "../assets/icons";
+import type { CommonViewProps } from "./common";
 import {
   Button,
   Flex,
@@ -10,120 +24,433 @@ import {
   Label,
   Text,
   TextField,
+  Badge,
+  IconHolder,
+  Panel,
 } from "../components";
-import type { CommonViewProps } from "./common";
-import RememberedIdentifierPanel from "./RememberedIdentifierPanel";
 
-interface SignInProps extends CommonViewProps {
-  handleEmailChange: React.ChangeEventHandler<HTMLInputElement>;
-  handleSignInOrUp: () => void;
-  webauthnAvailable: boolean;
-  rememberedIdentifier?: ScuteIdentifier | null;
-  resetRememberedIdentifier: () => void;
+import {
+  SubmitHandler,
+  useForm,
+  type FieldValues,
+  type SubmitErrorHandler,
+} from "react-hook-form";
+import { getIdentifierType } from "../helpers/identifierType";
+import PhoneInput from "../components/PhoneInput";
+import { VIEWS } from "@scute/ui-shared";
+
+interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
+  identifier: ScuteIdentifier;
+  setIdentifier: React.Dispatch<React.SetStateAction<ScuteIdentifier>>;
+  mode?: "sign_in" | "sign_up" | "sign_in_or_up";
+  appData: ScuteAppData;
+  webauthnEnabled?: boolean;
+  getMagicLinkIdCallback?: (magicLinkId: UniqueIdentifier) => void;
 }
 
-const SignIn = ({
-  identifier,
-  scuteClient,
-  setAuthView,
-  handleEmailChange,
-  handleSignInOrUp,
-  error,
-  webauthnAvailable,
-  rememberedIdentifier,
-  resetRememberedIdentifier,
-}: SignInProps) => {
+const SignInOrUp = (props: SignInOrUpProps) => {
+  const {
+    scuteClient,
+    identifier,
+    setIdentifier,
+    setAuthView,
+    appData,
+    mode = "sign_in_or_up",
+    webauthnEnabled = true,
+    setIsFatalError,
+    getMagicLinkIdCallback,
+  } = props;
+
+  const registerFormProps: SignInOrUpProps = { ...props };
+
+  const {
+    register,
+    handleSubmit,
+    trigger,
+    formState: { errors, isValid },
+  } = useForm();
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+
+  const [error, setError] = useState<string | null>(null);
+
+  const {
+    signInOrUpText,
+    identifierLabelText,
+    isEmailIdentifierAllowed,
+    isPhoneIdentifierAllowed,
+  } = useSignInOrUpFormHelpers(identifier, appData, mode);
+
+  const [rememberedIdentifier, setRememberedIdentifier] =
+    useRememberedIdentifier(scuteClient);
+
+  const isWebauthnAvailable =
+    webauthnEnabled && scuteClient.isWebauthnSupported();
+
+  const handleValidSubmit = async () => {
+    const _identifier = (
+      identifier ? identifier : rememberedIdentifier
+    ) as string;
+
+    setIdentifier(_identifier);
+    const user = await scuteClient.identifierExists(_identifier);
+
+    if (!user && mode === "sign_in") {
+      setError(new IdentifierNotRecognizedError().message);
+      return;
+    } else if (user && mode === "sign_up") {
+      setError(new IdentifierAlreadyExistsError().message);
+      return;
+    }
+
+    if (user) {
+      // login
+      if (webauthnEnabled && user.webauthn_enabled) {
+        setAuthView(VIEWS.WEBAUTHN_VERIFY);
+      } else {
+        const { data, error: magicLinkError } =
+          await scuteClient.sendLoginMagicLink(_identifier);
+
+        if (magicLinkError) {
+          const { isFatal, message: errorMsg } =
+            getMeaningfulError(magicLinkError);
+          setIsFatalError?.(isFatal);
+          setError(errorMsg);
+          return;
+        }
+
+        getMagicLinkIdCallback?.(data.magic_link.id);
+      }
+    } else {
+      // register
+      setShowRegisterForm(true);
+    }
+  };
+
   return (
     <>
       <Header>
-        <Flex>
-          <TempAvatar />
-        </Flex>
+        <Flex>{/* TODO: logo */}</Flex>
       </Header>
       <Inner>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSignInOrUp();
-          }}
-        >
-          {rememberedIdentifier ? (
-            <RememberedIdentifierPanel
-              identifier={rememberedIdentifier}
-              resetHandler={() => resetRememberedIdentifier()}
-            />
-          ) : (
-            <>
-              <Heading size="1" css={{ color: "$headingColor" }}>
-                Welcome
-              </Heading>
-              <Text css={{ color: "$textColor" }}>
-                Sign in to your account using your email
-              </Text>
-
-              <Group>
-                <Label>Email address</Label>
-                <TextField
-                  name="email"
-                  type="text"
-                  size="2"
-                  autoFocus={true}
-                  autoComplete="webauthn"
-                  required
-                  placeholder="example@email.com"
-                  value={identifier}
-                  onChange={handleEmailChange}
-                  state={error ? "invalid" : "valid"}
-                />
-                {error && (
-                  <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                    {error}
-                  </Text>
-                )}
-              </Group>
-            </>
-          )}
-          <Flex>
-            {webauthnAvailable ? (
-              <Button size="2" type="submit" disabled={!!error}>
-                <span>Continue</span>
-                <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
-              </Button>
+        {!showRegisterForm ? (
+          <form onSubmit={handleSubmit(handleValidSubmit)}>
+            {mode !== "sign_up" && rememberedIdentifier ? (
+              <>
+                <Heading size="1" css={{ color: "$headingColor" }}>
+                  Welcome back!
+                </Heading>
+                <Panel css={{ mt: "$4", mb: "$5" }}>
+                  <Flex gap={2} css={{ ai: "center", jc: "space-between" }}>
+                    <Flex>
+                      <IconHolder>
+                        <BellIcon />
+                      </IconHolder>
+                      <Flex css={{ fd: "column" }}>
+                        <Text size="1" css={{ pl: "$2" }}>
+                          Sign in as
+                        </Text>
+                        <Badge>{rememberedIdentifier}</Badge>
+                      </Flex>
+                    </Flex>
+                    <Button
+                      variant="alt"
+                      onClick={() => setRememberedIdentifier(null)}
+                    >
+                      Change user
+                    </Button>
+                  </Flex>
+                </Panel>
+              </>
             ) : (
-              <Button size="2" type="submit">
-                <span>Continue with magic link</span>
-                <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
-              </Button>
-            )}
-          </Flex>
-        </form>
+              <>
+                <Heading
+                  css={{
+                    color: "$headingColor",
+                    fontSize: "large",
+                    textAlign: "center",
+                  }}
+                >
+                  {signInOrUpText}
+                </Heading>
 
-        {rememberedIdentifier ? (
-          <Flex css={{ pt: "$3", jc: "center" }}></Flex>
+                <Group>
+                  <Label>{identifierLabelText}</Label>
+                  <TextField
+                    placeholder={identifierLabelText}
+                    {...register("identifier", {
+                      required: "Identifier is required.",
+                    })}
+                    size="2"
+                    autoComplete={`webauthn ${
+                      isEmailIdentifierAllowed ? "email" : ""
+                    }${isPhoneIdentifierAllowed ? "tel" : ""}`}
+                    state={error ? "invalid" : "valid"}
+                    onChange={(e) => {
+                      const identifier = e.target.value;
+                      setIdentifier(identifier);
+
+                      debounce(async () => {
+                        await trigger("identifier");
+                      }, 500)();
+                    }}
+                  />
+                  {error ||
+                    (!isValid && errors.identifier ? (
+                      <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                        <>{error || errors.identifier.message}</>
+                      </Text>
+                    ) : null)}
+                </Group>
+              </>
+            )}
+
+            <Flex>
+              {isWebauthnAvailable || mode === "sign_up" ? (
+                <Button
+                  size="2"
+                  type="submit"
+                  disabled={!!error || (!rememberedIdentifier && !isValid)}
+                >
+                  <span>Continue</span>
+                  {isWebauthnAvailable ? (
+                    <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
+                  ) : null}
+                </Button>
+              ) : (
+                <Button size="2" type="submit">
+                  <span>Continue with magic link</span>
+                  <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
+                </Button>
+              )}
+            </Flex>
+          </form>
         ) : (
-          ""
+          <RegisterForm {...registerFormProps} />
         )}
       </Inner>
     </>
   );
 };
 
-export default SignIn;
+const RegisterForm = ({
+  scuteClient,
+  identifier,
+  appData,
+  mode,
+  setIsFatalError,
+  getMagicLinkIdCallback,
+}: SignInOrUpProps) => {
+  const { register, handleSubmit, trigger, formState, reset } = useForm();
+  const { errors, isValid } = formState;
 
-const TempAvatar = () => (
-  <svg
-    width="56"
-    height="56"
-    viewBox="0 0 56 56"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <circle cx="28" cy="28" r="28" fill="#EEEEEE" />
-    <path
-      fillRule="evenodd"
-      clipRule="evenodd"
-      d="M43.8412 12.1491C43.8401 12.1484 43.8394 12.1473 43.8383 12.1466C43.8347 12.1433 43.8314 12.1404 43.8278 12.1375C43.8179 12.1284 43.8078 12.1197 43.7972 12.1113C43.6061 11.9612 43.3364 11.963 43.1478 12.116C33.1264 18.8708 23.1701 19.5071 12.8575 12.1222H12.8571C12.6834 11.9761 12.4352 11.9594 12.2437 12.0808C12.2422 12.0819 12.2408 12.083 12.2393 12.0841C12.2266 12.0921 12.2139 12.1008 12.2019 12.1102C12.199 12.1128 12.1957 12.1153 12.1928 12.1179C12.1833 12.1255 12.1743 12.1335 12.1655 12.1415C12.1597 12.1469 12.1539 12.1527 12.1485 12.1586C12.1426 12.1644 12.1368 12.1706 12.131 12.1771C12.123 12.1862 12.1154 12.1953 12.1081 12.2051C12.1056 12.2084 12.1034 12.2116 12.1008 12.2145C12.0914 12.228 12.0823 12.2414 12.074 12.2556C11.9595 12.4475 11.9802 12.6906 12.1248 12.8607C19.5049 23.1712 18.8697 33.1254 12.1197 43.1446H12.1201C11.9606 43.3372 11.9598 43.6156 12.1187 43.8086C12.1197 43.8104 12.1208 43.8119 12.1219 43.8137H12.1227C12.1296 43.821 12.1365 43.8282 12.1437 43.8351C12.1495 43.8413 12.1554 43.8471 12.1615 43.853C12.1641 43.8555 12.1666 43.858 12.1692 43.8606C12.3592 44.0372 12.65 44.047 12.8513 43.8842C22.8764 37.1332 32.8281 36.4932 43.1416 43.8769C43.3153 44.0234 43.5643 44.0405 43.7565 43.9191C43.758 43.9173 43.7594 43.9155 43.7609 43.9137C43.7736 43.9057 43.786 43.8969 43.7979 43.8878C43.8009 43.8853 43.8041 43.8828 43.807 43.8799C43.8165 43.8726 43.8256 43.8646 43.8343 43.8566C43.8401 43.8508 43.8459 43.8453 43.8514 43.8391C43.8572 43.8333 43.8634 43.8272 43.8688 43.821C43.8768 43.8119 43.8844 43.8024 43.8917 43.793C43.8942 43.7897 43.8968 43.7865 43.899 43.7832C43.9088 43.7701 43.9175 43.7563 43.9259 43.7425C44.0403 43.5509 44.02 43.3082 43.8757 43.1381C36.4949 32.8267 37.1334 22.8772 43.8801 12.8532C44.0396 12.6606 44.04 12.3822 43.8812 12.1896C43.8801 12.1882 43.8793 12.1871 43.8783 12.1856C43.8779 12.1856 43.8779 12.1853 43.8775 12.1849C43.871 12.1773 43.8641 12.17 43.8572 12.1627C43.8525 12.1576 43.8477 12.1522 43.843 12.1471L43.8412 12.1491Z"
-      fill="#2F2F2F"
-    />
-  </svg>
-);
+  const [error, setError] = useState<string | null>(null);
+
+  const {
+    allowedIdentifiers,
+    requiredIdentifiers,
+    maybeNeededIdentifierType,
+    maybeNeededIdentifierLabel,
+  } = useSignInOrUpFormHelpers(identifier, appData, mode);
+
+  const handleSignUp: SubmitHandler<FieldValues> = async (values) => {
+    const { data: pollingData, error: signUpError } = await scuteClient.signUp(
+      identifier,
+      {
+        userMeta: values,
+      }
+    );
+
+    if (signUpError) {
+      const { isFatal, message: errorMsg } = getMeaningfulError(signUpError);
+      setIsFatalError?.(isFatal);
+      setError(errorMsg);
+      return;
+    }
+
+    if (pollingData) {
+      const magicLinkId = pollingData.magic_link.id;
+      getMagicLinkIdCallback?.(magicLinkId);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(handleSignUp)}>
+      <div>
+        <span>Let's get yodu set up. We'll need following information:</span>
+        {error ||
+          (errors && (
+            <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+              {error
+                ? error
+                : Object.keys(errors).length !== 0
+                ? "Please correct all highlighted errors."
+                : null}
+            </Text>
+          ))}
+      </div>
+      <br />
+      <div>
+        {(
+          [
+            {
+              name: "First Name",
+              field_name: "first_name",
+              type: "string",
+            },
+            {
+              name: "Last Name",
+              field_name: "last_name",
+              type: "string",
+            },
+          ] as ScuteUserMetaDataSchema[]
+        ).map(({ name, field_name, type }) => (
+          <Group key={field_name}>
+            <Label>{name}</Label>
+            <TextField
+              placeholder={name}
+              {...register(field_name, {
+                required: "This field is required.",
+              })}
+              size="2"
+              onChange={debounce(async () => {
+                await trigger(field_name);
+              }, 500)}
+            />
+
+            {errors[field_name] ? (
+              <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                <>{errors[field_name]?.message}</>
+              </Text>
+            ) : null}
+          </Group>
+        ))}
+
+        {allowedIdentifiers.length > 1 ? (
+          <>
+            {/* // TODO
+          // maybeNeededIdentifierType === "phone" ? (
+          //   <PhoneInput
+          //     // {...register(maybeNeededIdentifierType, {
+          //     //   required: requiredIdentifiers.includes(
+          //     //     maybeNeededIdentifierType
+          //     //   ),
+          //     // })}
+          //   />
+          // ) : ( */}
+            <Group>
+              <Label>{maybeNeededIdentifierLabel}</Label>
+              <TextField
+                placeholder={maybeNeededIdentifierLabel}
+                {...register(maybeNeededIdentifierType, {
+                  required: requiredIdentifiers.includes(
+                    maybeNeededIdentifierType
+                  )
+                    ? "This field is required."
+                    : undefined,
+                })}
+                size="2"
+                onChange={() =>
+                  debounce(async () => {
+                    await trigger(maybeNeededIdentifierType);
+                  }, 500)
+                }
+              />
+            </Group>
+            {errors[maybeNeededIdentifierType] ? (
+              <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                <>{errors[maybeNeededIdentifierType]?.message}</>
+              </Text>
+            ) : null}
+          </>
+        ) : // )
+        null}
+        {appData.user_meta_data_schema.map(({ field_name, name, type }) => (
+          <Group key={field_name}>
+            <Label>{name}</Label>
+            <TextField
+              placeholder={name}
+              type={type}
+              {...register(field_name, {
+                required: "This field is required.",
+                valueAsNumber: type === "number" ? true : undefined,
+              })}
+              size="2"
+              onChange={debounce(async () => {
+                await trigger(field_name);
+              }, 500)}
+            />
+            {errors[field_name] ? (
+              <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                <>{errors[field_name]?.message}</>
+              </Text>
+            ) : null}
+          </Group>
+        ))}
+      </div>
+      <br />
+      <Button size="2" type="submit" disabled={!!error || !isValid}>
+        <span>Continue</span>
+      </Button>
+    </form>
+  );
+};
+
+const useSignInOrUpFormHelpers = (
+  identifier: ScuteIdentifier,
+  appData: ScuteAppData,
+  mode: SignInOrUpProps["mode"]
+) => {
+  const allowedIdentifiers = appData.allowed_identifiers;
+  const requiredIdentifiers = appData.required_identifiers;
+  const isPublicSignUpAllowed = appData.public_signup !== false;
+  const identifierType = getIdentifierType(identifier);
+
+  let signInOrUpText = "Sign Up or Log in";
+  if (!isPublicSignUpAllowed || mode === "sign_in") {
+    signInOrUpText = "Log in";
+  } else if (mode === "sign_up") {
+    signInOrUpText = "Sign Up";
+  }
+
+  const isEmailIdentifierAllowed = allowedIdentifiers.includes("email");
+  const isPhoneIdentifierAllowed = allowedIdentifiers.includes("phone");
+
+  let identifierLabelText = "Email";
+  if (isEmailIdentifierAllowed && isPhoneIdentifierAllowed) {
+    identifierLabelText = "Email or Phone number";
+  } else if (isPhoneIdentifierAllowed) {
+    identifierLabelText = "Phone number";
+  }
+
+  const maybeNeededIdentifierType: ScuteIdentifierType =
+    identifierType === "email" ? "phone" : "email";
+  const maybeNeededIdentifierLabel =
+    maybeNeededIdentifierType === "email" ? "Email" : "Phone number";
+
+  return {
+    isPublicSignUpAllowed,
+    signInOrUpText,
+    identifierLabelText,
+    allowedIdentifiers,
+    requiredIdentifiers,
+    isEmailIdentifierAllowed,
+    isPhoneIdentifierAllowed,
+    maybeNeededIdentifierType,
+    maybeNeededIdentifierLabel,
+  };
+};
+
+const useRememberedIdentifier = (scuteClient: ScuteClient) => {
+  const state = useState<ScuteIdentifier | null>(null);
+  const [_rememberedIdentifier, setRememberedIdentifier] = state;
+
+  useEffect(() => {
+    scuteClient
+      .getRememberedIdentifier()
+      .then((identifier) => setRememberedIdentifier(identifier));
+  }, [scuteClient]);
+
+  return state;
+};
+
+export default SignInOrUp;

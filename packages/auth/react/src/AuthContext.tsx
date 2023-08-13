@@ -1,9 +1,9 @@
 import { useEffect, useState, createContext, useContext } from "react";
 import {
   ScuteClient,
-  ScuteSession,
   type Session,
   type ScuteUser,
+  sessionLoadingState,
 } from "@scute/core";
 
 export type AuthSession = {
@@ -39,11 +39,7 @@ export const AuthContextProvider = ({
   scuteClient,
   children,
 }: AuthContextProviderProps) => {
-  const [session, setSession] = useState<Session>({
-    ...ScuteSession.unAuthenticatedState(),
-    status: "loading",
-  });
-
+  const [session, setSession] = useState<Session>(sessionLoadingState());
   const [user, setUser] = useState<ScuteUser | null>(null);
 
   useEffect(() => {
