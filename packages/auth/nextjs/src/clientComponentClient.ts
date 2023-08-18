@@ -1,25 +1,17 @@
-import { ScuteBrowserCookieStorage, ScuteError } from "@scute/react";
+import { ScuteBrowserCookieStorage } from "@scute/core";
+import { getRefreshHandlerPath } from "./handlers";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 
 let scute: ReturnType<typeof createScuteClient>;
 
 export const createClientComponentClient = (
-  config?: ScuteNextjsClientConfig
-) => {
-  const appId = config?.appId ?? process.env.NEXT_PUBLIC_SCUTE_APP_ID;
-  const baseUrl = config?.baseUrl ?? process.env.NEXT_PUBLIC_SCUTE_BASE_URL;
-
-  if (!appId) {
-    throw new ScuteError({
-      message: "either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!",
-    });
+  config?: ScuteNextjsClientConfig & {
+    handlersPrefix?: string;
   }
-
+) => {
   const createNewClient = () => {
-    return createScuteClient({
+    const scute = createScuteClient({
       ...config,
-      appId,
-      baseUrl,
       preferences: {
         ...config?.preferences,
         sessionStorageAdapter: new ScuteBrowserCookieStorage({
@@ -27,6 +19,25 @@ export const createClientComponentClient = (
         }),
       },
     });
+
+    scute.setRefreshProxyCallback(async () => {
+      // TODO
+      try {
+        (
+          await fetch(getRefreshHandlerPath(config?.handlersPrefix), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            // body: JSON.stringify({
+            //   csrfToken,
+            // }),
+          })
+        ).json();
+      } catch {}
+    });
+
+    return scute;
   };
 
   const _scute = scute ?? createNewClient();

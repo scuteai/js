@@ -29,12 +29,7 @@ import {
   Panel,
 } from "../components";
 
-import {
-  SubmitHandler,
-  useForm,
-  type FieldValues,
-  type SubmitErrorHandler,
-} from "react-hook-form";
+import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
 import { getIdentifierType } from "../helpers/identifierType";
 import PhoneInput from "../components/PhoneInput";
 import { VIEWS } from "@scute/ui-shared";
@@ -129,7 +124,10 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   return (
     <>
       <Header>
-        <Flex>{/* TODO: logo */}</Flex>
+        <Flex>
+          {/* TODO: dark mode logo? */}
+          <img height="150" width="150" src={appData.logo}/>
+        </Flex>
       </Header>
       <Inner>
         {!showRegisterForm ? (
@@ -276,7 +274,7 @@ const RegisterForm = ({
   return (
     <form onSubmit={handleSubmit(handleSignUp)}>
       <div>
-        <span>Let's get yodu set up. We'll need following information:</span>
+        <span>Let's get you set up. We'll need following information:</span>
         {error ||
           (errors && (
             <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>

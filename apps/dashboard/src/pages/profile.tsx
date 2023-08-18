@@ -1,7 +1,7 @@
 import { Content, Container } from "@scute/ui";
 import { AppLayout } from "@/components/shared/AppLayout";
 import { darkTheme, Profile } from "@scute/ui-react";
-import { useScuteClient } from "@scute/nextjs";
+import { useScuteClient } from "@scute/react";
 
 export default function ProfilePage() {
   const scuteClient = useScuteClient();

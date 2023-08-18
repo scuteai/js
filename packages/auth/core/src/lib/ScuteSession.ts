@@ -3,7 +3,6 @@ import {
   AUTH_CHANGE_EVENTS,
   SCUTE_ACCESS_STORAGE_KEY,
   SCUTE_CRED_STORAGE_KEY,
-  SCUTE_CSRF_STORAGE_KEY,
   SCUTE_LAST_LOGIN_STORAGE_KEY,
   SCUTE_REFRESH_STORAGE_KEY,
 } from "./constants";
@@ -15,7 +14,7 @@ import {
   isBrowser,
 } from "./helpers";
 import { UniqueIdentifier } from "./types/general";
-import { ScuteIdentifier, ScuteTokenPayload, ScuteUser } from "./types/scute";
+import { ScuteIdentifier, ScuteTokenPayload } from "./types/scute";
 import { AuthenticatedSession, Session } from "./types/session";
 
 /** session will be checked for refresh at this interval */
@@ -50,8 +49,19 @@ export abstract class ScuteSession {
     ...params: Parameters<ScuteClient["emitAuthChangeEvent"]>
   ): ReturnType<ScuteClient["emitAuthChangeEvent"]>;
 
-  protected refreshProxyCallback = async () =>
-    ({} as Partial<ScuteTokenPayload>);
+  /** @internal */
+  protected abstract _initialize(
+    ...params: Parameters<ScuteClient["_initialize"]>
+  ): ReturnType<ScuteClient["_initialize"]>;
+
+  /** @internal */
+  protected abstract debug(
+    ...params: Parameters<ScuteClient["debug"]>
+  ): ReturnType<ScuteClient["debug"]>;
+
+  protected refreshProxyCallback:
+    | (() => Promise<Partial<ScuteTokenPayload> | void>)
+    | null = null;
 
   protected refreshDeferred: Deferred<
     Awaited<ReturnType<ScuteSession["__refresh"]>>
@@ -75,36 +85,55 @@ export abstract class ScuteSession {
    * @see {@link getSession}
    */
   protected async _getSession(fresh?: boolean, emitRefetchEvent = true) {
-    let session = await this.initialSessionState();
-    let user: ScuteUser | null = null;
+    await this._initialize();
 
-    if (session.access) {
-      const expiresWithMargin =
-        session.accessExpiresAt.getTime() <
-        new Date().getTime() + EXPIRY_MARGIN * 1000;
+    const now = new Date();
+    let session = await this.initialSessionState();
+
+    if (session.access || session.refresh || this.refreshProxyCallback) {
+      const expiresWithMargin = session.access
+        ? session.accessExpiresAt.getTime() <
+          now.getTime() + EXPIRY_MARGIN * 1000
+        : true;
 
       if (expiresWithMargin) {
         if (this.config.autoRefreshToken) {
+          this.debug(
+            "#_getSession",
+            "session expires with margin",
+            "trying refresh"
+          );
           const { data: refreshedSession, error: refreshError } =
             await this._refresh(session);
 
           if (refreshError) {
+            this.debug("#_getSession", "refreshError");
             await this._handleRefreshError(refreshError);
             session = unAuthenticatedState();
           } else {
+            this.debug("#_getSession", "refreshed");
             session = refreshedSession;
           }
         } else {
+          this.debug(
+            "#_getSession",
+            "autoRefresh disabled",
+            "expiring session"
+          );
+
           await this._expireSession();
         }
       }
-
-      if (fresh) {
-        return this._refetchSession(session, emitRefetchEvent);
-      }
     }
 
-    return { data: { session, user }, error: null };
+    if (fresh) {
+      return this._refetchSession(session, emitRefetchEvent);
+    }
+
+    return {
+      data: { session, user: null },
+      error: null,
+    };
   }
 
   /**
@@ -115,33 +144,27 @@ export abstract class ScuteSession {
     const access = await this.scuteStorage.getItem(SCUTE_ACCESS_STORAGE_KEY);
     const refresh =
       (await this.scuteStorage.getItem(SCUTE_REFRESH_STORAGE_KEY)) ?? undefined;
-    const csrf =
-      (await this.scuteStorage.getItem(SCUTE_CSRF_STORAGE_KEY)) ?? undefined;
 
-    const session = {
-      access,
-      refresh,
-      csrf,
-    } as Session;
+    const decodedAccess = access ? decodeAccessToken(access) : undefined;
+    const decodedRefresh = refresh ? decodeRefreshToken(refresh) : undefined;
 
-    const decodedAccess = session.access
-      ? decodeAccessToken(session.access)
-      : undefined;
+    const isAuthenticated = !!access && !!decodedAccess;
 
-    if (!session.access || !decodedAccess) {
-      return unAuthenticatedState();
+    if (!isAuthenticated) {
+      return {
+        access: null,
+        accessExpiresAt: null,
+        refresh,
+        refreshExpiresAt: decodedRefresh?.expiresAt,
+        status: "unauthenticated",
+      };
     }
 
-    const decodedRefresh = session.refresh
-      ? decodeRefreshToken(session.refresh)
-      : undefined;
-
     return {
-      access: session.access,
+      access,
       accessExpiresAt: decodedAccess.expiresAt,
-      refresh: session.refresh,
+      refresh,
       refreshExpiresAt: decodedRefresh?.expiresAt,
-      csrf: session.csrf,
       status: "authenticated",
     };
   }
@@ -150,6 +173,10 @@ export abstract class ScuteSession {
    * Refetch session.
    */
   async refetchSession() {
+    if (this.refreshDeferred?.promise) {
+      await this.refreshDeferred.promise;
+    }
+
     const session = await this.initialSessionState();
     return this._refetchSession(session);
   }
@@ -183,7 +210,10 @@ export abstract class ScuteSession {
       );
     }
 
-    return { data: { session, user: data.user }, error: null };
+    return {
+      data: { session, user: data.user },
+      error: null,
+    };
   }
 
   /**
@@ -191,6 +221,7 @@ export abstract class ScuteSession {
    */
   async refreshSession() {
     const session = await this.initialSessionState();
+
     const { data: refreshedSession, error: refreshError } = await this._refresh(
       session
     );
@@ -198,8 +229,6 @@ export abstract class ScuteSession {
     if (refreshError) {
       return this._handleRefreshError(refreshError);
     }
-
-    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
 
     return { data: refreshedSession, error: null };
   }
@@ -210,15 +239,20 @@ export abstract class ScuteSession {
    * @param payload - {ScuteTokenPayload}
    */
   protected async setSession(payload: Partial<ScuteTokenPayload>) {
-    if (!payload || !payload.access) {
-      this.removeSession();
+    const decodedAccess = payload.access
+      ? decodeAccessToken(payload.access)
+      : null;
+
+    if (!payload || !payload.access || !decodedAccess) {
+      await this.removeSession();
 
       return unAuthenticatedState();
     }
 
-    const decodedAccess = decodeAccessToken(payload.access);
-    if (!decodedAccess) {
-      return unAuthenticatedState();
+    if (this.refreshProxyCallback) {
+      // server must not send this in proxy mode
+      // for maximum security
+      payload.refresh = undefined;
     }
 
     const decodedRefresh = payload.refresh
@@ -230,7 +264,6 @@ export abstract class ScuteSession {
       accessExpiresAt: decodedAccess.expiresAt,
       refresh: payload.refresh ?? undefined,
       refreshExpiresAt: decodedRefresh?.expiresAt,
-      csrf: payload.csrf ?? undefined,
       status: "authenticated",
     };
 
@@ -248,27 +281,24 @@ export abstract class ScuteSession {
   private async _saveSession(state: AuthenticatedSession): Promise<void> {
     const browser = isBrowser();
 
-    const { access, accessExpiresAt, refresh, refreshExpiresAt, csrf } = state;
+    const { access, accessExpiresAt, refresh, refreshExpiresAt } = state;
 
     if (access) {
       this.scuteStorage.setItem(SCUTE_ACCESS_STORAGE_KEY, access, {
         expires: accessExpiresAt,
+        sameSite: "lax",
         httpOnly: false,
+        path: "/",
       });
     }
 
     if (refresh) {
       this.scuteStorage.setItem(SCUTE_REFRESH_STORAGE_KEY, refresh, {
         expires: refreshExpiresAt,
+        sameSite: "lax",
         httpOnly: !browser ? true : false,
+        path: "/",
       });
-
-      if (csrf) {
-        this.scuteStorage.setItem(SCUTE_CSRF_STORAGE_KEY, csrf, {
-          expires: refreshExpiresAt,
-          httpOnly: false,
-        });
-      }
     }
   }
 
@@ -280,14 +310,14 @@ export abstract class ScuteSession {
 
     await this.scuteStorage.removeItem(SCUTE_ACCESS_STORAGE_KEY, {
       httpOnly: false,
+      sameSite: "lax",
+      path: "/",
     });
 
     await this.scuteStorage.removeItem(SCUTE_REFRESH_STORAGE_KEY, {
       httpOnly: !browser ? true : false,
-    });
-
-    await this.scuteStorage.removeItem(SCUTE_CSRF_STORAGE_KEY, {
-      httpOnly: false,
+      sameSite: "lax",
+      path: "/",
     });
   }
 
@@ -336,9 +366,9 @@ export abstract class ScuteSession {
    * @param callback - Callback function to
    */
   async setRefreshProxyCallback(
-    callback: () => Promise<Partial<ScuteTokenPayload>>
+    callback: NonNullable<ScuteSession["refreshProxyCallback"]>
   ) {
-    this.refreshProxyCallback = () => callback();
+    this.refreshProxyCallback = callback;
   }
 
   /**
@@ -386,9 +416,13 @@ export abstract class ScuteSession {
       AUTO_REFRESH_TICK_DURATION
     );
 
+    // running next tick to prevent recursive
     setTimeout(async () => {
+      await this._initialize();
       await this._autoRefreshTokenTick();
     }, 0);
+
+    this.debug("#_startAutoRefresh", "start", "auto refresh");
   }
 
   /**
@@ -401,6 +435,46 @@ export abstract class ScuteSession {
 
     if (ticker) {
       clearInterval(ticker);
+    }
+
+    this.debug("#_stopAutoRefresh", "stop", "auto refresh");
+  }
+
+  /**
+   * Runs the auto refresh token tick.
+   */
+  private async _autoRefreshTokenTick() {
+    this.debug("#_autoRefreshTokenTick", "start");
+
+    const now = new Date();
+    const session = await this.initialSessionState();
+
+    if (session.access || session.refresh || this.refreshProxyCallback) {
+      // session will expire in this many ticks (or has already expired if <= 0)
+      const expiresInTicks = session.access
+        ? Math.floor(
+            (session.accessExpiresAt.getTime() - now.getTime()) /
+              AUTO_REFRESH_TICK_DURATION
+          )
+        : 0;
+
+      if (expiresInTicks <= AUTO_REFRESH_TICK_THRESHOLD) {
+        const { error: refreshError } = await this._refresh(session);
+
+        this.debug(
+          "#_autoRefreshTokenTick",
+          "end with",
+          !refreshError ? "success" : "refresh error"
+        );
+
+        if (refreshError) {
+          await this._handleRefreshError(refreshError);
+        }
+      } else {
+        this.debug("#_autoRefreshTokenTick", "end with", "noop");
+      }
+    } else {
+      this.debug("#_autoRefreshTokenTick", "end with", "noop");
     }
   }
 
@@ -417,6 +491,7 @@ export abstract class ScuteSession {
     this.refreshDeferred = new Deferred();
     const response = await this.__refresh(...params);
     this.refreshDeferred.resolve(response);
+    this.refreshDeferred = null;
 
     return response;
   }
@@ -427,31 +502,48 @@ export abstract class ScuteSession {
    * @see {@link refreshSession}
    */
   private async __refresh(session: Session) {
-    if (!isBrowser()) {
-      const { data: tokenPayload, error: refreshError } =
-        await this.admin.refresh(session.refresh!);
+    if (!isBrowser() && (session.access || session.refresh)) {
+      const { data: tokenPayload, error: refreshError } = session.refresh
+        ? await this.admin.refresh(session.refresh)
+        : await this.admin.refreshWithAccess(session.access!);
 
       if (refreshError) {
         return { data: null, error: refreshError };
+      } else {
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
       }
 
       session = await this.setSession(tokenPayload);
     } else {
-      if (!session.refresh || !session.csrf) {
+      if (!session.refresh && this.refreshProxyCallback) {
+        this.debug(
+          "#__refresh",
+          "refreshProxyCallback detected",
+          "trying to get data"
+        );
+
         /** @see {@link setRefreshProxyCallback} */
         const payload = await this.refreshProxyCallback();
-        if (payload.access) {
+
+        if (payload && payload.access) {
           session = await this.setSession(payload);
+          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, session);
+        } else {
+          session = await this.initialSessionState();
         }
-      } else {
+      } else if (session.refresh) {
         const { data: tokenPayload, error: refreshError } =
-          await this._refreshRequest(session.refresh, session.csrf);
+          await this._refreshRequest(session.refresh);
 
         if (refreshError) {
           return { data: null, error: refreshError };
         } else {
+          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
           session = await this.setSession(tokenPayload);
         }
+      } else {
+        await this._signOut(session.access);
+        session = unAuthenticatedState();
       }
     }
 
@@ -482,32 +574,6 @@ export abstract class ScuteSession {
       data: null,
       error,
     };
-  }
-
-  /**
-   * Runs the auto refresh token tick.
-   */
-  private async _autoRefreshTokenTick() {
-    const now = new Date();
-    const session = await this.initialSessionState();
-
-    if (!session.access) {
-      return;
-    }
-
-    // session will expire in this many ticks (or has already expired if <= 0)
-    const expiresInTicks = Math.floor(
-      (session.accessExpiresAt.getTime() - now.getTime()) /
-        AUTO_REFRESH_TICK_DURATION
-    );
-
-    if (expiresInTicks <= AUTO_REFRESH_TICK_THRESHOLD) {
-      const { error: refreshError } = await this._refresh(session);
-
-      if (refreshError) {
-        await this._handleRefreshError(refreshError);
-      }
-    }
   }
 
   /**
@@ -552,15 +618,20 @@ export abstract class ScuteSession {
     }
 
     if (document.visibilityState === "visible") {
+      this.debug("visibility changed to", "visible");
+
       // in browser environments the refresh token ticker runs only on focused tabs
       // which prevents race conditions
       await this._startAutoRefresh();
 
       if (!isInitial) {
         // refetch session on `visibilitychange`
-        await this.refetchSession();
+        setTimeout(async () => {
+          await this.refetchSession();
+        }, 0);
       }
     } else if (document.visibilityState === "hidden") {
+      this.debug("visibility changed to", "hidden");
       await this._stopAutoRefresh();
     }
   }
@@ -569,14 +640,31 @@ export abstract class ScuteSession {
    * Get remembered (last logged) identifier.
    */
   async getRememberedIdentifier(): Promise<ScuteIdentifier | null> {
-    return this.scuteStorage.getItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
+    const identifier = await this.scuteStorage.getItem(
+      SCUTE_LAST_LOGIN_STORAGE_KEY
+    );
+
+    if (!identifier && typeof window !== "undefined") {
+      // fallback method
+      return window.localStorage.getItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
+    }
+
+    return identifier;
   }
 
   /**
    * Clear remembered (last logged) identifier.
    */
   async clearRememberedIdentifier() {
-    return this.scuteStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
+    if (typeof window !== "undefined") {
+      // fallback method
+      window.localStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
+    }
+
+    return this.scuteStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY, {
+      expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
+      sameSite: "strict",
+    });
   }
 
   /**
@@ -586,7 +674,15 @@ export abstract class ScuteSession {
   protected async setRememberedIdentifier(
     identifier: ScuteIdentifier
   ): Promise<void> {
-    return this.scuteStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier);
+    if (typeof window !== "undefined") {
+      // fallback method
+      window.localStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier);
+    }
+
+    return this.scuteStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier, {
+      expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
+      sameSite: "strict",
+    });
   }
 
   /**
@@ -594,10 +690,18 @@ export abstract class ScuteSession {
    * @internal
    */
   private async _getCredentialStore() {
-    const credData = await this.scuteStorage.getItem(SCUTE_CRED_STORAGE_KEY);
-    const parsed = credData ? JSON.parse(credData) : {};
+    let credData = await this.scuteStorage.getItem(SCUTE_CRED_STORAGE_KEY);
 
-    return parsed;
+    if (!credData && typeof window !== "undefined") {
+      // fallback method
+      credData = window.localStorage.getItem(SCUTE_CRED_STORAGE_KEY);
+    }
+
+    try {
+      return credData ? JSON.parse(credData) : {};
+    } catch {
+      return {};
+    }
   }
 
   /**
@@ -622,19 +726,26 @@ export abstract class ScuteSession {
     userId: UniqueIdentifier,
     credentialId: UniqueIdentifier
   ) {
-    return this.scuteStorage.setItem(
-      SCUTE_CRED_STORAGE_KEY,
-      JSON.stringify({
-        ...this._getCredentialStore(),
-        [userId]: Array.from(
-          new Set(
-            [...(await this.getCredentialIds(userId)), credentialId].filter(
-              Boolean
-            )
+    const value = JSON.stringify({
+      ...this._getCredentialStore(),
+      [userId]: Array.from(
+        new Set(
+          [...(await this.getCredentialIds(userId)), credentialId].filter(
+            Boolean
           )
-        ),
-      })
-    );
+        )
+      ),
+    });
+
+    if (typeof window !== "undefined") {
+      // fallback method
+      window.localStorage.setItem(SCUTE_CRED_STORAGE_KEY, value);
+    }
+
+    return this.scuteStorage.setItem(SCUTE_CRED_STORAGE_KEY, value, {
+      expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
+      sameSite: "strict",
+    });
   }
 }
 
@@ -644,7 +755,6 @@ const unAuthenticatedState = (): Session => {
     accessExpiresAt: null,
     refresh: null,
     refreshExpiresAt: null,
-    csrf: null,
     status: "unauthenticated",
   };
 };
@@ -655,7 +765,6 @@ const loadingState = (): Session => {
     accessExpiresAt: null,
     refresh: null,
     refreshExpiresAt: null,
-    csrf: null,
     status: "loading",
   };
 };

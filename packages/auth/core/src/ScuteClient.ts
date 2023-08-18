@@ -43,12 +43,14 @@ import {
   TechnicalError,
 } from "./lib/errors";
 
+import { version } from "./lib/version";
+
 import type {
   _ScuteAccessPayload,
   _ScuteRefreshPayload,
 } from "./lib/types/internal";
 
-import type { Session } from "./lib/types/session";
+import type { AuthenticatedSession, Session } from "./lib/types/session";
 import type { UniqueIdentifier } from "./lib/types/general";
 
 import type {
@@ -58,7 +60,7 @@ import type {
 
 import type {
   ScuteAppData,
-  ScuteDevice,
+  ScuteUserSession,
   ScuteIdentifier,
   ScuteMagicLinkIdResponse,
   ScuteSignInOptions,
@@ -66,6 +68,7 @@ import type {
   ScuteSignUpOptions,
   ScuteTokenPayload,
   ScuteUser,
+  ScuteUserData,
 } from "./lib/types/scute";
 
 class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
@@ -82,6 +85,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   protected readonly scuteStorage: ScuteStorage | ScuteCookieStorage;
   protected readonly emitter: Emitter<InternalEvent>;
   protected readonly channel: BroadcastChannel | null = null;
+
+  private static nextInstanceID = 0;
+  private instanceID = 0;
+  protected logDebugMessages = false;
 
   protected initializeDeferred: Deferred<void> | null = null;
   protected getCurrentUserDeferred: Deferred<
@@ -105,6 +112,19 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       credentials: "include",
     });
 
+    if (browser) {
+      this.instanceID = ScuteClient.nextInstanceID;
+      ScuteClient.nextInstanceID += 1;
+
+      if (this.instanceID > 0) {
+        console.warn(
+          "Multiple ScuteClient instances detected in the same browser context. Although it is not an error, but this should be avoided as it may produce undefined behavior."
+        );
+      }
+    }
+
+    this.logDebugMessages = config.debug === true;
+
     this.appId = appId;
 
     this.config = {
@@ -120,6 +140,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     if (config.preferences?.sessionStorageAdapter) {
       this.scuteStorage = config.preferences.sessionStorageAdapter;
+    }
+
+    if (!this.config.persistSession) {
+      this.scuteStorage = ScuteNoneStorage;
     }
 
     this.admin = new ScuteAdminApi({
@@ -143,13 +167,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * Initializes the client SDK (making sure it is initialized only once).
    * @internal
    */
-  private async _initialize() {
+  protected async _initialize() {
     if (this.initializeDeferred) {
       return this.initializeDeferred.promise;
     }
 
     try {
       this.initializeDeferred = new Deferred();
+
+      this.debug("#_initialize", "start");
+
       await this._initializeAppData();
 
       if (isBrowser()) {
@@ -159,18 +186,25 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         }
 
         await this.registerVisibilityChange();
-      } else {
-        if (this.config.autoRefreshToken) {
-          // in non-browser environments the refresh token ticker runs always
-          this.startAutoRefresh();
-        }
       }
 
       this.initializeDeferred.resolve();
     } catch {
       this.initializeDeferred?.reject();
-    } finally {
-      this.initializeDeferred = null;
+    }
+
+    this.debug("#_initialize", "end");
+  }
+
+  protected debug(...args: any[]) {
+    const instanceStr =
+      isBrowser() && this.instanceID > 0 ? `@${this.instanceID}` : "";
+
+    if (this.logDebugMessages) {
+      console.debug(
+        `ScuteClient${instanceStr} (${version}) ${new Date().toISOString()}`,
+        ...args
+      );
     }
   }
 
@@ -179,7 +213,6 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * `fresh` needs to be set to `true` to get the latest data from the server.
    *
    * @param fresh - fetch new data from the server instead cached
-   * @returns App data
    */
   async getAppData(fresh = false) {
     const { error } = await this._initializeAppData(fresh);
@@ -243,16 +276,28 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param callback - A callback function to be invoked when an auth event happens.
    */
   onAuthStateChange(
-    callback: (
+    callback: <T extends Session>(
       event: AuthChangeEvent,
-      session: Session,
-      user: ScuteUser | null
+      session: T,
+      user: T extends AuthenticatedSession ? ScuteUserData : null
     ) => void
   ) {
+    const sessionEvents: AuthChangeEvent[] = [
+      AUTH_CHANGE_EVENTS.INITIAL_SESSION,
+      AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
+      AUTH_CHANGE_EVENTS.SESSION_REFETCH,
+      AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
+      AUTH_CHANGE_EVENTS.SIGNED_IN,
+      AUTH_CHANGE_EVENTS.SIGNED_OUT,
+    ];
+
     const handler: Handler<
       InternalEvent[typeof INTERNAL_EVENTS.AUTH_STATE_CHANGED]
     > = async ({ event, session, user }) => {
-      if (!session || (session.access !== null && !user)) {
+      if (
+        sessionEvents.includes(event) &&
+        (!session || (session.access !== null && !user))
+      ) {
         // if user is passed, this means server check already happened
         // otherwise in specific events, refetch user
         const force = !user
@@ -269,7 +314,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         } = await this._getSession(force, emitRefetchEvent));
       }
 
-      callback(event, session, user ?? null);
+      callback(event, session ?? sessionUnAuthenticatedState(), user ?? null);
     };
 
     this.emitter.on(INTERNAL_EVENTS.AUTH_STATE_CHANGED, handler);
@@ -607,17 +652,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const session = await this.setSession(payload);
     const { data, error: getUserError } = await this.getUser(session.access);
 
-    if (getUserError) {
-      return { error: getUserError };
-    }
-
     const user = data?.user;
 
-    if (!user) {
+    if (getUserError || !user) {
       // something went wrong
       await this._signOut(session.access);
 
-      return { error: null };
+      return { error: getUserError };
     }
 
     // TODO(backlog): email or phone or somehow input identifier ?
@@ -730,11 +771,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   private async _getCurrentUser(accessToken: string) {
     const { data, error } = await this._getCurrentUserRequest(accessToken);
 
-    if (error && error.code === 401) {
-      return { data: { user: null }, error: new LoginRequiredError() };
+    if (error) {
+      return {
+        data: { user: null },
+        error: error.code === 401 ? new LoginRequiredError() : error,
+      };
     }
 
-    return { data: { user: data?.user ?? null }, error };
+    return { data: { user: data.user as NonNullable<ScuteUserData> }, error };
   }
 
   /**
@@ -743,7 +787,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @see {getUser}
    */
   private async _getCurrentUserRequest(accessToken: string) {
-    return this.get<{ user: ScuteUser | null }>(
+    return this.get<{ user: ScuteUserData | null }>(
       "/current_user",
       accessTokenHeader(accessToken)
     );
@@ -835,7 +879,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     credential: webauthn.PublicKeyCredentialWithAttestationJSON,
     accessToken: string
   ) {
-    return this.post<ScuteDevice>(
+    return this.post<ScuteUserSession>(
       "/devices/finalize",
       credential,
       accessTokenHeader(accessToken)
@@ -868,7 +912,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         return { data: null, error: finalizeError };
       }
 
-      this.storeCredentialId(data.user_id, credential.id);
+      const decodedAccess = decodeAccessToken(data.access);
+      if (!decodedAccess) {
+        return { data: null, error: new TechnicalError() };
+      }
+
+      this.storeCredentialId(decodedAccess.userId, credential.id);
 
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_SUCCESS);
 
@@ -1048,11 +1097,11 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @internal
    * @see {@link refreshSession}
    */
-  protected async _refreshRequest(jwt: string, csrf: string) {
+  protected async _refreshRequest(jwt: string) {
     return this.post<ScuteTokenPayload>(
       "/tokens/refresh",
       null,
-      refreshTokenHeaders(jwt, csrf)
+      refreshTokenHeaders(jwt)
     );
   }
 
@@ -1060,14 +1109,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * Emit an auth event so it can be listened to with onAuthStateChange.
    * @param event {AuthChangeEvent}
    * @param session {Session}
-   * @param user {ScuteUser}
+   * @param user {ScuteUserData}
    * @internal
    * @see {@link onAuthStateChange}
    */
   protected emitAuthChangeEvent(
     event: AuthChangeEvent,
     session?: Session | null,
-    user?: ScuteUser | null
+    user?: ScuteUserData | null
   ) {
     this.emitter.emit(INTERNAL_EVENTS.AUTH_STATE_CHANGED, {
       event,

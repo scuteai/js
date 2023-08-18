@@ -1,18 +1,12 @@
-import { useState } from "react";
 import type { AppProps } from "next/app";
-import { createPagesBrowserClient, AuthContextProvider } from "@scute/nextjs";
+import { createPagesBrowserClient } from "@scute/nextjs";
+import { AuthContextProvider } from "@scute/react";
 
 export default function App({ Component, pageProps }: AppProps) {
-  const [scuteClient] = useState(() =>
-    createPagesBrowserClient({
-      appId: process.env.NEXT_PUBLIC_SCUTE_APP_ID as string,
-      baseUrl: process.env.NEXT_PUBLIC_SCUTE_BASE_URL as string,
-    })
-  );
+  const scute = createPagesBrowserClient();
 
   return (
-    <AuthContextProvider scuteClient={scuteClient}>
-      {/* @ts-ignore */}
+    <AuthContextProvider scuteClient={scute}>
       <Component {...pageProps} />
     </AuthContextProvider>
   );

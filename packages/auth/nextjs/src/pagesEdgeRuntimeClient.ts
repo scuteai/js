@@ -1,11 +1,12 @@
 import { ScuteCookieStorage, type CookieAttributes } from "@scute/core";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
+import type { NextRequest } from "next/server";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 
-class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
+class ScuteNextPagesEdgeRuntimeStorage extends ScuteCookieStorage {
   constructor(
     private readonly context: {
-      cookies: () => ReadonlyRequestCookies;
+      request: NextRequest;
     },
     defaultCookieOptions?: CookieAttributes
   ) {
@@ -13,7 +14,7 @@ class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
   }
 
   protected getCookie(name: string): string | null {
-    const nextCookies = this.context.cookies();
+    const nextCookies = this.context.request.cookies;
     return nextCookies.get(name)?.value ?? null;
   }
 
@@ -22,12 +23,14 @@ class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
     value: string,
     options?: CookieAttributes
   ): void {
-    const nextCookies = this.context.cookies();
+    const nextCookies = this.context.request
+      .cookies as unknown as ReadonlyRequestCookies;
     nextCookies.set(name, value, options);
   }
 
   protected deleteCookie(name: string, options?: CookieAttributes): void {
-    const nextCookies = this.context.cookies();
+    const nextCookies = this.context.request
+      .cookies as unknown as ReadonlyRequestCookies;
     nextCookies.set(name, "", {
       ...options,
       maxAge: 0,
@@ -35,9 +38,9 @@ class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
   }
 }
 
-export const createRouteHandlerClient = (
+export const createPagesEdgeRuntimeClient = (
   context: {
-    cookies: () => ReadonlyRequestCookies;
+    request: NextRequest;
   },
   config?: ScuteNextjsClientConfig
 ) => {
@@ -45,9 +48,12 @@ export const createRouteHandlerClient = (
     ...config,
     preferences: {
       ...config?.preferences,
-      sessionStorageAdapter: new ScuteNextRouteHandlerStorage(context, {
-        secure: process.env.NODE_ENV === "production",
-      }),
+      sessionStorageAdapter: new ScuteNextPagesEdgeRuntimeStorage(
+        context as any,
+        {
+          secure: process.env.NODE_ENV === "production",
+        }
+      ),
     },
   });
 };

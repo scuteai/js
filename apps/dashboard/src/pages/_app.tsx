@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import Head from "next/head";
 import { DesignSystemProvider } from "@scute/ui";
 import { globalCss } from "../styles/stitches.config";
-import { AuthContextProvider, createPagesBrowserClient } from "@scute/nextjs";
+import { createPagesBrowserClient } from "@scute/nextjs";
+import { AuthContextProvider } from "@scute/react";
 
 const globalStyles = globalCss({
   "*, *::before, *::after": {

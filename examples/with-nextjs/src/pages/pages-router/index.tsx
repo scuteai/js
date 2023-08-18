@@ -1,20 +1,20 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { Auth } from "@scute/ui-react";
-import { useAuth, useScuteClient } from "@scute/nextjs";
+import { useAuth, useScuteClient } from "@scute/react";
 
 export default function Home() {
   const router = useRouter();
   const scute = useScuteClient();
-  const { session } = useAuth();
+  const { session, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    if (session.status === "authenticated") {
-      router.push("/authenticated");
+    if (isAuthenticated) {
+      router.push("/pages-router/authenticated");
     }
-  }, [session, router]);
+  }, [router, session.status, isAuthenticated]);
 
-  if (session.status === "loading") {
+  if (isLoading) {
     return null;
   }
 
@@ -27,12 +27,7 @@ export default function Home() {
         height: "100vh",
       }}
     >
-      <Auth
-        scuteClient={scute}
-        // onSignIn={() => {
-        //   router.push("/authenticated");
-        // }}
-      />
+      <Auth scuteClient={scute} />
     </div>
   );
 }

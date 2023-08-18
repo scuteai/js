@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { CenterContent } from "@scute/ui";
 import { Auth } from "@scute/ui-react";
 import { useRouter } from "next/router";
-import { useAuth, useScuteClient } from "@scute/nextjs";
+import { useAuth, useScuteClient } from "@scute/react";
 
 export default function Home() {
   const router = useRouter();

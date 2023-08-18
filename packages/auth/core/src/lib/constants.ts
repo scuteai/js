@@ -1,6 +1,6 @@
 import type { ValueOf } from "type-fest";
 
-import type { ScuteUser } from "./types/scute";
+import type { ScuteUserData } from "./types/scute";
 import type { Session } from "./types/session";
 
 export const AUTH_CHANGE_EVENTS = {
@@ -30,19 +30,18 @@ export type InternalEvent = {
   [AUTH_STATE_CHANGED]: {
     event: AuthChangeEvent;
     session?: Session | null;
-    user?: ScuteUser | null;
+    user?: ScuteUserData | null;
     _broadcasted?: boolean;
   };
 };
 
-export const SCUTE_BROADCAST_CHANNEL = "scute-broadcast";
+export const SCUTE_BROADCAST_CHANNEL = "sct_broadcast";
 export const SCUTE_MAGIC_PARAM = "sct_magic";
 export const SCUTE_CRED_STORAGE_KEY = "sct_cred_data";
+export const SCUTE_LAST_LOGIN_STORAGE_KEY = "sct_last_login";
+
 export const SCUTE_ACCESS_STORAGE_KEY = "sc-access-token";
 export const SCUTE_REFRESH_STORAGE_KEY = "sc-refresh-token";
-export const SCUTE_LAST_LOGIN_STORAGE_KEY = "scu_last_login";
-export const SCUTE_CSRF_STORAGE_KEY = "X-CSRF-Token";
 
 export const _SCUTE_ACCESS_HEADER = "X-Authorization";
 export const _SCUTE_REFRESH_HEADER = "X-Refresh-Token";
-export const _SCUTE_CSRF_HEADER = "X-CSRF-Token";

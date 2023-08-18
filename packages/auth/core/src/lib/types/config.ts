@@ -7,6 +7,7 @@ export type ScuteClientConfig = {
   /** IMPORTANT: Do not expose to the browser */
   secretKey?: string;
   preferences?: ScuteClientPreferences;
+  debug?: boolean;
 };
 
 export type ScuteSessionConfig = {
@@ -16,8 +17,6 @@ export type ScuteSessionConfig = {
 export type ScuteClientPreferences = {
   /** @default true */
   autoRefreshToken?: boolean;
-  /** @default true */
-  detectSessionInUrl?: boolean;
   /** @default true */
   persistSession?: boolean;
   sessionStorageAdapter?: ScuteStorage;

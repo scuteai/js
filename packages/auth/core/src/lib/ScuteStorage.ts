@@ -12,12 +12,17 @@ export abstract class ScuteStorage implements ScuteStorageInferface {
   abstract removeItem(key: string): Promise<void>;
 }
 
+const memoryStorage = new Map<string, any>();
 export const ScuteNoneStorage: ScuteStorage = {
   async getItem(key) {
-    return null;
+    return memoryStorage.get(key);
   },
-  async setItem(key, value) {},
-  async removeItem(key) {},
+  async setItem(key, value) {
+    memoryStorage.set(key, value);
+  },
+  async removeItem(key) {
+    memoryStorage.delete(key);
+  },
 };
 
 export abstract class ScuteCookieStorage extends ScuteStorage {

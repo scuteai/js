@@ -3,15 +3,13 @@ import { AppLayout } from "@/components/shared/AppLayout";
 import { AppCard } from "@/components/applications/AppCard";
 import { ScuteApp } from "@/types/app";
 import { NewAppDialog } from "@/components/applications/NewAppDialog";
-import { useAuth, useScuteClient } from "@scute/nextjs";
-import { useEffect } from "react";
+import { useAuth, useScuteClient } from "@scute/react";
 
 export default function Apps() {
   const apps = [] as any;
   const { session, user } = useAuth();
   const scuteClient = useScuteClient();
 
- 
   return (
     <AppLayout>
       <Wrapper>

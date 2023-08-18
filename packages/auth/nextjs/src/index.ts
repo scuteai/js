@@ -1,2 +1,2 @@
 export * from "./main";
-export * from "@scute/react";
+export * from "@scute/core";

@@ -1,4 +1,4 @@
-import { ScuteCookieStorage, ScuteError, type CookieAttributes } from "@scute/react";
+import { ScuteCookieStorage, type CookieAttributes } from "@scute/core";
 import type { NextRequest, NextResponse } from "next/server";
 import { parse as parseCookies, serialize as serializeCookie } from "cookie";
 import { splitCookiesString } from "set-cookie-parser";
@@ -57,19 +57,8 @@ export const createMiddlewareClient = (
   context: { req: NextRequest; res: NextResponse },
   config?: ScuteNextjsClientConfig
 ) => {
-  const appId = config?.appId ?? process.env.NEXT_PUBLIC_SCUTE_APP_ID;
-  const baseUrl = config?.baseUrl ?? process.env.NEXT_PUBLIC_SCUTE_BASE_URL;
-
-  if (!appId) {
-    throw new ScuteError({
-      message: "either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!",
-    });
-  }
-
   return createScuteClient({
     ...config,
-    appId,
-    baseUrl,
     preferences: {
       ...config?.preferences,
       sessionStorageAdapter: new ScuteNextMiddlewareStorage(context, {

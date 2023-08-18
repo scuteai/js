@@ -36,7 +36,7 @@ export type ScuteAppData = {
 };
 
 export interface ScuteUserMetaDataSchema {
-  id: string;
+  id: UniqueIdentifier;
   name: string;
   visible_profile: boolean;
   visible_registration: boolean;
@@ -45,23 +45,12 @@ export interface ScuteUserMetaDataSchema {
   field_name: string;
 }
 
-export type ScuteTokenPayload =
-  | {
-      csrf: string;
-      refresh?: string;
-      refresh_expires_at?: string;
-      access_expires_at: string;
-      access: string;
-      user_id: string;
-    }
-  | {
-      csrf?: string | null;
-      refresh?: string | null;
-      refresh_expires_at?: string | null;
-      access_expires_at: string;
-      access: string;
-      user_id: string;
-    };
+export type ScuteTokenPayload = {
+  refresh?: string | null;
+  refresh_expires_at?: string | null;
+  access_expires_at: string;
+  access: string;
+};
 
 export type ScuteSendMagicLinkResponse = {
   type: "magic_link";
@@ -79,19 +68,21 @@ export type ScuteUser = {
 };
 
 export type ScuteUserData = {
-  id: string;
-  created_at: string;
-  update_at: string;
-  status: string;
+  id: UniqueIdentifier;
   email: string | null;
   email_verified: boolean;
   phone: string | null;
   phone_verified: boolean;
   webauthn_enabled: boolean;
-  webauthn_devices: ScuteDevice[];
-  last_login_at: string;
-  login_count: number;
+  // TODO?
+  // created_at: string;
+  // update_at: string;
+  // status: string;
+  // last_login_at: string;
+  // login_count: number;
   meta: Metadata | null;
+  webauthn_types: string[]; // TODO
+  sessions: ScuteUserSession[];
 };
 
 type Metadata = Record<string, boolean | string | number>;
@@ -111,7 +102,7 @@ export type ScuteSignInOptions = {
 
 export type ScuteSignUpOptions = {
   webauthn?: ScuteWebauthnOption;
-  userMeta?: Record<string, any>
+  userMeta?: Record<string, any>;
 } & Record<string, any>; // TODO
 
 export type ScuteSignInOrUpOptions = {
@@ -122,8 +113,18 @@ export type ScuteMagicLinkIdResponse = {
   magic_link: { id: UniqueIdentifier };
 };
 
-export type ScuteDevice = {
+export type ScuteUserSession = {
   id: UniqueIdentifier;
-  nickname: string;
+  // TODO refresh_expiration: string;
+  display_name: string;
+  created_at: string;
+  updated_at: string;
+  credential_id: UniqueIdentifier | null;
+  last_used_at: string;
+  last_used_at_ip: string;
   user_agent: string;
+  type: string; // TODO
+  platform: string;
+  browser: string;
+  user_agent_shortname: string;
 };

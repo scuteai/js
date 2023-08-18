@@ -17,7 +17,7 @@ import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { Logo } from "@/components/shared/Logo";
 import Link from "next/link";
 import Protected from "./Protected";
-import { useAuth } from "@scute/nextjs";
+import { useAuth } from "@scute/react";
 
 const _APP = {
   id: "s3414dfa",

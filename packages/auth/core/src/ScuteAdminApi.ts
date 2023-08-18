@@ -1,7 +1,11 @@
 import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
 import { accessTokenHeader, refreshTokenHeaders } from "./lib/helpers";
 
-import type { ScuteIdentifier, ScuteUser } from "./lib/types/scute";
+import type {
+  ScuteAppData,
+  ScuteIdentifier,
+  ScuteUser,
+} from "./lib/types/scute";
 import type { ScuteAdminApiConfig } from "./lib/types/config";
 import type { UniqueIdentifier } from "./lib/types/general";
 
@@ -43,7 +47,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   async getAppData() {
-    return this.get<any>(`${this._appsPath}`);
+    return this.get<ScuteAppData>(`${this._appsPath}`);
   }
 
   /**
@@ -51,6 +55,8 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async getUser(id: string) {
+    throw new Error("Not implemented.");
+
     return this.get<any>(`${this._appsPath}/users/${id}`, {
       ...this._authorizationHeader,
     });
@@ -80,11 +86,17 @@ class ScuteAdminApi extends ScuteBaseHttp {
 
   /**
    * Create a user (with optional user metadata).
-   * @param attributes any
+   * * Unauthenticated
+   * @param identifier {ScuteIdentifier}
+   * @param meta - User meta
    */
-  async createUser(attributes: any) {
-    return this.post(`${this._appsPath}/users`, attributes, {
-      ...this._authorizationHeader,
+  async createUser(
+    identifier: string,
+    meta?: Record<string, boolean | string | number>
+  ) {
+    return this.post<{ user: ScuteUser }>(`${this._authPath}/users`, {
+      identifier,
+      user_meta: meta,
     });
   }
 
@@ -93,6 +105,8 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async activateUser(id: string) {
+    throw new Error("Not implemented.");
+
     return this.post<any>(`${this._appsPath}/users/${id}/activate`, null, {
       ...this._authorizationHeader,
     });
@@ -104,6 +118,8 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param data any
    */
   async updateUser(id: string, data: any) {
+    throw new Error("Not implemented.");
+
     // or patch
     return this.put<any>(`${this._appsPath}/users/${id}`, data, {
       ...this._authorizationHeader,
@@ -115,6 +131,8 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async deleteUser(id: string) {
+    throw new Error("Not implemented.");
+
     return this.post<any>(`${this._appsPath}/users/${id}/delete`, null, {
       ...this._authorizationHeader,
     });
@@ -132,11 +150,22 @@ class ScuteAdminApi extends ScuteBaseHttp {
 
   /**
    * Refresh
-   * @param accessToken JWT access_token
+   * @param refreshToken JWT refresh_token
    */
   async refresh(refreshToken: string) {
-    return this.post<any>(`${this._appsPath}/tokens/refresh`, {
+    return this.post<any>(`${this._authPath}/tokens/refresh`, null, {
       ...refreshTokenHeaders(refreshToken),
+      ...this._authorizationHeader,
+    });
+  }
+
+  /**
+   * Refresh with access_token
+   * @param accessToken JWT access_token
+   */
+  async refreshWithAccess(accessToken: string) {
+    return this.post<any>(`${this._authPath}/tokens/rotate_access`, null, {
+      ...accessTokenHeader(accessToken),
       ...this._authorizationHeader,
     });
   }
@@ -146,6 +175,8 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async listUserDevices(id: string) {
+    throw new Error("Not implemented.");
+
     return this.get<any>(`${this._appsPath}/users/${id}/devices`, {
       ...this._authorizationHeader,
     });
@@ -157,6 +188,8 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param deviceId Device ID
    */
   async revokeUserDevice(userId: string, deviceId: string) {
+    throw new Error("Not implemented.");
+
     return this.get<any>(
       `${this._appsPath}/users/${userId}/devices/${deviceId}/revoke`,
       {

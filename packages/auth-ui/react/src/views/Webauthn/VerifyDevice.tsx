@@ -86,8 +86,22 @@ const VerifyDevice = ({
   });
 
   if (!initialized) {
-    // TODO: loading
-    return null;
+     // TODO: loading
+    return (
+      <>
+        <Inner
+          css={{
+            display: "flex",
+            jc: "center",
+            fd: "column",
+            textAlign: "center",
+            minHeight: "12rem"
+          }}
+        >
+          {/* Loading... */}
+        </Inner>
+      </>
+    );
   }
 
   return (

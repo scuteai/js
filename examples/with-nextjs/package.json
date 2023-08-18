@@ -12,6 +12,7 @@
     "@scute/nextjs": "latest",
     "@scute/edge": "latest",
     "@scute/node": "latest",
+    "@scute/react": "latest",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "next": "13.4.7"

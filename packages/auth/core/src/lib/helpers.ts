@@ -2,7 +2,6 @@ import { supported as _isWebauthnSupported } from "./webauthn";
 import _jwtDecode from "jwt-decode";
 import {
   _SCUTE_ACCESS_HEADER,
-  _SCUTE_CSRF_HEADER,
   _SCUTE_REFRESH_HEADER,
 } from "./constants";
 import {
@@ -102,21 +101,17 @@ export const accessTokenHeader = (jwt: string | null): HeadersInit => {
   if (!jwt) return {};
 
   return {
-    [_SCUTE_ACCESS_HEADER]: `Bearer ${jwt}`,
+    [_SCUTE_ACCESS_HEADER]: jwt,
   };
 };
 
 /**
  * Get refresh token headers object.
  */
-export const refreshTokenHeaders = (
-  jwt: string | null,
-  csrf?: string | null
-): HeadersInit => {
+export const refreshTokenHeaders = (jwt: string | null): HeadersInit => {
   if (!jwt) return {};
 
   return {
     [_SCUTE_REFRESH_HEADER]: jwt,
-    ...(csrf ? { [_SCUTE_CSRF_HEADER]: csrf } : null),
   };
 };
