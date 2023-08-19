@@ -20,6 +20,12 @@ export type ScuteClientPreferences = {
   /** @default true */
   persistSession?: boolean;
   sessionStorageAdapter?: ScuteStorage;
+  /** @default true */
+  refetchOnWindowFocus?: boolean;
+  /**
+   * Refetch interval in seconds
+   * @default 300 */
+  refetchInverval?: number;
 };
 
 export type ScuteAdminApiConfig = {

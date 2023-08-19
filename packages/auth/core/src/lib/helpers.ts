@@ -1,9 +1,6 @@
 import { supported as _isWebauthnSupported } from "./webauthn";
 import _jwtDecode from "jwt-decode";
-import {
-  _SCUTE_ACCESS_HEADER,
-  _SCUTE_REFRESH_HEADER,
-} from "./constants";
+import { _SCUTE_ACCESS_HEADER, _SCUTE_REFRESH_HEADER } from "./constants";
 import {
   _ScuteAccessPayload,
   _ScuteMagicLinkTokenPayload,
@@ -11,7 +8,10 @@ import {
 
 export const jwtDecode = _jwtDecode;
 
-export const isBrowser = () => typeof document !== "undefined";
+export const isBrowser = () =>
+  typeof window !== "undefined" &&
+  typeof window.document !== "undefined" &&
+  typeof window.document.createElement !== "undefined";
 
 export class Deferred<T> {
   promise: Promise<T>;

@@ -30,7 +30,10 @@ export abstract class ScuteCookieStorage extends ScuteStorage {
 
   constructor(defaultCookieOptions?: CookieAttributes) {
     super();
-    this.defaultCookieOptions = defaultCookieOptions;
+    this.defaultCookieOptions = {
+      path: "/",
+      ...defaultCookieOptions,
+    };
   }
 
   protected abstract getCookie(name: string): string | null;

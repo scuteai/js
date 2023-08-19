@@ -1,5 +1,10 @@
 import { ScuteBrowserCookieStorage } from "@scute/core";
-import { getRefreshHandlerPath } from "./handlers";
+import {
+  fetchWithCsrf,
+  REFRESH_HANDLER,
+  SIGN_IN_HANDLER,
+  SIGN_OUT_HANDLER,
+} from "./handler";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 
 let scute: ReturnType<typeof createScuteClient>;
@@ -20,22 +25,53 @@ export const createClientComponentClient = (
       },
     });
 
-    scute.setRefreshProxyCallback(async () => {
-      // TODO
-      try {
-        (
-          await fetch(getRefreshHandlerPath(config?.handlersPrefix), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
+    if(typeof window === "undefined"){
+      // non browser, so prevent initializing browser only
+      // callbacks
+      return scute;
+    }
+
+    const handlersPrefix = config?.handlersPrefix;
+
+    scute.onAuthStateChange(async (event) => {
+      switch (event) {
+        case "signed_in":
+          await fetchWithCsrf(
+            SIGN_IN_HANDLER,
+            {
+              method: "POST",
             },
-            // body: JSON.stringify({
-            //   csrfToken,
-            // }),
-          })
-        ).json();
-      } catch {}
+            handlersPrefix
+          );
+          break;
+
+        case "session_expired":
+        case "signed_out":
+          await fetchWithCsrf(
+            SIGN_OUT_HANDLER,
+            {
+              method: "POST",
+            },
+            handlersPrefix
+          );
+          break;
+
+        default:
+          break;
+      }
     });
+
+    scute.setRefreshProxyCallback(async () =>
+      (
+        await fetchWithCsrf(
+          REFRESH_HANDLER,
+          {
+            method: "POST",
+          },
+          handlersPrefix
+        )
+      ).json()
+    );
 
     return scute;
   };

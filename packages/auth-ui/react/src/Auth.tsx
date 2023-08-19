@@ -18,7 +18,6 @@ import {
   Layout,
   Logo,
 } from "./components";
-import { createTheme } from "./stitches.config";
 import {
   SignInOrUp,
   RegisterDevice,
@@ -26,6 +25,8 @@ import {
   VerifyMagicLinkOtp,
   FatalErrorView,
 } from "./views";
+import { createTheme } from "./stitches.config";
+import { useTheme } from "./ThemeContext";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -237,8 +238,16 @@ const Container = ({
   webauthn,
   children,
 }: AuthProps & { children: React.ReactNode }) => {
+  const providerTheme = useTheme();
+
   return (
-    <Layout className={appearance?.theme ? createTheme(appearance.theme) : ""}>
+    <Layout
+      className={
+        appearance?.theme || providerTheme
+          ? createTheme((appearance?.theme || providerTheme) as any)
+          : ""
+      }
+    >
       <ElementCard>
         <Content>{children}</Content>
         {appearance?.scuteBranding ? (

@@ -78,6 +78,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   protected readonly config: {
     persistSession: ScuteClientPreferences["persistSession"];
     autoRefreshToken: ScuteClientPreferences["autoRefreshToken"];
+    refetchOnWindowFocus: ScuteClientPreferences["refetchOnWindowFocus"];
+    refetchInverval: ScuteClientPreferences["refetchInverval"];
   };
 
   readonly admin: ScuteAdminApi;
@@ -130,6 +132,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     this.config = {
       persistSession: config.preferences?.persistSession !== false,
       autoRefreshToken: config.preferences?.autoRefreshToken !== false,
+      refetchOnWindowFocus: config.preferences?.refetchOnWindowFocus !== false,
+      refetchInverval: config.preferences?.refetchInverval ?? 60 * 5,
     };
 
     this.scuteStorage =
@@ -186,6 +190,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         }
 
         await this.registerVisibilityChange();
+        await this.registerRefetchInterval();
       }
 
       this.initializeDeferred.resolve();

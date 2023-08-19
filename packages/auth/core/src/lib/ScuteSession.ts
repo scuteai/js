@@ -521,14 +521,20 @@ export abstract class ScuteSession {
           "refreshProxyCallback detected",
           "trying to get data"
         );
-
         /** @see {@link setRefreshProxyCallback} */
-        const payload = await this.refreshProxyCallback();
+        try {
+          const payload = await this.refreshProxyCallback();
 
-        if (payload && payload.access) {
-          session = await this.setSession(payload);
-          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, session);
-        } else {
+          if (payload && "access" in payload && payload.access) {
+            session = await this.setSession(payload);
+            this.emitAuthChangeEvent(
+              AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
+              session
+            );
+          } else {
+            session = await this.initialSessionState();
+          }
+        } catch {
           session = await this.initialSessionState();
         }
       } else if (session.refresh) {
@@ -578,6 +584,7 @@ export abstract class ScuteSession {
 
   /**
    * Register callback for `visibilitychange` browser event.
+   * * (browser-only)
    */
   protected async registerVisibilityChange() {
     if (!isBrowser()) {
@@ -592,6 +599,25 @@ export abstract class ScuteSession {
     );
 
     await this._onVisibilityChanged(true); // initial call
+  }
+
+  /**
+   * Register refetch interval
+   * * (browser-only)
+   */
+  protected async registerRefetchInterval() {
+    if (this.config.refetchInverval && this.config.refetchInverval !== 0) {
+      setInterval(async () => {
+        const session = await this.initialSessionState();
+        if (
+          session.access &&
+          document.visibilityState === "visible" &&
+          window.navigator.onLine
+        ) {
+          await this.refetchSession();
+        }
+      }, this.config.refetchInverval * 1000);
+    }
   }
 
   /**
@@ -624,7 +650,7 @@ export abstract class ScuteSession {
       // which prevents race conditions
       await this._startAutoRefresh();
 
-      if (!isInitial) {
+      if (!isInitial && this.config.refetchOnWindowFocus) {
         // refetch session on `visibilitychange`
         setTimeout(async () => {
           await this.refetchSession();
@@ -664,6 +690,7 @@ export abstract class ScuteSession {
     return this.scuteStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY, {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
+      path: "/",
     });
   }
 
@@ -682,6 +709,7 @@ export abstract class ScuteSession {
     return this.scuteStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier, {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
+      path: "/",
     });
   }
 
@@ -745,6 +773,7 @@ export abstract class ScuteSession {
     return this.scuteStorage.setItem(SCUTE_CRED_STORAGE_KEY, value, {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
+      path: "/",
     });
   }
 }

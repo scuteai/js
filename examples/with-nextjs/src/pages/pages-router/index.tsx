@@ -14,7 +14,7 @@ export default function Home() {
     }
   }, [router, session.status, isAuthenticated]);
 
-  if (isLoading) {
+  if (isLoading || isAuthenticated) {
     return null;
   }
 

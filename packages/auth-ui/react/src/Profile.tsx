@@ -8,6 +8,7 @@ import {
 import type { Theme } from "@scute/ui-shared";
 import { Badge, Button, ElementCard, Flex } from "./components";
 import { createTheme } from "./stitches.config";
+import { useTheme } from "./ThemeContext";
 
 export type ProfileProps = {
   scuteClient: ScuteClient;
@@ -19,6 +20,8 @@ export type ProfileProps = {
 const Profile = ({ scuteClient, appearance }: ProfileProps) => {
   const [user, setUser] = useState<ScuteUserData | null>(null);
   const [session, setSession] = useState<Session>(sessionLoadingState());
+
+  const providerTheme = useTheme();
 
   useEffect(() => {
     return scuteClient.onAuthStateChange((_event, session, user) => {
@@ -37,7 +40,11 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
   return (
     <div
       style={{ maxWidth: "640px", margin: "0 auto" }}
-      className={appearance?.theme ? createTheme(appearance.theme) : ""}
+      className={
+        appearance?.theme || providerTheme
+          ? createTheme((appearance?.theme || providerTheme) as any)
+          : ""
+      }
     >
       <h1>My Profile</h1>
       <ElementCard css={{ p: "$3" }}>

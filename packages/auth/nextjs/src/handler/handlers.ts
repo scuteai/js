@@ -1,12 +1,13 @@
-import { createPagesEdgeRuntimeClient } from "./pagesEdgeRuntimeClient";
-import { createPagesServerClient } from "./pagesServerClient";
-import { createRouteHandlerClient } from "./routeHandlerClient";
-import { getBody } from "./utils";
+import internalHandler from "./internalHandler";
+import { createPagesEdgeRuntimeClient } from "../pagesEdgeRuntimeClient";
+import { createPagesServerClient } from "../pagesServerClient";
+import { createRouteHandlerClient } from "../routeHandlerClient";
+import { getBody, getInitUrl } from "../utils";
 
-import type { ScuteClient, ScuteTokenPayload } from "@scute/core";
+import { splitCookiesString } from "set-cookie-parser";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
-import type { NextRequest, NextResponse } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 
 type RouteHandlerContext = {
   cookies: () => ReadonlyRequestCookies;
@@ -18,6 +19,7 @@ async function ScuteRouteHandler(
   context: RouteHandlerContext
 ) {
   const url = req.nextUrl;
+  const method = req.method;
   const query = Object.fromEntries(url.searchParams);
   const body = await getBody(req);
   const cookies = Object.fromEntries(
@@ -27,81 +29,99 @@ async function ScuteRouteHandler(
       .map((c) => [c.name, c.value])
   );
   const headers = Object.fromEntries(context.headers() as any);
-  const method = req.method;
 
   const scute = createRouteHandlerClient({ cookies: context.cookies });
-  const response = await internalHandler(scute);
-
-  return new Response(JSON.stringify(response), {
-    headers: {
-      "Content-Type": "application/json",
-    },
+  const response = await internalHandler(scute, {
+    url,
+    method,
+    query,
+    body,
+    cookies,
+    headers,
   });
+
+  return response;
 }
 
 async function ScuteNodeApiHandler(req: NextApiRequest, res: NextApiResponse) {
-  const nextInitUrl =
-    //@ts-ignore
-    req[
-      Reflect.ownKeys(req).find(
-        (key) => key.toString() === "Symbol(NextRequestMeta)"
-      )!
-    ].__NEXT_INIT_URL;
-
-
-  const url = new URL(nextInitUrl);
-  const query = req.query;
+  const url = getInitUrl(req);
+  const method = req.method ?? "GET";
+  const query = req.query as Record<string, string>;
   const body = req.body;
-  const cookies = req.cookies;
-  const headers = req.headers;
-  const method = req.method;
+  const cookies = req.cookies as Record<string, string>;
+  const headers = req.headers as Record<string, string>;
 
   const scute = createPagesServerClient({ req, res });
-  const response = await internalHandler(scute);
+  const response = await internalHandler(scute, {
+    url,
+    method,
+    query,
+    body,
+    cookies,
+    headers,
+  });
 
-  res.status(200).json(response);
+  res.statusCode = response.status;
+  res.statusMessage = response.statusText;
+
+  response.headers.forEach((value, key) => {
+    // The append handling is special cased for `set-cookie`.
+    if (key.toLowerCase() === "set-cookie") {
+      for (const cookie of splitCookiesString(value)) {
+        res.appendHeader(key, cookie);
+      }
+    } else {
+      res.appendHeader(key, value);
+    }
+  });
+
+  if (response.body && req.method !== "HEAD") {
+    try {
+      for await (const chunk of response.body as any) {
+        res.write(chunk);
+      }
+    } finally {
+      res.end();
+    }
+  } else {
+    res.end();
+  }
 }
 
 async function ScuteEdgeApiHandler(req: NextRequest) {
   const url = req.nextUrl;
+  const method = req.method;
   const query = Object.fromEntries(url.searchParams);
   const body = await getBody(req);
   const cookies = Object.fromEntries(
     req.cookies.getAll().map((c) => [c.name, c.value])
   );
   const headers = Object.fromEntries(req.headers as any);
-  const method = req.method;
 
   const scute = createPagesEdgeRuntimeClient({ request: req });
-  const response = await internalHandler(scute);
-
-  return new Response(JSON.stringify(response), {
-    headers: {
-      "Content-Type": "application/json",
-    },
+  const response = await internalHandler(scute, {
+    url,
+    method,
+    query,
+    body,
+    cookies,
+    headers,
   });
+
+  return response;
 }
-
-const internalHandler = async (scute: ScuteClient) => {
-  const { data, error } = await scute.refreshSession();
-
-  return {
-    access: data?.access,
-    access_expires_at: data?.accessExpiresAt,
-  } as Partial<ScuteTokenPayload>;
-};
 
 export function ScuteHandler(context: {
   cookies: () => ReadonlyRequestCookies;
   headers: () => Headers;
-}): (req: NextRequest) => Promise<NextResponse<Partial<ScuteTokenPayload>>>;
+}): (req: NextRequest) => ReturnType<typeof ScuteRouteHandler>;
 export function ScuteHandler(
   req: NextRequest
-): Promise<NextResponse<Partial<ScuteTokenPayload>>>;
+): ReturnType<typeof ScuteEdgeApiHandler>;
 export function ScuteHandler(
   req: NextApiRequest,
   res: NextApiResponse
-): Promise<void>;
+): ReturnType<typeof ScuteNodeApiHandler>;
 export function ScuteHandler(
   ...args:
     | [RouteHandlerContext]
@@ -116,13 +136,11 @@ export function ScuteHandler(
         ScuteRouteHandler(req, args[0] as RouteHandlerContext);
     }
   } else if (args.length > 1) {
+    if ((args[1] as unknown as NextFetchEvent).waitUntil) {
+      // pages api (edge)
+      return ScuteEdgeApiHandler(args[0] as unknown as NextRequest);
+    }
     // pages api (node)
     return ScuteNodeApiHandler(...args);
   }
 }
-
-export const getRefreshHandlerPath = (prefix?: string) => {
-  return `${prefix?.startsWith("/") ? "" : "/"}${prefix ?? ""}${
-    prefix?.endsWith("/") ? "" : "/"
-  }auth/refresh` as `/${string}/auth/refresh`;
-};

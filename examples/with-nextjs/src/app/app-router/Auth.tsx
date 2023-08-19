@@ -13,9 +13,9 @@ const Auth = () => {
     if (isAuthenticated) {
       router.push("/app-router/authenticated");
     }
-  }, [router, session.status, isAuthenticated]);
+  }, [router, isAuthenticated]);
 
-  if (isLoading) {
+  if (isLoading || isAuthenticated) {
     return null;
   }
 

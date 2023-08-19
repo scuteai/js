@@ -1,5 +1,4 @@
 "use client";
-import { useEffect } from "react";
 import { AuthContextProvider } from "@scute/react";
 import { createClientComponentClient } from "@scute/nextjs";
 

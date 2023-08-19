@@ -41,14 +41,14 @@ class ScuteNextMiddlewareStorage extends ScuteCookieStorage {
   }
 
   private _setCookie(name: string, value: string, options?: CookieAttributes) {
-    const newSessionStr = serializeCookie(name, value, {
+    const cookieStr = serializeCookie(name, value, {
       ...this.defaultCookieOptions,
       ...options,
     });
 
     if (this.context.res.headers) {
-      this.context.res.headers.append("set-cookie", newSessionStr);
-      this.context.res.headers.append("cookie", newSessionStr);
+      this.context.res.headers.append("set-cookie", cookieStr);
+      this.context.res.headers.append("cookie", cookieStr);
     }
   }
 }
