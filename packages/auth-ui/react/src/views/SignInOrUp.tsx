@@ -125,7 +125,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   return (
     <>
       <Header>
-          <AppLogo url={appData.logo} alt={appData.name} size={2} />
+        <AppLogo url={appData.logo} alt={appData.name} size={2} />
       </Header>
       <Inner>
         {!showRegisterForm ? (
@@ -450,4 +450,3 @@ const useRememberedIdentifier = (scuteClient: ScuteClient) => {
 };
 
 export default SignInOrUp;
-

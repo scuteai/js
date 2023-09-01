@@ -123,13 +123,20 @@ export type ScuteUserSession = {
   last_used_at: string;
   last_used_at_ip: string;
   user_agent: string;
-  type: string; // TODO
+  type: ScuteSessionType;
   platform: string;
   browser: string;
   user_agent_shortname: string;
   app_name: string;
   app_slug: string;
   app_logo: string;
-  app_origin:string;
+  app_origin: string;
   nickname: string;
 };
+
+export type ScuteSessionType =
+  | "webauthn"
+  | "magic"
+  | "xlogin"
+  | "oauth"
+  | "misc";
