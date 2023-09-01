@@ -7,7 +7,7 @@ import {
   ScuteUserSession,
 } from "@scute/core";
 import type { Theme } from "@scute/ui-shared";
-import { Badge, Button, ElementCard, Flex, Text, Heading } from "./components";
+import { Badge, Button, ElementCard, Flex, Text, Heading, Label } from "./components";
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import { AppLogo } from "./components/AppLogo";
@@ -62,9 +62,20 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
               <Button onClick={() => scuteClient.signOut()}>Logout</Button>
             </Flex>
           </Flex>
-          
+          <Flex css={{fd:'column', gap:'$3', borderTop:'1px solid rgba(0,0,0,0.1)', borderBottom:'1px solid rgba(0,0,0,0.1)', width:'100%', py:'$3'}}>
+            <Flex css={{gap:'$7'}}>
+              <Text css={{fontSize:'$1',opacity:.5}}>Custom key</Text>
+              <Text css={{fontSize:'$1'}}>Meta value</Text>
+            </Flex>
+            <Flex css={{gap:'$7'}}>
+              <Text css={{fontSize:'$1',opacity:.5}}>Custom key</Text>
+              <Text css={{fontSize:'$1'}}>Meta value</Text>
+            </Flex>
+            
+          </Flex>
         </Flex>
         <Flex css={{ fd: "column", gap: "$1", mt: "$3" }}>
+          <h3>Sessions</h3>
           {user?.sessions ? (
             <Flex css={{ fd: "column", gap: "$2" }}>
               {user.sessions.map((session) => (
