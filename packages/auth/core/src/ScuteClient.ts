@@ -1099,6 +1099,60 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /**
+   * Update user meta for the current user.
+   * @param meta
+   */
+  async updateUserMeta(meta: Record<string, any>) {
+    const { data: accessToken, error } = await this.getAuthToken();
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this._updateUserMeta(meta, accessToken);
+  }
+
+  /**
+   * Update user meta.
+   * @param meta
+   * @param accessToken Access Token
+   * @returns
+   */
+  protected async _updateUserMeta(meta: Record<string, any>, accessToken: string) {
+    return this.patch<any>(
+      "/current_user/meta",
+      {
+        user_meta: meta,
+      },
+      accessTokenHeader(accessToken)
+    );
+  }
+
+  /**
+   * Revoke the specific session of the current user
+   * @param id Session ID
+   */
+  async revokeSession(id: UniqueIdentifier) {
+    const { data: accessToken, error } = await this.getAuthToken();
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this._revokeSession(id, accessToken);
+  }
+
+  /**
+   * Revoke session
+   * @param id Session ID
+   * @param accessToken Access Token
+   * @see {@link revokeSession}
+   */
+  protected async _revokeSession(id: UniqueIdentifier, accessToken: string) {
+    return this.delete(`/sessions/${id}`, accessTokenHeader(accessToken));
+  }
+
+  /**
    * @internal
    * @see {@link refreshSession}
    */

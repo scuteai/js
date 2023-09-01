@@ -1,18 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type ScuteClient,
   type ScuteUserData,
   type Session,
+  type ScuteUserSession,
   sessionLoadingState,
-  ScuteUserSession,
+  ScuteAppData,
 } from "@scute/core";
 import type { Theme } from "@scute/ui-shared";
-import {
-  Button,
-  ElementCard,
-  Flex,
-  Text,
-} from "./components";
+import { Button, ElementCard, Flex, Text, TextField } from "./components";
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import { AppLogo } from "./components/AppLogo";
@@ -29,18 +25,27 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
   const [user, setUser] = useState<ScuteUserData | null>(null);
   const [session, setSession] = useState<Session>(sessionLoadingState());
 
-  const providerTheme = useTheme();
-
+  const [appData, setAppData] = useState<ScuteAppData | null>(null);
   useEffect(() => {
+    (async () => {
+      const { data: appData } = await scuteClient.getAppData();
+      setAppData(appData);
+    })();
+
     return scuteClient.onAuthStateChange((_event, session, user) => {
       setSession(session);
       setUser(user);
     });
   }, []);
 
-  if (session.status === "loading") {
+  const providerTheme = useTheme();
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  if (session.status === "loading" || !appData) {
     return <>Loading...</>;
-  } else if (session.status === "unauthenticated") {
+  } else if (session.status === "unauthenticated" || !user) {
     // TODO
     return <>Login Required.</>;
   }
@@ -59,40 +64,87 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
         <Flex css={{ fd: "column" }}>
           <Flex css={{ jc: "space-between", ai: "center" }}>
             <Flex css={{ fd: "column", pt: "$2", mb: "$6" }}>
-              <Text css={{ fontSize: "24px" }}>Name</Text>
-              <Text css={{ mt: "$2" }}>{user?.email}</Text>
+              <Text css={{ fontSize: "24px" }}>
+                {user.meta && user.meta.first_name
+                  ? `${user.meta.first_name} ${user.meta.last_name ?? ""}`
+                  : user.email?.split("@")?.[0] ?? ""}
+              </Text>
+
+              <Text css={{ mt: "$2" }}>{user.email}</Text>
             </Flex>
             <Flex css={{ gap: "$2" }}>
-              <Button variant="alt">Edit profile</Button>
-              <Button onClick={() => scuteClient.signOut()}>Logout</Button>
+              {isEditMode ? (
+                <Button
+                  variant="alt"
+                  onClick={async () => {
+                    const formData = new FormData(formRef.current!);
+                    const userMeta = Object.fromEntries(formData);
+                    setIsEditMode(false);
+
+                    await scuteClient.updateUserMeta(userMeta);
+                    await scuteClient.refetchSession();
+                  }}
+                >
+                  Save
+                </Button>
+              ) : null}
+              <Button
+                variant="alt"
+                onClick={() => {
+                  setIsEditMode(!isEditMode);
+                }}
+              >
+                {!isEditMode ? "Edit profile" : "Cancel"}
+              </Button>
+              <Button css={{ ml: "$1" }} onClick={() => scuteClient.signOut()}>
+                Logout
+              </Button>
             </Flex>
           </Flex>
-          <Flex
-            css={{
-              fd: "column",
-              gap: "$3",
-              borderTop: "1px solid rgba(0,0,0,0.1)",
-              borderBottom: "1px solid rgba(0,0,0,0.1)",
-              width: "100%",
-              py: "$3",
-            }}
-          >
-            <Flex css={{ gap: "$7" }}>
-              <Text css={{ fontSize: "$1", opacity: 0.5 }}>Custom key</Text>
-              <Text css={{ fontSize: "$1" }}>Meta value</Text>
+          <form ref={formRef}>
+            <Flex
+              css={{
+                fd: "column",
+                gap: "$3",
+                borderTop: "1px solid rgba(0,0,0,0.1)",
+                borderBottom: "1px solid rgba(0,0,0,0.1)",
+                width: "100%",
+                py: "$3",
+              }}
+            >
+              {user.meta
+                ? Object.entries(user.meta).map(([key, value]) => (
+                    <Flex key={key} css={{ gap: "$7" }}>
+                      <Text css={{ fontSize: "$1", opacity: 0.5 }}>
+                        {key === "first_name" || key === "last_name"
+                          ? key === "first_name"
+                            ? "First Name"
+                            : "Last Name"
+                          : appData.user_meta_data_schema.find(
+                              (schema) => schema.field_name === key
+                            )?.name}
+                      </Text>
+                      {isEditMode ? (
+                        <TextField defaultValue={value as any} name={key} />
+                      ) : (
+                        <Text css={{ fontSize: "$1" }}>{value}</Text>
+                      )}
+                    </Flex>
+                  ))
+                : null}
             </Flex>
-            <Flex css={{ gap: "$7" }}>
-              <Text css={{ fontSize: "$1", opacity: 0.5 }}>Custom key</Text>
-              <Text css={{ fontSize: "$1" }}>Meta value</Text>
-            </Flex>
-          </Flex>
+          </form>
         </Flex>
         <Flex css={{ fd: "column", gap: "$1", mt: "$3" }}>
           <h3>Sessions</h3>
-          {user?.sessions ? (
+          {user.sessions ? (
             <Flex css={{ fd: "column", gap: "$2" }}>
               {user.sessions.map((session) => (
-                <SessionCard session={session} key={session.id} />
+                <SessionCard
+                  key={session.id}
+                  scuteClient={scuteClient}
+                  session={session}
+                />
               ))}
             </Flex>
           ) : (
@@ -106,7 +158,13 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
 
 export default Profile;
 
-const SessionCard = ({ session }: { session: ScuteUserSession }) => {
+const SessionCard = ({
+  scuteClient,
+  session,
+}: {
+  scuteClient: ScuteClient;
+  session: ScuteUserSession;
+}) => {
   return (
     <ElementCard css={{ p: "$3" }} key={session.id}>
       <Flex css={{ jc: "space-between" }}>
@@ -118,7 +176,21 @@ const SessionCard = ({ session }: { session: ScuteUserSession }) => {
         </Flex>
         <Flex css={{ ai: "center", gap: "$2" }}>
           <SessionIcon type={session.type} />
-          <Button variant="alt">Revoke</Button>
+          <Button
+            variant="alt"
+            onClick={async () => {
+              if (
+                window.confirm("Do you really want to revoke this session ?")
+              ) {
+                await scuteClient.revokeSession(session.id);
+                setTimeout(async () => {
+                  await scuteClient.refetchSession();
+                }, 100);
+              }
+            }}
+          >
+            Revoke
+          </Button>
         </Flex>
       </Flex>
       <Flex
