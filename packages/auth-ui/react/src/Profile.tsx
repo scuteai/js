@@ -4,11 +4,14 @@ import {
   type ScuteUserData,
   type Session,
   sessionLoadingState,
+  ScuteUserSession,
 } from "@scute/core";
 import type { Theme } from "@scute/ui-shared";
-import { Badge, Button, ElementCard, Flex } from "./components";
+import { Badge, Button, ElementCard, Flex, Text, Heading } from "./components";
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
+import { AppLogo } from "./components/AppLogo";
+import { SessionIcon } from "./assets/sessionIcons";
 
 export type ProfileProps = {
   scuteClient: ScuteClient;
@@ -49,38 +52,23 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
       <h1>My Profile</h1>
       <ElementCard css={{ p: "$3" }}>
         <Flex css={{ fd: "column" }}>
-          <h3>Login info</h3>
-          <Flex css={{ jc: "space-between" }}>
-            <div>Email</div>
-            {user?.email}
-            <div>
-              <Button variant="alt">Edit</Button>
-            </div>
+          <Flex css={{jc:'space-between', ai:'center'}}>
+            <Flex css={{fd:'column', pt:'$2', mb:'$6'}}>
+              <Text css={{fontSize:'24px'}}>Umit Kitapcigil</Text>
+              <Text css={{mt:'$2'}}>{user?.email}</Text>
+            </Flex>
+            <Flex css={{gap:'$2'}}>
+              <Button variant="alt">Edit profile</Button>
+              <Button onClick={() => scuteClient.signOut()}>Logout</Button>
+            </Flex>
           </Flex>
+          
         </Flex>
         <Flex css={{ fd: "column", gap: "$1", mt: "$3" }}>
           {user?.sessions ? (
-            <Flex css={{ fd: "column", gap: "$1" }}>
+            <Flex css={{ fd: "column", gap: "$2" }}>
               {user.sessions.map((session) => (
-                <ElementCard css={{ p: "$2" }} key={session.id}>
-                  <Flex css={{ jc: "space-between", ai: "center", pb: "$1" }}>
-                    <Flex>
-                      {session.user_agent_shortname} &middot; {session.platform}
-                    </Flex>
-                    <Badge
-                      css={{
-                        bc: "$contrast2",
-                        fontSize: "9px",
-                        p: "$1",
-                        height: "auto",
-                      }}
-                    >
-                      {session.display_name}
-                    </Badge>
-                  </Flex>
-
-                  <Flex css={{ fontSize: "12px" }}>{session.created_at}</Flex>
-                </ElementCard>
+                <SessionCard session={session} key={session.id} />
               ))}
             </Flex>
           ) : (
@@ -88,9 +76,46 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
           )}
         </Flex>
       </ElementCard>
-      <Button onClick={() => scuteClient.signOut()}>Logout</Button>
+      
     </div>
   );
 };
 
 export default Profile;
+
+const SessionCard = ({ session }: { session: ScuteUserSession }) => {
+  return (
+    <ElementCard css={{ p: "$3" }} key={session.id}>
+      <Flex css={{ jc: "space-between" }}>
+        <Flex css={{ gap: "$2", ai:'center'}}>
+          <AppLogo url={session.app_logo} alt={session.app_name} size={1} />
+          <Flex css={{ fd: "column" }}>
+            <Text>{session.nickname}</Text>
+          </Flex>
+        </Flex>
+        <Flex css={{ai:'center', gap:'$2'}}>
+          <SessionIcon type={session.type} />
+          <Button variant='alt'>Revoke</Button>
+        </Flex>
+      </Flex>
+      <Flex css={{fd:'column', mt: "$4", gap: "$2", '@bp1':{ fd:'row', gap: "$6" } }}>
+        <Flex css={{ fd: "column", gap: "$1" }}>
+          <Text size="1" css={{opacity:0.5}}>Last used</Text>
+          <Text size="2">{session.last_used_at}</Text>
+        </Flex>
+        <Flex css={{ fd: "column", gap: "$1" }}>
+          <Text size="1" css={{opacity:0.5}}>Last ip</Text>
+          <Text size="2">{session.last_used_at_ip}</Text>
+        </Flex>
+        <Flex css={{ fd: "column", gap: "$1" }}>
+          <Text size="1" css={{opacity:0.5}}>Browser</Text>
+          <Text size="2">{session.browser}</Text>
+        </Flex>
+        <Flex css={{ fd: "column", gap: "$1" }}>
+          <Text size="1" css={{opacity:0.5}}>Platform</Text>
+          <Text size="2">{session.platform}</Text>
+        </Flex>
+      </Flex>
+    </ElementCard>
+  );
+};

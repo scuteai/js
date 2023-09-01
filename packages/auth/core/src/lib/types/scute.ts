@@ -127,4 +127,9 @@ export type ScuteUserSession = {
   platform: string;
   browser: string;
   user_agent_shortname: string;
+  app_name: string;
+  app_slug: string;
+  app_logo: string;
+  app_origin:string;
+  nickname: string;
 };

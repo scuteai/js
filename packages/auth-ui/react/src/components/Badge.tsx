@@ -8,6 +8,7 @@ export const Badge = styled('span', {
   boxSizing: 'border-box',
   display: 'inline-flex',
   flexShrink: 0,
+  fontWeight:'normal',
   fontFamily: 'inherit',
   justifyContent: 'center',
   lineHeight: '1',

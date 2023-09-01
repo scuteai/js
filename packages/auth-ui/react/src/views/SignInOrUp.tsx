@@ -33,6 +33,7 @@ import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
 import { getIdentifierType } from "../helpers/identifierType";
 import PhoneInput from "../components/PhoneInput";
 import { VIEWS } from "@scute/ui-shared";
+import { AppLogo } from "../components/AppLogo";
 
 interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   identifier: ScuteIdentifier;
@@ -124,10 +125,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   return (
     <>
       <Header>
-        <Flex>
-          {/* TODO: dark mode logo? */}
-          <img height="150" width="150" src={appData.logo}/>
-        </Flex>
+          <AppLogo url={appData.logo} alt={appData.name} size={2} />
       </Header>
       <Inner>
         {!showRegisterForm ? (
@@ -403,11 +401,11 @@ const useSignInOrUpFormHelpers = (
   const isPublicSignUpAllowed = appData.public_signup !== false;
   const identifierType = getIdentifierType(identifier);
 
-  let signInOrUpText = "Sign Up or Log in";
+  let signInOrUpText = "Sign up or Log in";
   if (!isPublicSignUpAllowed || mode === "sign_in") {
     signInOrUpText = "Log in";
   } else if (mode === "sign_up") {
-    signInOrUpText = "Sign Up";
+    signInOrUpText = "Sign up";
   }
 
   const isEmailIdentifierAllowed = allowedIdentifiers.includes("email");
@@ -452,3 +450,4 @@ const useRememberedIdentifier = (scuteClient: ScuteClient) => {
 };
 
 export default SignInOrUp;
+
