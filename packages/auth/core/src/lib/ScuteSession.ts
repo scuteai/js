@@ -195,7 +195,7 @@ export abstract class ScuteSession {
    * @see {@link refetchSession}
    */
   private async _refetchSession(session: Session, emitEvent = true) {
-    const { data: accessToken, error: getAuthTokenError } =
+    const { data: authData, error: getAuthTokenError } =
       await this._getAuthToken(session);
 
     if (getAuthTokenError) {
@@ -203,7 +203,7 @@ export abstract class ScuteSession {
     }
 
     const { data, error: getUserError } = await this.getCurrentUser(
-      accessToken
+      authData.access
     );
 
     if (getUserError) {
@@ -398,7 +398,7 @@ export abstract class ScuteSession {
       return { data: null, error: new LoginRequiredError() };
     }
 
-    return { data: session.access, error: null };
+    return { data: { access: session.access }, error: null };
   }
 
   /**

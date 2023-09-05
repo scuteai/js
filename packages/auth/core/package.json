@@ -20,7 +20,6 @@
   },
   "dependencies": {
     "@github/webauthn-json": "^2.1.1",
-    "broadcast-channel": "^5.1.0",
     "mitt": "^3.0.0",
     "js-cookie": "^3.0.5",
     "jwt-decode": "^3.1.2",

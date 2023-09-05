@@ -1,7 +1,7 @@
 import { isValidDomain } from "./helpers";
 import type webauthn from "./webauthn";
 
-export const getMeaningfulError = (error: ScuteError) => {
+export const getMeaningfulError = (error: ScuteError | Error) => {
   const nonFatalWebauthn: WebAuthnErrorCode[] = [
     "ERROR_CEREMONY_ABORTED",
     "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY",
@@ -36,6 +36,9 @@ export const getMeaningfulError = (error: ScuteError) => {
     !nonFatalWebauthn.includes(error.code)
   ) {
     isFatal = true;
+  } else if (error instanceof CustomScuteError) {
+    message = error.message;
+    isFatal = false;
   }
 
   return {
@@ -358,7 +361,9 @@ export type CustomScuteErrorCode =
   | "identifier-not-recognized"
   | "identifier-already-exists"
   | "new-device"
-  | "login-required";
+  | "login-required"
+  | "unknown-sign-in"
+  | "invalid-magic-link";
 
 export class CustomScuteError extends ScuteError {
   constructor(
@@ -398,5 +403,18 @@ export class LoginRequiredError extends CustomScuteError {
   constructor() {
     super("Login Required.", "login-required");
     Object.setPrototypeOf(this, LoginRequiredError.prototype);
+  }
+}
+export class UnknownSignInError extends CustomScuteError {
+  constructor() {
+    super("Unknown sign in.", "unknown-sign-in");
+    Object.setPrototypeOf(this, UnknownSignInError.prototype);
+  }
+}
+
+export class InvalidMagicLinkError extends CustomScuteError {
+  constructor() {
+    super("Invalid magic link.", "invalid-magic-link");
+    Object.setPrototypeOf(this, InvalidMagicLinkError.prototype);
   }
 }
