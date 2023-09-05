@@ -85,7 +85,10 @@ export abstract class ScuteSession {
    * @see {@link getSession}
    */
   protected async _getSession(fresh?: boolean, emitRefetchEvent = true) {
-    await this._initialize();
+    const { error: initializeError } = await this._initialize();
+    if (initializeError) {
+      return { data: { session: null, user: null }, error: initializeError };
+    }
 
     const now = new Date();
     let session = await this.initialSessionState();
@@ -173,11 +176,16 @@ export abstract class ScuteSession {
    * Refetch session.
    */
   async refetchSession() {
+    let session: Session | null = null;
+
     if (this.refreshDeferred?.promise) {
-      await this.refreshDeferred.promise;
+      session = (await this.refreshDeferred.promise).data;
     }
 
-    const session = await this.initialSessionState();
+    if (!session) {
+      session = await this.initialSessionState();
+    }
+
     return this._refetchSession(session);
   }
 
@@ -368,7 +376,13 @@ export abstract class ScuteSession {
   async setRefreshProxyCallback(
     callback: NonNullable<ScuteSession["refreshProxyCallback"]>
   ) {
-    this.refreshProxyCallback = callback;
+    this.refreshProxyCallback = async () => {
+      try {
+        return await callback();
+      } catch {
+        return;
+      }
+    };
   }
 
   /**
@@ -502,18 +516,20 @@ export abstract class ScuteSession {
    * @see {@link refreshSession}
    */
   private async __refresh(session: Session) {
-    if (!isBrowser() && (session.access || session.refresh)) {
-      const { data: tokenPayload, error: refreshError } = session.refresh
-        ? await this.admin.refresh(session.refresh)
-        : await this.admin.refreshWithAccess(session.access!);
+    if (!isBrowser()) {
+      if (session.access || session.refresh) {
+        const { data: tokenPayload, error: refreshError } = session.refresh
+          ? await this.admin.refresh(session.refresh)
+          : await this.admin.refreshWithAccess(session.access!);
 
-      if (refreshError) {
-        return { data: null, error: refreshError };
-      } else {
-        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
+        if (refreshError) {
+          return { data: null, error: refreshError };
+        } else {
+          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
+        }
+
+        session = await this.setSession(tokenPayload);
       }
-
-      session = await this.setSession(tokenPayload);
     } else {
       if (!session.refresh && this.refreshProxyCallback) {
         this.debug(
@@ -521,21 +537,13 @@ export abstract class ScuteSession {
           "refreshProxyCallback detected",
           "trying to get data"
         );
-        /** @see {@link setRefreshProxyCallback} */
-        try {
-          const payload = await this.refreshProxyCallback();
 
-          if (payload && "access" in payload && payload.access) {
-            session = await this.setSession(payload);
-            this.emitAuthChangeEvent(
-              AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
-              session
-            );
-          } else {
-            session = await this.initialSessionState();
-          }
-        } catch {
-          session = await this.initialSessionState();
+        /** @see {@link setRefreshProxyCallback} */
+        const payload = await this.refreshProxyCallback();
+
+        if (payload && "access" in payload && payload.access) {
+          session = await this.setSession(payload);
+          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, session);
         }
       } else if (session.refresh) {
         const { data: tokenPayload, error: refreshError } =
@@ -733,6 +741,24 @@ export abstract class ScuteSession {
   }
 
   /**
+   * Save credential store value string
+   * @param value Store value string
+   * @internal
+   */
+  private async _saveCredentialStore(value: string) {
+    if (typeof window !== "undefined") {
+      // fallback method
+      window.localStorage.setItem(SCUTE_CRED_STORAGE_KEY, value);
+    }
+
+    return this.scuteStorage.setItem(SCUTE_CRED_STORAGE_KEY, value, {
+      expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
+      sameSite: "strict",
+      path: "/",
+    });
+  }
+
+  /**
    * Get all stored credential ids as array.
    * @param userId {UniqueIdentifier}
    * @internal
@@ -741,7 +767,13 @@ export abstract class ScuteSession {
     userId: UniqueIdentifier
   ): Promise<string[]> {
     const store = await this._getCredentialStore();
-    return Array.isArray(store[userId]) ? store[userId] : [store[userId]];
+    const userIdStore = store[userId];
+
+    if (!userIdStore) {
+      return [];
+    }
+
+    return Array.isArray(userIdStore) ? userIdStore : [userIdStore];
   }
 
   /**
@@ -765,16 +797,31 @@ export abstract class ScuteSession {
       ),
     });
 
-    if (typeof window !== "undefined") {
-      // fallback method
-      window.localStorage.setItem(SCUTE_CRED_STORAGE_KEY, value);
-    }
+    return this._saveCredentialStore(value);
+  }
 
-    return this.scuteStorage.setItem(SCUTE_CRED_STORAGE_KEY, value, {
-      expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
-      sameSite: "strict",
-      path: "/",
+  /**
+   * Delete credential id.
+   * @param userId {UniqueIdentifier}
+   * @param credentialId {UniqueIdentifier}
+   * @internal
+   */
+  protected async deleteCredentialId(
+    userId: UniqueIdentifier,
+    credentialId: UniqueIdentifier
+  ) {
+    const value = JSON.stringify({
+      ...this._getCredentialStore(),
+      [userId]: Array.from(
+        new Set(
+          [...(await this.getCredentialIds(userId)), credentialId].filter(
+            (item) => Boolean(item) && item !== credentialId
+          )
+        )
+      ),
     });
+
+    return this._saveCredentialStore(value);
   }
 }
 

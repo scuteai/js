@@ -69,17 +69,12 @@ export type ScuteUser = {
 
 export type ScuteUserData = {
   id: UniqueIdentifier;
+  active: boolean;
   email: string | null;
   email_verified: boolean;
   phone: string | null;
   phone_verified: boolean;
   webauthn_enabled: boolean;
-  // TODO?
-  // created_at: string;
-  // update_at: string;
-  // status: string;
-  // last_login_at: string;
-  // login_count: number;
   meta: Metadata | null;
   webauthn_types: string[]; // TODO
   sessions: ScuteUserSession[];

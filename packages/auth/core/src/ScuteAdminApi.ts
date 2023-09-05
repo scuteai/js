@@ -5,6 +5,8 @@ import type {
   ScuteAppData,
   ScuteIdentifier,
   ScuteUser,
+  ScuteUserData,
+  ScuteUserSession,
 } from "./lib/types/scute";
 import type { ScuteAdminApiConfig } from "./lib/types/config";
 import type { UniqueIdentifier } from "./lib/types/general";
@@ -46,8 +48,20 @@ class ScuteAdminApi extends ScuteBaseHttp {
     this.secretKey = secretKey;
   }
 
+  /**
+   * Get app config data.
+   */
   async getAppData() {
     return this.get<ScuteAppData>(`${this._appsPath}`);
+  }
+
+  /**
+   * Get all users.
+   */
+  async getUsers() {
+    return this.get<ScuteUserData[]>(`${this._v1Path}/users`, {
+      ...this._authorizationHeader,
+    });
   }
 
   /**
@@ -55,11 +69,12 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async getUser(id: string) {
-    throw new Error("Not implemented.");
-
-    return this.get<any>(`${this._appsPath}/users/${id}`, {
-      ...this._authorizationHeader,
-    });
+    return this.get<{ user: ScuteUserData | null }>(
+      `${this._v1Path}/users/${id}`,
+      {
+        ...this._authorizationHeader,
+      }
+    );
   }
 
   /**
@@ -101,29 +116,46 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   /**
-   * Activate or deactivate a user (a deactivated user will not be able to log in).
-   * @param id User ID
-   */
-  async activateUser(id: string) {
-    throw new Error("Not implemented.");
-
-    return this.post<any>(`${this._appsPath}/users/${id}/activate`, null, {
-      ...this._authorizationHeader,
-    });
-  }
-
-  /**
    * Update a user's information (email address or phone number).
    * @param id User ID
    * @param data any
    */
   async updateUser(id: string, data: any) {
-    throw new Error("Not implemented.");
+    return this.patch<{ user: ScuteUserData }>(
+      `${this._v1Path}/users/${id}`,
+      data,
+      {
+        ...this._authorizationHeader,
+      }
+    );
+  }
 
-    // or patch
-    return this.put<any>(`${this._appsPath}/users/${id}`, data, {
-      ...this._authorizationHeader,
-    });
+  /**
+   * Activate a user.
+   * @param id User ID
+   */
+  async activateUser(id: string) {
+    return this.post<{ user: ScuteUserData }>(
+      `${this._v1Path}/users/${id}/activate`,
+      null,
+      {
+        ...this._authorizationHeader,
+      }
+    );
+  }
+
+  /**
+   * Deactivate a user (a deactivated user will not be able to log in).
+   * @param id User ID
+   */
+  async deactivateUser(id: string) {
+    return this.post<{ user: ScuteUserData }>(
+      `${this._v1Path}/users/${id}/deactivate`,
+      null,
+      {
+        ...this._authorizationHeader,
+      }
+    );
   }
 
   /**
@@ -131,9 +163,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async deleteUser(id: string) {
-    throw new Error("Not implemented.");
-
-    return this.post<any>(`${this._appsPath}/users/${id}/delete`, null, {
+    return this.delete(`${this._v1Path}/users/${id}`, {
       ...this._authorizationHeader,
     });
   }
@@ -155,7 +185,6 @@ class ScuteAdminApi extends ScuteBaseHttp {
   async refresh(refreshToken: string) {
     return this.post<any>(`${this._authPath}/tokens/refresh`, null, {
       ...refreshTokenHeaders(refreshToken),
-      ...this._authorizationHeader,
     });
   }
 
@@ -171,27 +200,34 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   /**
-   * List all devices for a user.
-   * @param id User ID
+   * Generates new access_token with refresh_token
+   * @param refreshToken JWT refresh_token
    */
-  async listUserDevices(id: string) {
-    throw new Error("Not implemented.");
-
-    return this.get<any>(`${this._appsPath}/users/${id}/devices`, {
+  async forceRefresh(refreshToken: string) {
+    return this.post<any>(`${this._authPath}/tokens/force_refresh`, null, {
+      ...refreshTokenHeaders(refreshToken),
       ...this._authorizationHeader,
     });
   }
 
   /**
-   * Revoke a particular device from a user.
-   * @param userId User ID
-   * @param deviceId Device ID
+   * List all sessions for a user.
+   * @param id User ID
    */
-  async revokeUserDevice(userId: string, deviceId: string) {
-    throw new Error("Not implemented.");
+  async listUserSessions(id: string) {
+    return this.get<ScuteUserSession[]>(`${this._appsPath}/users/${id}/sessions`, {
+      ...this._authorizationHeader,
+    });
+  }
 
-    return this.get<any>(
-      `${this._appsPath}/users/${userId}/devices/${deviceId}/revoke`,
+  /**
+   * Revoke a particular session from a user.
+   * @param userId User ID
+   * @param sessionId Session ID
+   */
+  async revokeUserSession(userId: string, sessionId: string) {
+    return this.delete(
+      `${this._v1Path}/users/${userId}/sessions/${sessionId}`,
       {
         ...this._authorizationHeader,
       }
@@ -208,6 +244,10 @@ class ScuteAdminApi extends ScuteBaseHttp {
     return {
       Authorization: `Bearer ${this.secretKey}`,
     };
+  }
+
+  private get _v1Path() {
+    return `/v1/${this.appId}`;
   }
 
   private get _appsPath() {

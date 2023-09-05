@@ -92,7 +92,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   private instanceID = 0;
   protected logDebugMessages = false;
 
-  protected initializeDeferred: Deferred<void> | null = null;
+  protected initializeDeferred: Deferred<{ error: ScuteError | null }> | null =
+    null;
   protected getCurrentUserDeferred: Deferred<
     Awaited<ReturnType<ScuteClient["_getCurrentUser"]>>
   > | null = null;
@@ -176,29 +177,30 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return this.initializeDeferred.promise;
     }
 
+    this.debug("#_initialize", "start");
+    this.initializeDeferred = new Deferred();
+
     try {
-      this.initializeDeferred = new Deferred();
+      const { error: appDataError } = await this._initializeAppData();
+      if (!appDataError) {
+        if (isBrowser()) {
+          if (this.config.persistSession) {
+            // only when persisting the session and running in the browser
+            this._setupSessionBroadcast();
+          }
 
-      this.debug("#_initialize", "start");
-
-      await this._initializeAppData();
-
-      if (isBrowser()) {
-        if (this.config.persistSession) {
-          // only when persisting the session and running in the browser
-          this._setupSessionBroadcast();
+          await this.registerVisibilityChange();
+          await this.registerRefetchInterval();
         }
-
-        await this.registerVisibilityChange();
-        await this.registerRefetchInterval();
       }
 
-      this.initializeDeferred.resolve();
+      this.initializeDeferred.resolve({ error: appDataError });
     } catch {
-      this.initializeDeferred?.reject();
+      this.initializeDeferred.reject();
     }
 
     this.debug("#_initialize", "end");
+    return this.initializeDeferred.promise;
   }
 
   protected debug(...args: any[]) {
@@ -294,6 +296,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
       AUTH_CHANGE_EVENTS.SIGNED_IN,
       AUTH_CHANGE_EVENTS.SIGNED_OUT,
+      AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
+      AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
     ];
 
     const handler: Handler<
@@ -305,12 +309,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       ) {
         // if user is passed, this means server check already happened
         // otherwise in specific events, refetch user
-        const force = !user
-          ? event === AUTH_CHANGE_EVENTS.INITIAL_SESSION ||
-            event === AUTH_CHANGE_EVENTS.TOKEN_REFRESHED
-            ? true
-            : false
-          : false;
+        const force =
+          !user &&
+          (event === AUTH_CHANGE_EVENTS.INITIAL_SESSION ||
+            event === AUTH_CHANGE_EVENTS.TOKEN_REFRESHED ||
+            event === AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START ||
+            event === AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS);
 
         const emitRefetchEvent = !force;
 
@@ -338,8 +342,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @returns Polling data if webauthn is not available else null.
    */
   async signIn(identifier: ScuteIdentifier, options?: ScuteSignInOptions) {
-    const user = await this.identifierExists(identifier);
+    const { data, error } = await this._identifierExists(identifier);
+    if (error) {
+      return { data: null, error };
+    }
 
+    const user = data.user;
     if (!user) {
       return {
         data: null,
@@ -363,7 +371,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     identifier: ScuteIdentifier,
     options?: ScuteSignInOrUpOptions
   ) {
-    const user = await this.identifierExists(identifier);
+    const { data, error } = await this._identifierExists(identifier);
+    if (error) {
+      return { data: null, error };
+    }
+
+    const user = data.user;
 
     return user
       ? this._signIn(identifier, user, options)
@@ -413,7 +426,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @returns Polling data.
    */
   async signUp(identifier: ScuteIdentifier, options?: ScuteSignUpOptions) {
-    if (await this._identifierExistsAndVerified(identifier)) {
+    const { data: identifierExistsAndVerified, error } =
+      await this._identifierExistsAndVerified(identifier);
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    if (identifierExistsAndVerified) {
       return {
         data: null,
         error: new IdentifierAlreadyExistsError(),
@@ -433,22 +453,6 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     options?: ScuteSignUpOptions
   ) {
     return this.sendRegisterMagicLink(identifier, options?.userMeta);
-  }
-
-  /**
-   * Log in with registering the current device.
-   * @param payload {ScuteTokenPayload} - Scute auth payload
-   */
-  async signInWithRegisterDevice(payload: ScuteTokenPayload) {
-    const { error: registerDeviceError } = await this._signInWithRegisterDevice(
-      payload
-    );
-
-    if (registerDeviceError) {
-      return { error: registerDeviceError };
-    }
-
-    return this.signInWithTokenPayload(payload);
   }
 
   /**
@@ -548,20 +552,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @returns Scute Device
    */
   async addDevice() {
-    const {
-      data: { session },
-      error: sessionError,
-    } = await this._getSession();
+    const { data: accessToken, error } = await this.getAuthToken();
 
-    if (sessionError) {
-      return { data: null, error: sessionError };
-    }
-
-    const { data: accessToken, error: authTokenError } =
-      await this._getAuthToken(session);
-
-    if (authTokenError) {
-      return { data: null, error: authTokenError };
+    if (error) {
+      return { data: null, error };
     }
 
     return this._addDevice(accessToken);
@@ -587,6 +581,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /**
+   * Log in with registering the current device.
+   * @param payload {ScuteTokenPayload} - Scute auth payload
+   */
+  async signInWithRegisterDevice(payload: ScuteTokenPayload) {
+    return this._signInWithRegisterDevice(payload);
+  }
+
+  /**
    * Register the device (create webauthn credentials) and login.
    * @internal
    * @see {@link signInWithRegisterDevice}
@@ -606,8 +608,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param identifier {ScuteIdentifier}
    */
   async signInWithVerifyDevice(identifier: ScuteIdentifier) {
-    const user = await this.identifierExists(identifier);
+    const { data, error } = await this._identifierExists(identifier);
+    if (error) {
+      return { data: null, error };
+    }
 
+    const user = data.user;
     if (!user) {
       return {
         error: new IdentifierNotRecognizedError(),
@@ -682,43 +688,64 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @returns true if the refresh token is revoked successfully.
    */
   async signOut(): Promise<boolean> {
-    const {
-      data: {
-        session: { access: accessToken },
-      },
-    } = await this._getSession();
+    const { data: sessionData } = await this._getSession();
 
     this.emitAuthChangeEvent(
       AUTH_CHANGE_EVENTS.SIGNED_OUT,
       sessionUnAuthenticatedState()
     );
 
-    return this._signOut(accessToken);
+    const session = sessionData.session;
+    return this._signOut(session?.access);
   }
 
   /**
    * Check for an identifier and return the user if any.
    * @param identifier {ScuteIdentifier}
    * @returns {Promise<ScuteUser | null>}
+   * @throws {@link TechnicalError}
    */
   async identifierExists(
     identifier: ScuteIdentifier
   ): Promise<ScuteUser | null> {
-    const { data } = await this.admin.getUserByIdentifier(identifier);
-    return data ? data.user : null;
+    const { data, error } = await this._identifierExists(identifier);
+
+    if (error) {
+      throw error;
+    }
+
+    return data.user;
+  }
+
+  /**
+   * @see {@link identifierExists}
+   */
+  protected async _identifierExists(identifier: ScuteIdentifier) {
+    const { data, error } = await this.admin.getUserByIdentifier(identifier);
+    if (error) {
+      return { data: null, error: new TechnicalError() };
+    }
+
+    return { data, error: null };
   }
 
   /**
    * @param identifier {ScuteIdentifier}
    * @returns true if exists and verified
    * @internal
-   * @see {@link identifierExists}
+   * @see {@link _identifierExists}
    */
-  private async _identifierExistsAndVerified(
-    identifier: ScuteIdentifier
-  ): Promise<boolean> {
-    const user = await this.identifierExists(identifier);
-    return Boolean(user && (user.email_verified || user.phone_verified));
+  private async _identifierExistsAndVerified(identifier: ScuteIdentifier) {
+    const { data, error } = await this._identifierExists(identifier);
+    if (error) {
+      return { data: null, error };
+    }
+
+    const user = data.user;
+    return {
+      data: Boolean(user && (user.email_verified || user.phone_verified)),
+      error: null,
+    };
   }
 
   /**
@@ -804,6 +831,23 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   isWebauthnSupported(): boolean {
     return isWebauthnSupported();
+  }
+
+  /**
+   * Check if any webauthn device registered on this device with the current user.
+   * @returns true if any webauthn credential is registered on this device with the current user, false otherwise.
+   * @throws {@link LoginRequiredError}
+   */
+  async isAnyDeviceRegistered(): Promise<boolean> {
+    const { data: accessToken, error } = await this.getAuthToken();
+    const decodedAccess = accessToken ? decodeAccessToken(accessToken) : null;
+
+    if (error || !decodedAccess?.userId) {
+      throw new LoginRequiredError();
+    }
+
+    const credentialIds = await this.getCredentialIds(decodedAccess.userId);
+    return credentialIds.length > 0;
   }
 
   /**
@@ -1042,11 +1086,15 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       webauthnEnabled
     );
 
-    if (!error && emitEvent) {
+    if (error) {
+      return { data: null, error };
+    }
+
+    if (emitEvent) {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_PENDING);
     }
 
-    return { data, error };
+    return { data, error: null };
   }
 
   /**
@@ -1114,12 +1162,15 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   /**
    * Update user meta.
-   * @param meta
+   * @param meta Meta fields
    * @param accessToken Access Token
    * @returns
    */
-  protected async _updateUserMeta(meta: Record<string, any>, accessToken: string) {
-    return this.patch<any>(
+  protected async _updateUserMeta(
+    meta: Record<string, any>,
+    accessToken: string
+  ) {
+    return this.patch<{ user: ScuteUserData }>(
       "/current_user/meta",
       {
         user_meta: meta,
@@ -1129,27 +1180,69 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /**
-   * Revoke the specific session of the current user
+   * Revoke the specific session of the current user.
    * @param id Session ID
+   * @param credentialId (Optional) credentialId
    */
-  async revokeSession(id: UniqueIdentifier) {
+  async revokeSession(id: UniqueIdentifier, credentialId?: UniqueIdentifier | null) {
     const { data: accessToken, error } = await this.getAuthToken();
 
     if (error) {
       return { data: null, error };
     }
 
+    if (!credentialId) {
+      const { data } = await this.listUserSessions();
+      if (data) {
+        const session = data.find((session) => session.id === id);
+        if (session?.credential_id) {
+          credentialId = session.credential_id;
+        }
+      }
+    }
+
+    if (credentialId) {
+      const decodedAccess = decodeAccessToken(accessToken);
+      if (decodedAccess?.userId) {
+        await this.deleteCredentialId(decodedAccess.userId, credentialId);
+      }
+    }
+
     return this._revokeSession(id, accessToken);
   }
 
   /**
-   * Revoke session
+   * Revoke session.
    * @param id Session ID
    * @param accessToken Access Token
    * @see {@link revokeSession}
    */
   protected async _revokeSession(id: UniqueIdentifier, accessToken: string) {
     return this.delete(`/sessions/${id}`, accessTokenHeader(accessToken));
+  }
+
+  /**
+   * Get all sessions for the authenticated user.
+   */
+  async listUserSessions() {
+    const { data: accessToken, error } = await this.getAuthToken();
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this._userSessionsRequest(accessToken);
+  }
+
+  /**
+   * Get all user sessions.
+   * @param accessToken Access Token
+   */
+  protected async _userSessionsRequest(accessToken: string) {
+    return this.get<ScuteUserSession[]>(
+      "/sessions",
+      accessTokenHeader(accessToken)
+    );
   }
 
   /**

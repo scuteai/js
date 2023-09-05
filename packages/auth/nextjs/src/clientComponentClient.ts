@@ -25,53 +25,56 @@ export const createClientComponentClient = (
       },
     });
 
-    if(typeof window === "undefined"){
+    if (typeof window === "undefined") {
       // non browser, so prevent initializing browser only
       // callbacks
       return scute;
     }
 
-    const handlersPrefix = config?.handlersPrefix;
+    if (config?.preferences?.httpOnlyRefresh !== false) {
+      const handlersPrefix = config?.handlersPrefix;
+      scute.onAuthStateChange(async (event) => {
+        switch (event) {
+          case "signed_in":
+            await fetchWithCsrf(
+              SIGN_IN_HANDLER,
+              {
+                method: "POST",
+              },
+              handlersPrefix
+            );
+            break;
 
-    scute.onAuthStateChange(async (event) => {
-      switch (event) {
-        case "signed_in":
-          await fetchWithCsrf(
-            SIGN_IN_HANDLER,
-            {
-              method: "POST",
-            },
-            handlersPrefix
-          );
-          break;
+          case "session_expired":
+          case "signed_out":
+            await fetchWithCsrf(
+              SIGN_OUT_HANDLER,
+              {
+                method: "POST",
+              },
+              handlersPrefix
+            );
+            break;
 
-        case "session_expired":
-        case "signed_out":
-          await fetchWithCsrf(
-            SIGN_OUT_HANDLER,
-            {
-              method: "POST",
-            },
-            handlersPrefix
-          );
-          break;
+          default:
+            break;
+        }
+      });
 
-        default:
-          break;
-      }
-    });
-
-    scute.setRefreshProxyCallback(async () =>
-      (
-        await fetchWithCsrf(
+      scute.setRefreshProxyCallback(async () => {
+        const refreshFetch = await fetchWithCsrf(
           REFRESH_HANDLER,
           {
             method: "POST",
           },
           handlersPrefix
-        )
-      ).json()
-    );
+        );
+
+        if (refreshFetch.ok) {
+          return refreshFetch.json();
+        }
+      });
+    }
 
     return scute;
   };

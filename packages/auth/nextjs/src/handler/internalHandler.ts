@@ -51,7 +51,7 @@ const internalHandler = async (
 
     if (
       error ||
-      !session.access ||
+      !session?.access ||
       !appData ||
       // if more than `SIGN_IN_MAX_DELAY_MS` passed after sign in
       // it may be an attack, so do not allow

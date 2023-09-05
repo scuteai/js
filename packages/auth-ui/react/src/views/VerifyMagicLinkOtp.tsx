@@ -35,7 +35,7 @@ export interface VerifyMagicLinkOtpProps extends CommonViewProps {
 
 const VerifyMagicLinkOtp = ({
   scuteClient,
-  identifier,
+  identifier: _identifier,
   setAuthView,
   setIsFatalError,
   magicLinkId,
@@ -46,6 +46,7 @@ const VerifyMagicLinkOtp = ({
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [isVerifyCalled, setIsVerifyCalled] = useState(false);
+  const [identifier, setIdentifier] = useState(_identifier);
 
   const [magicLinkToken] = useState(
     () =>
@@ -114,6 +115,20 @@ const VerifyMagicLinkOtp = ({
         handleLogin(data.authPayload);
       }
 
+      if (!identifier) {
+        try {
+          const { data: userData } = await scuteClient.admin.getUserByUserId(
+            data.magicPayload.uuid
+          );
+
+          const user = userData?.user;
+          if (user && user.email) {
+            // TODO: phone?
+            setIdentifier(user.email);
+          }
+        } catch {}
+      }
+
       getAuthPayloadCallback?.(data.authPayload);
     }
 
@@ -144,7 +159,7 @@ const VerifyMagicLinkOtp = ({
     <>
       <Header css={{ mb: "$1" }}>
         <LargeSpinner
-          iconColor="var(--scute-colors-contrast8)"
+          icon={<EmailIcon color="var(--scute-colors-contrast8)" />}
           spinnerColor="var(--scute-colors-focusColor)"
         />
       </Header>
@@ -200,7 +215,7 @@ const LoadingMagic = ({
       <Header css={{ mb: "$1" }}>
         {!error ? (
           <LargeSpinner
-            iconColor="var(--scute-colors-contrast8)"
+            icon={<EmailIcon color="var(--scute-colors-contrast8)" />}
             spinnerColor="green"
           />
         ) : (
@@ -240,10 +255,11 @@ const LoadingMagic = ({
             </Flex>
           </>
         )}
-
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
+        {identifier ? (
+          <Flex css={{ jc: "center", py: "$5" }}>
+            <Badge size="1">{identifier}</Badge>
+          </Flex>
+        ) : null}
       </Inner>
     </>
   );

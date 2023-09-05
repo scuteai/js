@@ -1,6 +1,8 @@
+import type { UniqueIdentifier } from "./general";
+
 export type _ScuteAccessPayload = {
   exp: number;
-  uuid: string;
+  uuid: UniqueIdentifier;
 } & Record<string, any>;
 
 export type _ScuteRefreshPayload = {
@@ -9,4 +11,5 @@ export type _ScuteRefreshPayload = {
 
 export type _ScuteMagicLinkTokenPayload = {
   webauthnEnabled: boolean;
+  uuid: UniqueIdentifier;
 } & Record<string, any>;

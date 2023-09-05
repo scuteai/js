@@ -24,12 +24,25 @@ export type ProfileProps = {
 const Profile = ({ scuteClient, appearance }: ProfileProps) => {
   const [user, setUser] = useState<ScuteUserData | null>(null);
   const [session, setSession] = useState<Session>(sessionLoadingState());
-
   const [appData, setAppData] = useState<ScuteAppData | null>(null);
+  const [isAnyDeviceRegistered, setIsAnyDeviceRegistered] = useState<
+    boolean | null
+  >(null);
+
   useEffect(() => {
     (async () => {
       const { data: appData } = await scuteClient.getAppData();
       setAppData(appData);
+    })();
+
+    (async () => {
+      try {
+        const isAnyDeviceRegistered = await scuteClient.isAnyDeviceRegistered();
+        setIsAnyDeviceRegistered(isAnyDeviceRegistered);
+      } catch {
+        // login required
+        // ignore
+      }
     })();
 
     return scuteClient.onAuthStateChange((_event, session, user) => {
@@ -46,7 +59,6 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
   if (session.status === "loading" || !appData) {
     return <>Loading...</>;
   } else if (session.status === "unauthenticated" || !user) {
-    // TODO
     return <>Login Required.</>;
   }
 
@@ -136,7 +148,26 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
           </form>
         </Flex>
         <Flex css={{ fd: "column", gap: "$1", mt: "$3" }}>
-          <h3>Sessions</h3>
+          <Flex css={{ jc: "space-between", ai: "center" }}>
+            <h3>Sessions</h3>
+
+            {!isAnyDeviceRegistered ? (
+              <Button
+                variant="alt"
+                onClick={async () => {
+                  const { error } = await scuteClient.addDevice();
+                  if (error) {
+                    window.alert("An error has occurred. You can try again.");
+                  } else {
+                    setIsAnyDeviceRegistered(true);
+                    window.confirm("Success!");
+                  }
+                }}
+              >
+                Register Device
+              </Button>
+            ) : null}
+          </Flex>
           {user.sessions ? (
             <Flex css={{ fd: "column", gap: "$2" }}>
               {user.sessions.map((session) => (
@@ -182,7 +213,10 @@ const SessionCard = ({
               if (
                 window.confirm("Do you really want to revoke this session ?")
               ) {
-                await scuteClient.revokeSession(session.id);
+                await scuteClient.revokeSession(
+                  session.id,
+                  session.credential_id
+                );
                 setTimeout(async () => {
                   await scuteClient.refetchSession();
                 }, 100);

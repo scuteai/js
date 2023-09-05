@@ -46,3 +46,7 @@ export function randomBytes(length: number) {
   const arr = crypto.getRandomValues(new Uint8Array(length));
   return Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength);
 }
+
+export type Prettify<T> = {
+  [K in keyof T]: T[K];
+} & {};

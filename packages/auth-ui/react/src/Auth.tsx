@@ -15,6 +15,7 @@ import {
   ElementCard,
   Flex,
   FooterCredits,
+  LargeSpinner,
   Layout,
   Logo,
 } from "./components";
@@ -51,7 +52,6 @@ function Auth(props: AuthProps) {
   } = props;
 
   const [identifier, setIdentifier] = useState<ScuteIdentifier>("");
-
   const [isFatalError, setIsFatalError] = useState(false);
 
   const [magicLinkId, setMagicLinkId] = useState<UniqueIdentifier>();
@@ -115,6 +115,14 @@ function Auth(props: AuthProps) {
     return () => unsubscribe();
   }, [scuteClient, onSignIn, onSignOut, view]);
 
+  const [_isMounted, _setIsMounted] = useState(false);
+  useEffect(() => {
+    _setIsMounted(true);
+  }, []);
+  if (!_isMounted) {
+    return null;
+  }
+
   if (isFatalError) {
     return (
       <Container {...containerProps}>
@@ -132,7 +140,11 @@ function Auth(props: AuthProps) {
   }
 
   if (!appData) {
-    return null;
+    return (
+      <Container {...containerProps}>
+        <LargeSpinner />
+      </Container>
+    );
   }
 
   switch (authView) {

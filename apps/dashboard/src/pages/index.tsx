@@ -7,19 +7,14 @@ import { useAuth, useScuteClient } from "@scute/react";
 export default function Home() {
   const router = useRouter();
   const scuteClient = useScuteClient();
-  const { isAuthenticated, isLoading, session, user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    scuteClient.onAuthStateChange((event, session, user) => {});
     if (isAuthenticated) {
       router.push("/apps");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
-
-  if (isAuthenticated || isLoading) {
-    return null;
-  }
 
   return (
     <CenterContent>

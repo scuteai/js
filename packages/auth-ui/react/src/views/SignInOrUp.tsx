@@ -10,7 +10,6 @@ import {
   IdentifierNotRecognizedError,
 } from "@scute/core";
 
-import debounce from "lodash.debounce";
 import { useEffect, useState } from "react";
 import { FingerprintIcon, MagicMailIcon, BellIcon } from "../assets/icons";
 import type { CommonViewProps } from "./common";
@@ -62,9 +61,13 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   const {
     register,
     handleSubmit,
-    trigger,
     formState: { errors, isValid },
-  } = useForm();
+  } = useForm({
+    defaultValues: {
+      identifier: "",
+    },
+  });
+
   const [showRegisterForm, setShowRegisterForm] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +85,9 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   const isWebauthnAvailable =
     webauthnEnabled && scuteClient.isWebauthnSupported();
 
-  const handleValidSubmit = async () => {
+  const handleValidSubmit: SubmitHandler<FieldValues> = async (values) => {
+    const identifier = values.identifier;
+
     const _identifier = (
       identifier ? identifier : rememberedIdentifier
     ) as string;
@@ -175,20 +180,39 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                     placeholder={identifierLabelText}
                     {...register("identifier", {
                       required: "Identifier is required.",
+                      validate: {
+                        maxLength: (v) => {
+                          const identifierType = getIdentifierType(v);
+
+                          if (identifierType === "email") {
+                            return (
+                              v.length <= 50 ||
+                              "The email should have at most 50 characters"
+                            );
+                          } else {
+                            return true;
+                          }
+                        },
+                        matchPattern: (v) => {
+                          const identifierType = getIdentifierType(v);
+
+                          if (identifierType === "email") {
+                            return (
+                              /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(
+                                v
+                              ) || "Email address must be a valid address"
+                            );
+                          } else {
+                            return true;
+                          }
+                        },
+                      },
                     })}
                     size="2"
                     autoComplete={`webauthn ${
                       isEmailIdentifierAllowed ? "email" : ""
                     }${isPhoneIdentifierAllowed ? "tel" : ""}`}
                     state={error ? "invalid" : "valid"}
-                    onChange={(e) => {
-                      const identifier = e.target.value;
-                      setIdentifier(identifier);
-
-                      debounce(async () => {
-                        await trigger("identifier");
-                      }, 500)();
-                    }}
                   />
                   {error ||
                     (!isValid && errors.identifier ? (
@@ -236,7 +260,7 @@ const RegisterForm = ({
   setIsFatalError,
   getMagicLinkIdCallback,
 }: SignInOrUpProps) => {
-  const { register, handleSubmit, trigger, formState, reset } = useForm();
+  const { register, handleSubmit, formState } = useForm();
   const { errors, isValid } = formState;
 
   const [error, setError] = useState<string | null>(null);
@@ -308,9 +332,6 @@ const RegisterForm = ({
                 required: "This field is required.",
               })}
               size="2"
-              onChange={debounce(async () => {
-                await trigger(field_name);
-              }, 500)}
             />
 
             {errors[field_name] ? (
@@ -345,11 +366,6 @@ const RegisterForm = ({
                     : undefined,
                 })}
                 size="2"
-                onChange={() =>
-                  debounce(async () => {
-                    await trigger(maybeNeededIdentifierType);
-                  }, 500)
-                }
               />
             </Group>
             {errors[maybeNeededIdentifierType] ? (
@@ -371,9 +387,6 @@ const RegisterForm = ({
                 valueAsNumber: type === "number" ? true : undefined,
               })}
               size="2"
-              onChange={debounce(async () => {
-                await trigger(field_name);
-              }, 500)}
             />
             {errors[field_name] ? (
               <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>

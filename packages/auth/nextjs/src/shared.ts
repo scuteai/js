@@ -6,18 +6,19 @@ import {
   type ScuteClientPreferences,
   ScuteError,
 } from "@scute/core";
+import { Prettify } from "./utils";
 
-export type ScuteNextjsClientConfig = Omit<
-  ScuteClientConfig,
-  "appId" | "preferences"
-> & {
-  appId?: UniqueIdentifier;
-} & {
-  preferences?: Omit<
-    ScuteClientPreferences,
-    "autoRefreshToken" | "persistSession"
-  >;
-};
+export type ScuteNextjsClientConfig = Prettify<
+  Omit<ScuteClientConfig, "appId" | "preferences"> & {
+    appId?: UniqueIdentifier;
+  } & {
+    preferences?: Prettify<
+      Omit<ScuteClientPreferences, "autoRefreshToken" | "persistSession"> & {
+        httpOnlyRefresh?: boolean;
+      }
+    >;
+  }
+>;
 
 export const createScuteClient = (config: ScuteNextjsClientConfig) => {
   const browser = isBrowser();
