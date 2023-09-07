@@ -1,6 +1,6 @@
 import { Layout } from "@/components/shared/Layout";
 
-export default function ProfileLayout({
+export default function AppsLayout({
   children,
 }: {
   children: React.ReactNode;
