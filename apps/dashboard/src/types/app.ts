@@ -4,5 +4,5 @@ export type ScuteApp = {
   id: UniqueIdentifier;
   name: string;
   slug: string;
-  url: string;
+  origin: string;
 } & Record<string, unknown>;

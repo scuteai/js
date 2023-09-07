@@ -1,0 +1,5 @@
+export const LANDING_URL = 'https://scute.io'
+export const GITHUB_URL = 'https://github.com/scuteai'
+export const DOC_URL = 'https://docs.scute.io'
+export const TWITTER_URL = 'https://twitter.com/scute_ai'
+export const DISCORD_URL = 'https://discord.gg/5Qj8Gwq'
