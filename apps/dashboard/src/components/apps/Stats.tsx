@@ -1,7 +1,8 @@
-import { Flex, Text, Card, Box, Grid } from "@radix-ui/themes";
+import Link from "next/link";
+import { Flex, Text, Card, Grid } from "@radix-ui/themes";
 import styles from "@/styles/Stats.module.scss";
 import { ArrowRightIcon, ChevronRightIcon } from "@radix-ui/react-icons";
-import Link from "next/link";
+
 export const MultipleStats = () => {
   return (
     <Card variant="classic">
@@ -48,7 +49,9 @@ export const StatItem = ({
     if (url) {
       return (
         <Link legacyBehavior href={url}>
-          <Flex align='center' justify='between'><Text size="1">{title}</Text> <ChevronRightIcon /></Flex>
+          <Flex align="center" justify="between">
+            <Text size="1">{title}</Text> <ChevronRightIcon />
+          </Flex>
         </Link>
       );
     } else {

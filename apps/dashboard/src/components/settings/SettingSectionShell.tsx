@@ -1,5 +1,4 @@
 // Consistent wrapper to hold settings sections
-
 import { Flex, Text, Heading, Section, Separator } from "@radix-ui/themes";
 
 type SettingSectionShellProps = {
@@ -35,8 +34,19 @@ export const SettingSectionShell = ({
               </Text>
             ) : null}
           </Flex>
-          {flexRow ? (<Flex style={{flexGrow:'1', width:'40%', justifyContent:'flex-end'}}>{children}</Flex>) : children}
-          
+          {flexRow ? (
+            <Flex
+              style={{
+                flexGrow: "1",
+                width: "40%",
+                justifyContent: "flex-end",
+              }}
+            >
+              {children}
+            </Flex>
+          ) : (
+            children
+          )}
         </Flex>
       </Section>
       {separator ? <Separator orientation="horizontal" size="4" /> : null}

@@ -1,15 +1,24 @@
-import { IconButton, Text, Flex, Avatar, DropdownMenu } from "@radix-ui/themes";
+"use client";
+
+import {
+  IconButton,
+  Text,
+  Flex,
+  Avatar,
+  DropdownMenu,
+  Button,
+  TextField,
+  Dialog,
+} from "@radix-ui/themes";
 import { LogoIcon } from "./Logo";
 import styles from "@/styles/Layout.module.scss";
 import {
   BookmarkIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
   CrumpledPaperIcon,
   EnvelopeOpenIcon,
-  GearIcon,
   LightningBoltIcon,
   LockClosedIcon,
+  MagnifyingGlassIcon,
   MixIcon,
   PaddingIcon,
   PersonIcon,
@@ -17,20 +26,45 @@ import {
   TableIcon,
 } from "@radix-ui/react-icons";
 import Link from "next/link";
-import { useRouter } from "next/router";
+import { useRouter, usePathname, useParams } from "next/navigation";
 import { getCurrentPageTitle } from "@/utils/router";
 import { useAuth } from "@scute/react";
-import { ReactElement, useEffect } from "react";
+import { useEffect } from "react";
 
 type LayoutProps = {
   children?: React.ReactNode;
-  titleBarContent?: React.ReactNode;
 };
 
-export const Layout = ({ children, titleBarContent }: LayoutProps) => {
+export const Layout = ({ children }: LayoutProps) => {
   const router = useRouter();
-  const pageTitle = getCurrentPageTitle(router.pathname);
-  const appId = router.query.id;
+  const pathname = usePathname();
+  const params = useParams();
+
+  // TODO
+  const titleBarContent =
+    pathname === "/apps" ? (
+      <Link href="/apps/new">
+        <Button>Create new app</Button>
+      </Link>
+    ) : pathname?.includes("users") ? (
+      <Flex gap="3" justify="end">
+        <TextField.Root>
+          <TextField.Slot>
+            <MagnifyingGlassIcon height="16" width="16" />
+          </TextField.Slot>
+          <TextField.Input placeholder="Search users" />
+        </TextField.Root>
+        <Button variant="outline">Create new user</Button>
+        <Button variant="outline" color="gray">
+          Import users
+        </Button>
+      </Flex>
+    ) : pathname?.includes("api-keys") ? (
+      <CreateApiKeyModal />
+    ) : null;
+
+  const pageTitle = getCurrentPageTitle(pathname);
+  const appId = params?.id;
   const { session, signOut } = useAuth();
 
   useEffect(() => {
@@ -91,10 +125,12 @@ export const Layout = ({ children, titleBarContent }: LayoutProps) => {
 };
 
 const AppSidebar = () => {
-  const router = useRouter();
-  const pageTitle = getCurrentPageTitle(router.pathname);
+  const pathname = usePathname();
+  const params = useParams();
+  const pageTitle = getCurrentPageTitle(pathname);
 
-  const appId = router.query.id;
+  const appId = params?.id;
+
   const NavItems = [
     {
       title: "Summary",
@@ -214,5 +250,46 @@ const NavItem = ({ title, icon, active, url = "#" }: NavItemType) => {
         <Text size="4">{title}</Text>
       </Flex>
     </Link>
+  );
+};
+
+const CreateApiKeyModal = () => {
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger>
+        <Button variant="classic">Create new key</Button>
+      </Dialog.Trigger>
+
+      <Dialog.Content size="4" style={{ maxWidth: 450 }}>
+        <Dialog.Title>Create API Key</Dialog.Title>
+        <Dialog.Description size="2" mb="4">
+          Name your new API Key.
+        </Dialog.Description>
+
+        <Flex direction="column" gap="3">
+          <label>
+            <Text as="div" size="2" mb="1" weight="bold">
+              API Key name
+            </Text>
+            <TextField.Input
+              color="pink"
+              variant="soft"
+              placeholder="Enter a nickname for this API Key"
+            />
+          </label>
+        </Flex>
+
+        <Flex gap="3" mt="4" justify="end">
+          <Dialog.Close>
+            <Button variant="soft" color="gray">
+              Cancel
+            </Button>
+          </Dialog.Close>
+          <Dialog.Close>
+            <Button variant="classic">Save</Button>
+          </Dialog.Close>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 };

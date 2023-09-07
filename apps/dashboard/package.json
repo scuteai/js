@@ -24,17 +24,11 @@
     "sass": "^1.66.1",
     "scss": "^0.2.4",
     "sonner": "^0.7.0",
-    "typescript": "5.1.6",
     "victory": "^36.6.11",
-    "@lukemorales/query-key-factory": "^1.1.0",
     "@scute/nextjs": "workspace:*",
     "@scute/react": "workspace:*",
     "@scute/ui-react": "workspace:*",
-    "@tanstack/react-query": "^4.19.0",
-    "@tanstack/react-query-devtools": "^4.19.0",
-    "axios": "^1.4.0",
-    "boring-avatars": "^1.7.0",
-    "cookies-next": "^2.1.2"
+    "boring-avatars": "^1.7.0"
   },
   "devDependencies": {
     "@scute/eslint-config": "workspace:*",

@@ -1,8 +1,9 @@
-import {
-  TextField,
-} from "@radix-ui/themes";
+"use client";
+
+import { TextField } from "@radix-ui/themes";
 import { SettingSectionShell } from "./SettingSectionShell";
-import { RegisterOptions, UseFormRegisterReturn } from 'react-hook-form';
+import { RegisterOptions, UseFormRegisterReturn } from "react-hook-form";
+
 type STextFieldProps = {
   title: string;
   description?: string;
@@ -13,8 +14,7 @@ type STextFieldProps = {
   inputActionSlot?: React.ReactNode;
   inputName?: string;
   register?: UseFormRegisterReturn;
-  rules?: RegisterOptions; 
-
+  rules?: RegisterOptions;
 };
 
 export const STextField = ({
@@ -25,10 +25,14 @@ export const STextField = ({
   separator,
   disabled,
   inputActionSlot,
-  register
+  register,
 }: STextFieldProps) => {
   return (
-    <SettingSectionShell title={title} description={description} separator={separator}>
+    <SettingSectionShell
+      title={title}
+      description={description}
+      separator={separator}
+    >
       <TextField.Root>
         <TextField.Input
           value={value}
@@ -36,7 +40,7 @@ export const STextField = ({
           radius="large"
           size="3"
           placeholder={placeholder}
-          {...register} 
+          {...register}
         />
         {inputActionSlot ? (
           <TextField.Slot>{inputActionSlot}</TextField.Slot>

@@ -1,20 +1,12 @@
-import {
-  Flex,
-  Text,
-  Card,
-  Box,
-  Avatar,
-  IconButton,
-  Badge,
-} from "@radix-ui/themes";
-import { ChevronRightIcon, DotsVerticalIcon } from "@radix-ui/react-icons";
+import { Flex, Text, Card, Box, Avatar } from "@radix-ui/themes";
+import { ChevronRightIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { ScuteApp } from "@/types";
 
-
 type AppCardProps = {
-  app:ScuteApp
+  app: ScuteApp;
 };
+
 export const AppCard = ({ app }: AppCardProps) => {
   return (
     <Link href="/apps/1" legacyBehavior>

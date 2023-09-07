@@ -8,11 +8,20 @@ import {
   Checkbox,
   Switch,
 } from "@radix-ui/themes";
-import { Layout } from "@/components/shared/Layout";
 import { STextField } from "@/components/settings/STextField";
 import { SCardBottom } from "@/components/settings/SCardBottom";
-import { CopyIcon } from "@radix-ui/react-icons";
 import { SettingSectionShell } from "@/components/settings/SettingSectionShell";
+
+export default function AppAuthSettings() {
+  return (
+    <Container size="2">
+      <Flex direction="column" gap="4">
+        <SectionGeneral />
+        <SectionSessionManagement />
+      </Flex>
+    </Container>
+  );
+}
 
 const SectionGeneral = () => {
   return (
@@ -72,7 +81,6 @@ const SectionGeneral = () => {
             </Flex>
           </Flex>
         </SettingSectionShell>
-       
       </Flex>
     </Card>
   );
@@ -104,16 +112,3 @@ const SectionSessionManagement = () => {
     </Card>
   );
 };
-
-export default function AppAuthSettings() {
-  return (
-    <Layout>
-      <Container size="2">
-        <Flex direction="column" gap="4">
-          <SectionGeneral />
-          <SectionSessionManagement />
-        </Flex>
-      </Container>
-    </Layout>
-  );
-}

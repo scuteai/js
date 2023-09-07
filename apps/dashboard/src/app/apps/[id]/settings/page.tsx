@@ -1,8 +1,19 @@
 import { Flex, Text, Button, Container, Card, Heading } from "@radix-ui/themes";
-import { Layout } from "@/components/shared/Layout";
 import { STextField } from "@/components/settings/STextField";
 import { SCardBottom } from "@/components/settings/SCardBottom";
 import { CopyIcon } from "@radix-ui/react-icons";
+
+export default function AppSettings() {
+  return (
+    <Container size="2">
+      <Flex direction="column" gap="4">
+        <SectionAppConfig />
+        <SectionAppIdCopy />
+        <SectionDelete />
+      </Flex>
+    </Container>
+  );
+}
 
 const SectionAppConfig = () => {
   return (
@@ -91,17 +102,3 @@ const SectionAppIdCopy = () => {
     </Card>
   );
 };
-
-export default function AppSettings() {
-  return (
-    <Layout>
-      <Container size="2">
-        <Flex direction="column" gap="4">
-          <SectionAppConfig />
-          <SectionAppIdCopy />
-          <SectionDelete />
-        </Flex>
-      </Container>
-    </Layout>
-  );
-}
