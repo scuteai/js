@@ -3,7 +3,7 @@ import { Layout } from "@/components/shared/Layout";
 
 export default function Customize() {
   return (
-    <Layout app>
+    <Layout>
       <Container size="3">
         <Grid columns={{ initial: "1", md: "2" }} gap="5" width="auto">
           Customize

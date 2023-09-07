@@ -32,7 +32,7 @@ export default function AppSingle() {
         </Flex>
       </Card>
       <Card>
-        <Flex gap="1" direction="column" gap="3">
+        <Flex direction="column" gap="3">
           <Flex direction="column" gap="1">
             <Text size="2">App ID:</Text>
             <Flex align="center" justify="between">

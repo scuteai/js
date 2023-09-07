@@ -1,4 +1,4 @@
-import { IconButton, Text, Flex, Avatar } from "@radix-ui/themes";
+import { IconButton, Text, Flex, Avatar, DropdownMenu } from "@radix-ui/themes";
 import { LogoIcon } from "./Logo";
 import styles from "@/styles/Layout.module.scss";
 import {
@@ -19,6 +19,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { getCurrentPageTitle } from "@/utils/router";
+import { useAuth } from "@scute/react";
+import { ReactElement, useEffect } from "react";
 
 type LayoutProps = {
   children?: React.ReactNode;
@@ -28,19 +30,51 @@ type LayoutProps = {
 export const Layout = ({ children, titleBarContent }: LayoutProps) => {
   const router = useRouter();
   const pageTitle = getCurrentPageTitle(router.pathname);
-
   const appId = router.query.id;
+  const { session, signOut } = useAuth();
+
+  useEffect(() => {
+    if (session.status === "unauthenticated") {
+      router.push("/");
+    }
+  }, [session.status, router]);
+
+  if (session.status !== "authenticated") {
+    return null;
+  }
+
+  const ProfileDropdown = () => {
+    return (
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger>
+          <IconButton color="gray" size="1" variant="ghost">
+            <Avatar size="2" fallback="U" color="pink" />
+          </IconButton>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Content>
+          <Link legacyBehavior href="/profile">
+            <DropdownMenu.Item>View profile</DropdownMenu.Item>
+          </Link>
+          <DropdownMenu.Item onClick={() => signOut()}>
+            Logout
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Root>
+    );
+  };
 
   return (
     <div className={styles.AppLayout}>
       <Flex className={styles.Sidebar}>
-        <Flex className={styles.Toolbar} direction='column'>
+        <Flex className={styles.Toolbar} direction="column">
           <Link href="/">
             <LogoIcon />
           </Link>
-          <Flex direction='column' gap='3'>
-            <IconButton variant='soft' color="lime"><ReaderIcon /></IconButton>
-            <Avatar size="2" fallback="U" color="pink" />
+          <Flex direction="column" gap="3">
+            <IconButton variant="soft" color="lime">
+              <ReaderIcon />
+            </IconButton>
+            <ProfileDropdown />
           </Flex>
         </Flex>
         {appId ? <AppSidebar /> : null}
