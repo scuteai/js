@@ -83,7 +83,10 @@ export default function AppSettings() {
     <Portal>
       <Flex justify="end" className={styles.SaveBar}>
         something changed{" "}
-        <Button style={{ width: "50%", background: "red" }} type="submit">
+        <Button
+          style={{ width: "50%", background: "red" }}
+          onClick={handleSubmit(onSubmit)}
+        >
           Save
         </Button>
       </Flex>
@@ -99,9 +102,7 @@ export default function AppSettings() {
           <Card size="3">
             <Flex direction="column" gap="5">
               <Heading color="gray">Application Config</Heading>
-              
-              
-              
+
               <Controller
                 name="on_profile"
                 control={control}
@@ -110,7 +111,8 @@ export default function AppSettings() {
                   <TextField.Input
                     size="3"
                     placeholder="Application name name"
-                    // {...field} TODO: Not working
+                    value={field.value}
+                    onChange={field.onChange}
                   ></TextField.Input>
                 )}
               />
