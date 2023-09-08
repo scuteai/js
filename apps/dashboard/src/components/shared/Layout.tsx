@@ -193,7 +193,7 @@ const AppSidebar = () => {
           <Text size="3">example app</Text>
         </Flex>
       </Flex>
-      <Flex className={styles.NavList} gap="2">
+      <Flex className={styles.NavList} gap="0">
         {NavItems.map((item, index) => (
           <NavItem
             active={pageTitle === item.title}
@@ -209,6 +209,7 @@ const AppSidebar = () => {
             fontWeight: "500",
             color: "var(--black-a8)",
             marginTop: "10px",
+            marginBottom:'10px',
             padding: "0px var(--space-4)",
           }}
         >
@@ -247,7 +248,7 @@ const NavItem = ({ title, icon, active, url = "#" }: NavItemType) => {
     <Link href={url} className={klasses()}>
       <Flex align="center" gap="2">
         {icon}
-        <Text size="4">{title}</Text>
+        <Text size="3">{title}</Text>
       </Flex>
     </Link>
   );

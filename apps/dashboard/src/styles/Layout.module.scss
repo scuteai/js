@@ -75,7 +75,8 @@ $spaceX: 12px;
   }
   & > div {
     border-radius: var(--radius-3);
-    padding:0px var(--space-2)
+    padding:0px var(--space-2);
+    height:40px;
   }
 }
 

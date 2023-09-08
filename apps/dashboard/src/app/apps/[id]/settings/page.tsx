@@ -1,63 +1,41 @@
-import { Flex, Text, Button, Container, Card, Heading } from "@radix-ui/themes";
+"use client";
+import {
+  Flex,
+  Text,
+  Button,
+  Container,
+  Card,
+  Heading,
+  TextField,
+  Portal,
+} from "@radix-ui/themes";
 import { STextField } from "@/components/settings/STextField";
 import { SCardBottom } from "@/components/settings/SCardBottom";
 import { CopyIcon } from "@radix-ui/react-icons";
+import { useForm, SubmitHandler, Controller } from "react-hook-form";
+import { Toaster, toast } from "sonner";
+import styles from "@/styles/Settings.module.scss";
 
-export default function AppSettings() {
-  return (
-    <Container size="2">
-      <Flex direction="column" gap="4">
-        <SectionAppConfig />
-        <SectionAppIdCopy />
-        <SectionDelete />
-      </Flex>
-    </Container>
-  );
-}
-
-const SectionAppConfig = () => {
-  return (
-    <Card size="3">
-      <Flex direction="column" gap="5">
-        <Heading color="gray">Application Config</Heading>
-        <STextField
-          title="Application name"
-          description="The name of your application."
-          placeholder="My App"
-          separator
-        />
-        <STextField
-          title="Auth origin"
-          description="The url of your application."
-          placeholder="/"
-          separator
-        />
-        <STextField
-          title="Callback URL"
-          description="The name of your application."
-          placeholder="/"
-          separator
-        />
-        <STextField
-          title="Login URL"
-          description="The name of your application."
-          placeholder="/"
-        />
-
-        <Flex style={{ marginBottom: "10px" }} />
-
-        <SCardBottom>
-          <Button size="2" color="green" variant="classic">
-            Save
-          </Button>
-        </SCardBottom>
-      </Flex>
-    </Card>
-  );
+type Inputs = {
+  name: string;
+  origin: string;
 };
 
-const SectionDelete = () => {
-  return (
+export default function AppSettings() {
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isDirty, isSubmitting, isValid },
+  } = useForm<IFormInputs>();
+
+  const onSubmit: SubmitHandler<Inputs> = (data) => {
+    // toast('Success')
+    console.log("success");
+  };
+
+  const SectionDelete = () => (
     <Card size="3">
       <Flex direction="column" gap="5">
         <Heading color="tomato">Danger zone</Heading>
@@ -75,10 +53,8 @@ const SectionDelete = () => {
       </Flex>
     </Card>
   );
-};
 
-const SectionAppIdCopy = () => {
-  return (
+  const SectionAppIdCopy = () => (
     <Card size="3">
       <Flex direction="column" gap="5">
         <Heading color="gray">Info</Heading>
@@ -101,4 +77,76 @@ const SectionAppIdCopy = () => {
       </Flex>
     </Card>
   );
-};
+
+  // TODO: Styles not working on Portal, maybe App Routes ?
+  const SaveBar = () => (
+    <Portal>
+      <Flex justify="end" className={styles.SaveBar}>
+        something changed{" "}
+        <Button style={{ width: "50%", background: "red" }} type="submit">
+          Save
+        </Button>
+      </Flex>
+    </Portal>
+  );
+
+  return (
+    <Container size="2">
+      {isDirty && <SaveBar />}
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <Flex direction="column" gap="4">
+          {/* Section App Config  */}
+          <Card size="3">
+            <Flex direction="column" gap="5">
+              <Heading color="gray">Application Config</Heading>
+              
+              
+              
+              <Controller
+                name="on_profile"
+                control={control}
+                rules={{ required: false }}
+                render={({ field, fieldState }) => (
+                  <TextField.Input
+                    size="3"
+                    placeholder="Application name name"
+                    // {...field} TODO: Not working
+                  ></TextField.Input>
+                )}
+              />
+
+              <STextField
+                title="Application name"
+                description="The name of your application."
+                placeholder="My App"
+                separator
+              />
+              <STextField
+                title="Auth origin"
+                description="The url of your application."
+                placeholder="/"
+                separator
+              />
+              <STextField
+                title="Callback URL"
+                description="The name of your application."
+                placeholder="/"
+                separator
+              />
+              <STextField
+                title="Login URL"
+                description="The name of your application."
+                placeholder="/"
+              />
+
+              <Flex style={{ marginBottom: "10px" }} />
+            </Flex>
+          </Card>
+
+          <SectionAppIdCopy />
+          <SectionDelete />
+        </Flex>
+      </form>
+    </Container>
+  );
+}

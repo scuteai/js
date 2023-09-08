@@ -19,7 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
-          <Theme accentColor="teal" grayColor="mauve" scaling="110%">
+          <Theme accentColor="teal" grayColor="mauve" scaling="110%" >
             {children}
           </Theme>
         </AuthProvider>
