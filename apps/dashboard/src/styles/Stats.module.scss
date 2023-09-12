@@ -1,12 +1,12 @@
 .StatColumn {
-    border-right:1px solid #EDEDED;
-    &:last-child {
-        border-right: none;
-    }
-    @media screen and (max-width: 1025px) {
-        border-right:none;
-    }
+  border-right: 1px solid #ededed;
+  &:last-child {
+    border-right: none;
+  }
+  @media screen and (max-width: 1025px) {
+    border-right: none;
+  }
 }
 .StatSecondValue {
-    color:var(--teal-a8);
+  color: var(--teal-a8);
 }

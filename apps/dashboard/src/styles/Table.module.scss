@@ -1,44 +1,44 @@
 .table {
-    width:100%;
-    border-collapse: separate; 
+  width: 100%;
+  border-collapse: separate;
 
-    box-sizing: border-box;
-    border-spacing: 0px;
+  box-sizing: border-box;
+  border-spacing: 0px;
 }
 .tbody {
-    display: table-row-group;
-    vertical-align: middle;
-    background:white;
+  display: table-row-group;
+  vertical-align: middle;
+  background: white;
 }
 
 .th {
-    text-align: left;
-    font-size: 14px;
-    padding:0px 10px;
-    padding-bottom:10px;
-    color:#666;
-    user-select: none;
+  text-align: left;
+  font-size: 14px;
+  padding: 0px 10px;
+  padding-bottom: 10px;
+  color: #666;
+  user-select: none;
 }
 
 .td {
-    padding: 0.75rem;
-    display: table-cell;
-    vertical-align: inherit;
-    
-    border-bottom:1px solid #eee;
+  padding: 0.75rem;
+  display: table-cell;
+  vertical-align: inherit;
+
+  border-bottom: 1px solid #eee;
 }
 
 .tr {
-    border-bottom: 1pt solid red;
-    padding:26px 20px;
-    box-sizing: border-box;
-    display: table-row;
-    border-radius: var(--radius-4);
-    overflow:hidden;
-    font-size:var(--font-size-1);
-    &:hover {
-        background:var(--lime-3);
-    }
+  border-bottom: 1pt solid red;
+  padding: 26px 20px;
+  box-sizing: border-box;
+  display: table-row;
+  border-radius: var(--radius-4);
+  overflow: hidden;
+  font-size: var(--font-size-1);
+  &:hover {
+    background: var(--lime-3);
+  }
 }
 .userIdHolder {
 }

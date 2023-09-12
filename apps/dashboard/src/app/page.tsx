@@ -1,27 +1,21 @@
-"use client";
-
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/api";
+import { PATHS } from "./routes";
 import { Flex, Container } from "@radix-ui/themes";
-import { Auth } from "@scute/ui-react";
-import { useAuth, useScuteClient } from "@scute/react";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Auth from "@/components/Auth";
 
-export default function Home() {
-  const router = useRouter();
-  const scuteClient = useScuteClient();
-  const { isAuthenticated } = useAuth();
+export default async function Home() {
+  const user = await getCurrentUser();
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/apps");
-    }
-  }, [isAuthenticated]);
+  if (user) {
+    redirect(PATHS.APPS);
+  }
 
   return (
     <div>
       <Container size="3">
         <Flex align="center" justify="center" style={{ height: "100vh" }}>
-          <Auth scuteClient={scuteClient} />
+          <Auth />
         </Flex>
       </Container>
     </div>

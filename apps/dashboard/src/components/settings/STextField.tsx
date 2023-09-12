@@ -1,51 +1,49 @@
 "use client";
 
+import { forwardRef } from "react";
 import { TextField } from "@radix-ui/themes";
+import type { TextFieldInputProps } from "@radix-ui/themes/dist/cjs/components/text-field";
 import { SettingSectionShell } from "./SettingSectionShell";
-import { RegisterOptions, UseFormRegisterReturn } from "react-hook-form";
 
 type STextFieldProps = {
   title: string;
   description?: string;
   placeholder?: string;
-  value?: string;
   separator?: boolean;
-  disabled?: boolean;
   inputActionSlot?: React.ReactNode;
-  inputName?: string;
-  register?: UseFormRegisterReturn;
-  rules?: RegisterOptions;
-};
+} & TextFieldInputProps;
 
-export const STextField = ({
-  title,
-  description,
-  placeholder,
-  value,
-  separator,
-  disabled,
-  inputActionSlot,
-  register,
-}: STextFieldProps) => {
-  return (
-    <SettingSectionShell
-      title={title}
-      description={description}
-      separator={separator}
-    >
-      <TextField.Root>
-        <TextField.Input
-          value={value}
-          disabled={disabled}
-          radius="large"
-          size="3"
-          placeholder={placeholder}
-          {...register}
-        />
-        {inputActionSlot ? (
-          <TextField.Slot>{inputActionSlot}</TextField.Slot>
-        ) : null}
-      </TextField.Root>
-    </SettingSectionShell>
-  );
-};
+export const STextField = forwardRef<HTMLInputElement, STextFieldProps>(
+  (
+    {
+      title,
+      description,
+      placeholder,
+      separator,
+      inputActionSlot,
+      ...inputProps
+    },
+    ref
+  ) => {
+    return (
+      <SettingSectionShell
+        title={title}
+        description={description}
+        separator={separator}
+      >
+        <TextField.Root>
+          <TextField.Input
+            radius="large"
+            size="3"
+            placeholder={placeholder}
+            ref={ref}
+            {...inputProps}
+          />
+          {inputActionSlot ? (
+            <TextField.Slot>{inputActionSlot}</TextField.Slot>
+          ) : null}
+        </TextField.Root>
+      </SettingSectionShell>
+    );
+  }
+);

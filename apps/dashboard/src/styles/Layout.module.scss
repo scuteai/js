@@ -1,22 +1,20 @@
-
-
 $spaceY: 16px;
 $spaceX: 12px;
 .AppLayout {
-  display:flex;
-  height:100%;
+  display: flex;
+  height: 100%;
   // flex-direction: column;
 }
 
 .Sidebar {
-  display:flex;
+  display: flex;
   flex-direction: row;
-  height:100vh;
+  height: 100vh;
   overflow-y: scroll;
   -ms-overflow-style: none;
   scrollbar-width: none;
-  border-right: 1px solid #EDEDED;
-  background:white;
+  border-right: 1px solid #ededed;
+  background: white;
   box-sizing: border-box;
   //hide scrollbar
   &::-webkit-scrollbar {
@@ -24,27 +22,24 @@ $spaceX: 12px;
   }
 }
 
-
-
-.Toolbar {  
-  display:flex;
+.Toolbar {
+  display: flex;
   justify-content: space-between;
   align-items: center;
   padding: $spaceY $spaceX;
-  border-right: 1px solid #EDEDED;
+  border-right: 1px solid #ededed;
 }
 
 .SidebarContent {
   flex-direction: column;
-  gap:40px;
+  gap: 40px;
   width: 220px;
-  padding:$spaceY 0px
+  padding: $spaceY 0px;
 }
 
 .SidebarContentHeader {
-  padding:0 $spaceX;
+  padding: 0 $spaceX;
 }
-
 
 .MainContent {
   flex-grow: 1;
@@ -52,37 +47,36 @@ $spaceX: 12px;
 }
 
 .ContentTitleBar {
-  background:white;
+  background: white;
   align-items: center;
-  padding:$spaceY 40px;
-  border-bottom: 1px solid #EDEDED;;
+  padding: $spaceY 40px;
+  border-bottom: 1px solid #ededed;
 }
 
 .Content {
   padding: 40px 0px;
 }
 
-
 .NavList {
   flex-direction: column;
 }
 .NavItem {
-  padding:0 $spaceX;
+  padding: 0 $spaceX;
   text-decoration: none;
-  color:var(--black-a12);
+  color: var(--black-a12);
   &:hover {
-    color:var(--lime-11);
+    color: var(--lime-11);
   }
   & > div {
     border-radius: var(--radius-3);
-    padding:0px var(--space-2);
-    height:40px;
+    padding: 0px var(--space-2);
+    height: 40px;
   }
 }
 
 .NavItemActive {
   & > div {
-    background:var(--teal-4);
-    color:var(--teal-11);
+    background: var(--teal-4);
+    color: var(--teal-11);
   }
 }

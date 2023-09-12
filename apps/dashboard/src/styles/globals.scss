@@ -1,40 +1,40 @@
 body {
-  margin:0;
+  margin: 0;
 }
 :root {
-  --color-page-background: #FAF5E8 !important;
+  --color-page-background: #faf5e8 !important;
 }
 
 .rt-BaseButton {
-  cursor:pointer;
+  cursor: pointer;
 }
 .reset {
   appearance: none;
-  border:none;
-  padding:0px;
-  margin:0px;
+  border: none;
+  padding: 0px;
+  margin: 0px;
   background: none;
   cursor: pointer;
 }
 
-.custom-grid{
-  display:flex;
+.custom-grid {
+  display: flex;
 }
 .cg-1rds {
-  max-width:400px;
-  width:100%;
+  max-width: 400px;
+  width: 100%;
 }
 .cg-3rds {
-  flex-grow:1;
+  flex-grow: 1;
 }
 
 .comp-pad {
-  padding:20px;
+  padding: 20px;
 }
 
 .app-card {
   cursor: pointer;
   &:hover {
-    box-shadow: 0 0 0 4px #F2F2F2;
+    box-shadow: 0 0 0 4px #f2f2f2;
   }
 }

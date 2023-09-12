@@ -1,0 +1,10 @@
+.SaveBar {
+  position: fixed;
+  bottom: 0px;
+  width: 100%;
+  left: 0;
+  background: rgba(255, 255, 255, 0.9);
+  filter: backdrop(blur(10px));
+  height: 80px;
+  padding: 20px;
+}
