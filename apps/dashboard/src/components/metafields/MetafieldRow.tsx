@@ -15,6 +15,7 @@ import {
   Checkbox,
   Code,
   AlertDialog,
+  Switch
 } from "@radix-ui/themes";
 import {
   CheckIcon,
@@ -222,6 +223,25 @@ const AddOrEditMetaFieldView = ({
             )}
           />
           <label htmlFor="on_profile">Profile</label>
+        </Flex>
+        <Flex align="center" gap="2">
+          <Controller
+            name="required"
+            control={control}
+            rules={{ required: false }}
+            render={({ field, fieldState }) => (
+              <Switch
+                size="1"
+                color="pink"
+                id="required"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            )}
+          />
+          <label htmlFor="required" className="checkbox-label">
+            Required
+          </label>
         </Flex>
       </Flex>
     </form>

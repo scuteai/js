@@ -7,4 +7,5 @@ export type Metafield = {
   field_name: string;
   visible_profile: boolean;
   visible_registration: boolean;
+  required?:boolean;
 };
