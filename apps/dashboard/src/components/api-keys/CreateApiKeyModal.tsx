@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { AppApiKey } from "@/types";
 import { Button, Code, Dialog, Flex, Text, TextField } from "@radix-ui/themes";
 import { CopyIcon } from "@radix-ui/react-icons";
@@ -94,6 +94,8 @@ export const ApiKeyCreatedDialogContent = ({
   apiKey: string;
   onClose: () => void;
 }) => {
+  const apiKeyCodeRef = useRef<HTMLTextAreaElement>(null);
+
   return (
     <Dialog.Content
       size="4"
@@ -111,14 +113,35 @@ export const ApiKeyCreatedDialogContent = ({
           size="1"
           variant="soft"
           color="red"
-          style={{ letterSpacing: "0.5px" }}
+          style={{ letterSpacing: "0.5px", width: "100%" }}
         >
-          {apiKey}
+          <textarea
+            ref={apiKeyCodeRef}
+            readOnly
+            style={{
+              all: "unset",
+              width: "100%",
+              height: "1rem",
+            }}
+          >
+            {apiKey}
+          </textarea>
         </Code>
       </Flex>
 
       <Flex mt="2" justify="end">
-        <Button size="1" variant="surface">
+        <Button
+          size="1"
+          variant="surface"
+          onClick={() => {
+            if (!apiKeyCodeRef.current) return;
+            apiKeyCodeRef.current.select();
+            apiKeyCodeRef.current.focus();
+            document.execCommand("copy");
+
+            toast.success("Copied!");
+          }}
+        >
           <CopyIcon />
           Copy
         </Button>

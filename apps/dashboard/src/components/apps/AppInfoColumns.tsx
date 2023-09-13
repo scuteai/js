@@ -1,3 +1,7 @@
+"use client";
+
+import { useRef } from "react";
+import { toast } from "sonner";
 import type { ScuteAppData } from "@/types";
 import {
   Avatar,
@@ -12,43 +16,73 @@ import {
 } from "@radix-ui/themes";
 import { CopyIcon } from "@radix-ui/react-icons";
 
-export const AppInfoColumns = ({ appData }: { appData: ScuteAppData }) => (
-  <Grid columns={{ initial: "1", md: "2" }} gap="5" width="auto">
-    <Card>
-      <Flex align="center" gap="5">
-        <Avatar
-          src={appData.logo}
-          fallback={appData.name.charAt(0)}
-          color="red"
-          size="7"
-        />
-        <Flex direction="column" justify="start" align="start">
-          <Heading>{appData.name}</Heading> <Text>{appData.origin}</Text>
-          <Badge variant="soft">Active</Badge>
-        </Flex>
-      </Flex>
-    </Card>
-    <Card>
-      <Flex direction="column" gap="3">
-        <Flex direction="column" gap="1">
-          <Text size="2">App ID:</Text>
-          <Flex align="center" justify="between">
-            <Code variant="outline" size="1">
-              {appData.id}
-            </Code>
-            <Button size="1" variant="surface">
-              <CopyIcon />
-              Copy
-            </Button>
+export const AppInfoColumns = ({ appData }: { appData: ScuteAppData }) => {
+  const applicationIdRef = useRef<HTMLTextAreaElement>(null);
+
+  return (
+    <Grid columns={{ initial: "1", md: "2" }} gap="5" width="auto">
+      <Card>
+        <Flex align="center" gap="5">
+          <Avatar
+            src={appData.logo}
+            fallback={appData.name.charAt(0)}
+            color="red"
+            size="7"
+          />
+          <Flex direction="column" justify="start" align="start">
+            <Heading>{appData.name}</Heading> <Text>{appData.origin}</Text>
+            <Badge variant="soft">Active</Badge>
           </Flex>
         </Flex>
-        <Flex direction="column" gap="1">
-          <Text size="2">API Url:</Text>
-          <Code variant="ghost" size="1">
-            https://api.scute.io/apps/{appData.id}
-          </Code>
+      </Card>
+      <Card>
+        <Flex direction="column" gap="3">
+          <Flex direction="column" gap="1">
+            <Text size="2">App ID:</Text>
+            <Flex align="center" justify="between">
+              <Code
+                variant="outline"
+                size="1"
+                mr="2"
+                style={{ letterSpacing: "0.5px", width: "100%" }}
+              >
+                <textarea
+                  ref={applicationIdRef}
+                  readOnly
+                  style={{
+                    all: "unset",
+                    width: "100%",
+                    height: "1rem",
+                  }}
+                >
+                  {appData.id}
+                </textarea>
+              </Code>
+              <Button
+                size="1"
+                variant="surface"
+                onClick={() => {
+                  if (!applicationIdRef.current) return;
+                  applicationIdRef.current.select();
+                  applicationIdRef.current.focus();
+                  document.execCommand("copy");
+
+                  toast.success("Copied!");
+                }}
+              >
+                <CopyIcon />
+                Copy
+              </Button>
+            </Flex>
+          </Flex>
+          <Flex direction="column" gap="1">
+            <Text size="2">API Url:</Text>
+            <Code variant="ghost" size="1">
+              https://api.scute.io/apps/{appData.id}
+            </Code>
+          </Flex>
         </Flex>
-      </Flex>
-    </Card>
-  </Grid>
-);
+      </Card>
+    </Grid>
+  );
+};

@@ -14,6 +14,7 @@ import styles from "@/styles/Table.module.scss";
 
 import { CopyIcon } from "@radix-ui/react-icons";
 import { AppUserActions } from "./AppUserActions";
+import { toast } from "sonner";
 
 interface UsersProps {
   appId: UniqueIdentifier;
@@ -30,7 +31,18 @@ export const Users = ({ appId, users }: UsersProps) => {
           <Tooltip content={info.getValue()}>
             <Kbd size="1">{shortString(info.getValue() as string, 8)}</Kbd>
           </Tooltip>
-          <IconButton color="gray" size="1" variant="ghost">
+          <IconButton
+            color="gray"
+            size="1"
+            variant="ghost"
+            onClick={() =>
+              navigator.clipboard
+                .writeText(info.getValue() as string)
+                .then(() => {
+                  toast.success("Copied!");
+                })
+            }
+          >
             <CopyIcon />
           </IconButton>
         </Flex>

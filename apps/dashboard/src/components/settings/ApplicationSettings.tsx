@@ -1,4 +1,5 @@
 "use client";
+import { useRef } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import type { ScuteAppData } from "@/types";
@@ -36,7 +37,7 @@ export const AppSettings = ({
   deleteApp,
 }: AppSettingsProps) => {
   const router = useRouter();
-
+  const applicationIdRef = useRef<HTMLInputElement>(null);
   const {
     register,
     handleSubmit,
@@ -116,11 +117,24 @@ export const AppSettings = ({
           <Flex direction="column" gap="5">
             <Heading color="gray">Info</Heading>
             <STextField
+              ref={applicationIdRef}
               title="Application ID"
-              disabled
               value={appData.id as string}
+              readOnly
               inputActionSlot={
-                <Button size="1" variant="outline">
+                <Button
+                  size="1"
+                  variant="outline"
+                  onClick={() => {
+                    if (!applicationIdRef.current) return;
+
+                    applicationIdRef.current.focus();
+                    applicationIdRef.current.select();
+                    document.execCommand("copy");
+
+                    toast.success("Copied!");
+                  }}
+                >
                   <CopyIcon /> Copy
                 </Button>
               }
