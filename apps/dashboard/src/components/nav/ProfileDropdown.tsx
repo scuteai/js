@@ -26,10 +26,23 @@ export const ProfileDropdown = ({
         </IconButton>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content>
-        <Link href={PATHS.PROFILE}>
-          <DropdownMenu.Item>View profile</DropdownMenu.Item>
+        <Link href={PATHS.PROFILE} legacyBehavior>
+          <DropdownMenu.Item
+            style={{
+              cursor: "pointer",
+            }}
+          >
+            View profile
+          </DropdownMenu.Item>
         </Link>
-        <DropdownMenu.Item onClick={() => signOut()}>Logout</DropdownMenu.Item>
+        <DropdownMenu.Item
+          onClick={() => signOut()}
+          style={{
+            cursor: "pointer",
+          }}
+        >
+          Logout
+        </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   );

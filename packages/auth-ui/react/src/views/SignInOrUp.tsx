@@ -310,38 +310,6 @@ const RegisterForm = ({
       </div>
       <br />
       <div>
-        {(
-          [
-            {
-              name: "First Name",
-              field_name: "first_name",
-              type: "string",
-            },
-            {
-              name: "Last Name",
-              field_name: "last_name",
-              type: "string",
-            },
-          ] as ScuteUserMetaDataSchema[]
-        ).map(({ name, field_name, type }) => (
-          <Group key={field_name}>
-            <Label>{name}</Label>
-            <TextField
-              placeholder={name}
-              {...register(field_name, {
-                required: "This field is required.",
-              })}
-              size="2"
-            />
-
-            {errors[field_name] ? (
-              <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                <>{errors[field_name]?.message}</>
-              </Text>
-            ) : null}
-          </Group>
-        ))}
-
         {allowedIdentifiers.length > 1 ? (
           <>
             {/* // TODO

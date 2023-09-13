@@ -1,6 +1,4 @@
 "use client";
-
-import { useRouter } from "next/navigation";
 import { type UpdateAppBodyParams } from "@/api";
 import type { ScuteAppData } from "@/types";
 
@@ -116,6 +114,7 @@ export const AuthSettings = ({ appData, updateApp }: AuthSettingsProps) => {
               title="Supported identifiers"
               description="Choose how your users will identify themselves on your app."
               flexRow={false}
+              separator
             >
               <Flex gap="7">
                 <Flex align="center" gap="2">
@@ -139,11 +138,33 @@ export const AuthSettings = ({ appData, updateApp }: AuthSettingsProps) => {
                   <Checkbox id="checkbox-7" size="1" disabled />
                   <label htmlFor="checkbox-7">
                     <Text size="1">
-                      Phone number{" "}
+                      Phone number
                       <span style={{ color: "var(--orange-11)" }}>(soon)</span>
                     </Text>
                   </label>
                 </Flex>
+              </Flex>
+            </SettingSectionShell>
+            <SettingSectionShell
+              title="Scute Branding"
+              description="Add or remove the “Powered by Scute” tag at the bottom of UI elements."
+              flexRow={true}
+              separator
+            >
+              <Flex>
+                <Controller
+                  control={control}
+                  name="scute_branding"
+                  render={({ field }) => (
+                    <Switch
+                      color="lime"
+                      {...field}
+                      value={undefined}
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
               </Flex>
             </SettingSectionShell>
           </Flex>

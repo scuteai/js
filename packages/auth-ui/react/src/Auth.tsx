@@ -37,7 +37,6 @@ export type AuthProps = {
   webauthn?: ScuteWebauthnOption;
   appearance?: {
     theme?: Theme;
-    scuteBranding?: boolean;
   };
 };
 
@@ -72,13 +71,18 @@ function Auth(props: AuthProps) {
 
   const appearance: AuthProps["appearance"] = {
     // defaults
-    scuteBranding: true,
+    
     // client preferences
     ..._appearance,
   };
-  const containerProps: AuthProps = { ...props, appearance };
 
   const [appData, _setAppData] = useState<ScuteAppData>();
+
+  const containerProps: Omit<ContainerProps, "children"> = {
+    ...props,
+    appearance,
+    appData,
+  };
 
   useEffect(() => {
     if (isFatalError) return;
@@ -244,12 +248,18 @@ function Auth(props: AuthProps) {
   }
 }
 
+interface ContainerProps extends AuthProps {
+  appData?: ScuteAppData;
+  children: React.ReactNode;
+}
+
 const Container = ({
   scuteClient,
+  appData,
   appearance,
   webauthn,
   children,
-}: AuthProps & { children: React.ReactNode }) => {
+}: ContainerProps) => {
   const providerTheme = useTheme();
 
   return (
@@ -262,7 +272,7 @@ const Container = ({
     >
       <ElementCard>
         <Content>{children}</Content>
-        {appearance?.scuteBranding ? (
+        {appData?.scute_branding !== false ? (
           <Flex css={{ jc: "center", pb: "$1" }}>
             <FooterCredits>
               <span>powered by</span>

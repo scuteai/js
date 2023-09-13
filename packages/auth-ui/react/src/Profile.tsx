@@ -8,7 +8,14 @@ import {
   ScuteAppData,
 } from "@scute/core";
 import type { Theme } from "@scute/ui-shared";
-import { Button, ElementCard, Flex, Text, TextField } from "./components";
+import {
+  Button,
+  ElementCard,
+  Flex,
+  LargeSpinner,
+  Text,
+  TextField,
+} from "./components";
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import { AppLogo } from "./components/AppLogo";
@@ -57,7 +64,17 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
   const formRef = useRef<HTMLFormElement>(null);
 
   if (session.status === "loading" || !appData) {
-    return <>Loading...</>;
+    return (
+      <Flex
+        justify="center"
+        align="center"
+        css={{
+          height: "75vh",
+        }}
+      >
+        <LargeSpinner />
+      </Flex>
+    );
   } else if (session.status === "unauthenticated" || !user) {
     return <>Login Required.</>;
   }

@@ -15,7 +15,7 @@ import {
   Checkbox,
   Code,
   AlertDialog,
-  Switch
+  Switch,
 } from "@radix-ui/themes";
 import {
   CheckIcon,
@@ -27,9 +27,10 @@ import { toast } from "sonner";
 
 type MetaFieldInputs = {
   name: Metafield["name"];
-  type: Metafield["type"];
+  field_type: Metafield["field_type"];
   visible_registration: Metafield["visible_registration"];
   visible_profile: Metafield["visible_profile"];
+  required: Metafield["required"];
 };
 
 type MetaFieldRowProps = {
@@ -89,6 +90,12 @@ const AddOrEditMetaFieldView = ({
   addMetaField: MetaFieldRowProps["addMetaField"];
   editMetaField: MetaFieldRowProps["editMetaField"];
 }) => {
+  const minDefaultValues: Partial<MetaFieldInputs> = {
+    visible_registration: true,
+    visible_profile: true,
+    field_type: "string",
+  };
+
   const {
     register,
     handleSubmit,
@@ -96,13 +103,7 @@ const AddOrEditMetaFieldView = ({
     reset,
     formState: { errors },
   } = useForm<MetaFieldInputs>({
-    defaultValues: metafield
-      ? metafield
-      : {
-          visible_registration: true,
-          visible_profile: true,
-          type: "string",
-        },
+    defaultValues: metafield ? metafield : minDefaultValues,
   });
 
   return (
@@ -150,13 +151,12 @@ const AddOrEditMetaFieldView = ({
         </Box>
 
         <Controller
-          name="type"
+          name="field_type"
           control={control}
           rules={{ required: true }}
           render={({ field }) => (
             <Select.Root
               size="3"
-              {...field}
               value={field.value}
               onValueChange={field.onChange}
             >
@@ -229,11 +229,12 @@ const AddOrEditMetaFieldView = ({
             name="required"
             control={control}
             rules={{ required: false }}
-            render={({ field, fieldState }) => (
+            render={({ field }) => (
               <Switch
                 size="1"
                 color="pink"
-                id="required"
+                {...field}
+                value={undefined}
                 checked={field.value}
                 onCheckedChange={field.onChange}
               />
@@ -265,7 +266,7 @@ const DisplayMetaFieldView = ({
           <Flex align="center" gap="2">
             <Text size="3">{metafield.name}</Text>
             <Code variant="soft" color="lime" size="1">
-              {metafield.type}
+              {metafield.field_type}
             </Code>
           </Flex>
           <Flex align="center" gap="2">
@@ -321,6 +322,11 @@ const DisplayMetaFieldView = ({
         style={{ fontSize: "14px", paddingTop: "10px", opacity: 0.6 }}
         gap="2"
       >
+        {metafield.required ? (
+          <Flex align="center" gap="1">
+            <CheckIcon /> Required
+          </Flex>
+        ) : null}
         {metafield.visible_registration ? (
           <Flex align="center" gap="1">
             <CheckIcon /> Register

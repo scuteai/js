@@ -68,14 +68,13 @@ export const ROUTES = [
 type Routes = (typeof ROUTES)[number];
 type RouteKey = Routes["key"];
 
-export const PATHS = (<T extends RouteKey>() =>
-  ROUTES.reduce(
-    (obj, { key, pathname }) => {
-      (obj as any)[key] = basePath ? pathname.replace(basePath, "") : pathname;
+export const PATHS = ROUTES.reduce(
+  (obj, { key, pathname }) => {
+    (obj as any)[key] = basePath ? pathname.replace(basePath, "") : pathname;
 
-      return obj;
-    },
-    {} as {
-      [K in T]: Extract<Routes, { key: K }>["pathname"];
-    }
-  ))();
+    return obj;
+  },
+  {} as {
+    [K in RouteKey]: Extract<Routes, { key: K }>["pathname"];
+  }
+);
