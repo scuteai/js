@@ -15,23 +15,24 @@ export type ScuteAppData = {
   name: string;
   created_at: string;
   updated_at: string;
+  origin: string;
+  callback_url: string;
+  login_url: string;
   logo: string;
   logo_dark: string;
+  colors: any; // TODO
   public_key: any; // TODO
   profile_management: boolean;
   public_signup: boolean;
   access_expiration: number;
   refresh_expiration: number;
   refresh_enabled: boolean;
+  magic_link_expiration: number;
   session_timeout: number;
-  scute_branding: boolean; // TODO
+  scute_branding: boolean;
   allowed_identifiers: ScuteIdentifierType[];
   required_identifiers: ScuteIdentifierType[];
   default_language: string;
-  auth_login_url: string;
-  auth_origin: string;
-  auth_callback: string;
-  magic_link_ttl: number;
   user_meta_data_schema: ScuteUserMetaDataSchema[];
 };
 

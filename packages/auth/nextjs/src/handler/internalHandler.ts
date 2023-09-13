@@ -67,8 +67,10 @@ const internalHandler = async (
     // sets refresh token http-only
     await scute.refreshSession();
 
+    const { data } = await scute.getSession();
+
     const response = new Response(null, {
-      status: 200,
+      status: data.session?.status === "authenticated" ? 200 : 401,
     });
 
     return response;
@@ -88,7 +90,9 @@ const internalHandler = async (
 
     return response;
   } else if (isCsrfRequest(url, method)) {
-    const token = cookies[CSRF_TOKEN_KEY] ?? createCsrfToken();
+    const token = cookies[CSRF_TOKEN_KEY]
+      ? cookies[CSRF_TOKEN_KEY]
+      : createCsrfToken();
 
     const response = new Response(token, {
       status: 200,

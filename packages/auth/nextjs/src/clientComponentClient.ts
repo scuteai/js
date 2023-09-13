@@ -36,13 +36,17 @@ export const createClientComponentClient = (
       scute.onAuthStateChange(async (event) => {
         switch (event) {
           case "signed_in":
-            await fetchWithCsrf(
+            const res = await fetchWithCsrf(
               SIGN_IN_HANDLER,
               {
                 method: "POST",
               },
               handlersPrefix
             );
+            if (!res.ok) {
+              await scute.signOut();
+            }
+
             break;
 
           case "session_expired":

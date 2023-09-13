@@ -7,3 +7,4 @@ export * from "./routeHandlerClient";
 export * from "./serverActionClient";
 export * from "./serverComponentClient";
 export { ScuteHandler } from "./handler";
+export type { ScuteNextjsClientConfig } from "./shared";

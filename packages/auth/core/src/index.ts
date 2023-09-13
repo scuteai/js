@@ -20,7 +20,11 @@ export {
 } from "./lib/ScuteSession";
 export type { Session } from "./lib/types/session";
 
-export { isBrowser } from "./lib/helpers";
+export {
+  isBrowser,
+  accessTokenHeader,
+  refreshTokenHeaders,
+} from "./lib/helpers";
 export type { CookieAttributes, UniqueIdentifier } from "./lib/types/general";
 export * from "./lib/types/scute";
 
