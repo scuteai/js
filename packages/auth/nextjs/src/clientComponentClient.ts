@@ -1,4 +1,8 @@
-import { ScuteBrowserCookieStorage } from "@scute/core";
+import {
+  ScuteBrowserCookieStorage,
+  UnknownSignInError,
+  type ScuteTokenPayload,
+} from "@scute/core";
 import {
   fetchWithCsrf,
   REFRESH_HANDLER,
@@ -32,23 +36,41 @@ export const createClientComponentClient = (
     }
 
     if (config?.preferences?.httpOnlyRefresh !== false) {
+      const originalSignInWithTokenPayload = scute["signInWithTokenPayload"];
+
+      const signInWithTokenPayload = async (payload: ScuteTokenPayload) => {
+        const res = await fetchWithCsrf(
+          SIGN_IN_HANDLER,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${payload.access}`,
+            },
+          },
+          handlersPrefix
+        );
+        if (!res.ok) {
+          // something went wrong
+          await scute.signOut();
+          return { error: new UnknownSignInError() };
+        } else {
+          const { access} = await scute[
+            "initialSessionState"
+          ]();
+
+          return originalSignInWithTokenPayload.bind(scute)({
+            access,
+          } as any);
+        }
+      };
+
+      scute["signInWithTokenPayload"] = async (payload) => {
+        return signInWithTokenPayload(payload);
+      };
+
       const handlersPrefix = config?.handlersPrefix;
       scute.onAuthStateChange(async (event) => {
         switch (event) {
-          case "signed_in":
-            const res = await fetchWithCsrf(
-              SIGN_IN_HANDLER,
-              {
-                method: "POST",
-              },
-              handlersPrefix
-            );
-            if (!res.ok) {
-              await scute.signOut();
-            }
-
-            break;
-
           case "session_expired":
           case "signed_out":
             await fetchWithCsrf(

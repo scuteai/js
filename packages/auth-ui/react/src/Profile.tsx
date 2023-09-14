@@ -191,6 +191,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
                 <SessionCard
                   key={session.id}
                   scuteClient={scuteClient}
+                  appData={appData}
                   session={session}
                 />
               ))}
@@ -208,16 +209,18 @@ export default Profile;
 
 const SessionCard = ({
   scuteClient,
+  appData,
   session,
 }: {
   scuteClient: ScuteClient;
+  appData: ScuteAppData;
   session: ScuteUserSession;
 }) => {
   return (
     <ElementCard css={{ p: "$3" }} key={session.id}>
       <Flex css={{ jc: "space-between" }}>
         <Flex css={{ gap: "$2", ai: "center" }}>
-          <AppLogo url={session.app_logo} alt={session.app_name} size={1} />
+          <AppLogo url={appData.logo} alt={appData.name} size={1} />
           <Flex css={{ fd: "column" }}>
             <Text>{session.nickname}</Text>
           </Flex>

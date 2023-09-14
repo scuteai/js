@@ -32,7 +32,6 @@ import { useTheme } from "./ThemeContext";
 export type AuthProps = {
   scuteClient: ScuteClient;
   onSignIn?: () => void;
-  onSignOut?: () => void;
   view?: Extract<Views, "sign-in-or-up" | "sign-in" | "sign-up">;
   webauthn?: ScuteWebauthnOption;
   appearance?: {
@@ -47,7 +46,6 @@ function Auth(props: AuthProps) {
     view = VIEWS.SIGN_IN_OR_UP,
     webauthn = "optional",
     onSignIn,
-    onSignOut,
   } = props;
 
   const [identifier, setIdentifier] = useState<ScuteIdentifier>("");
@@ -71,7 +69,7 @@ function Auth(props: AuthProps) {
 
   const appearance: AuthProps["appearance"] = {
     // defaults
-    
+
     // client preferences
     ..._appearance,
   };
@@ -104,7 +102,7 @@ function Auth(props: AuthProps) {
       if (event === AUTH_CHANGE_EVENTS.SIGNED_IN) {
         onSignIn?.();
       } else if (event === AUTH_CHANGE_EVENTS.SIGNED_OUT) {
-        onSignOut?.();
+        //
       } else if (event === AUTH_CHANGE_EVENTS.MAGIC_PENDING) {
         setAuthView(VIEWS.MAGIC_PENDING);
       } else if (event === AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING) {
@@ -117,7 +115,7 @@ function Auth(props: AuthProps) {
     });
 
     return () => unsubscribe();
-  }, [scuteClient, onSignIn, onSignOut, view]);
+  }, [scuteClient, onSignIn, view]);
 
   const [_isMounted, _setIsMounted] = useState(false);
   useEffect(() => {

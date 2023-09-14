@@ -33,7 +33,7 @@ const internalHandler = async (
     query: Record<string, string>;
     body: Record<string, any> | undefined;
     cookies: Record<string, string>;
-    headers: Record<string, string>;
+    headers: Headers;
   }
 ): Promise<Response> => {
   if (isSignInRequest(url, method)) {
@@ -42,11 +42,12 @@ const internalHandler = async (
       return response;
     }
 
-    const {
-      data: { session },
-      error,
-    } = await scute.getSession();
+    await scute["setSession"]({
+      access: headers.get("Authorization")?.split("Bearer ")?.[1],
+    });
 
+    // sets refresh token http-only
+    const { data: session, error } = await scute.refreshSession();
     const { data: appData } = await scute.getAppData();
 
     if (
@@ -59,21 +60,16 @@ const internalHandler = async (
         (new Date().getTime() + appData.access_expiration * 1000) >
         SIGN_IN_MAX_DELAY_MS
     ) {
+      await scute.signOut();
+
       return new Response(null, {
         status: 401,
       });
     }
 
-    // sets refresh token http-only
-    await scute.refreshSession();
-
-    const { data } = await scute.getSession();
-
-    const response = new Response(null, {
-      status: data.session?.status === "authenticated" ? 200 : 401,
+    return new Response(null, {
+      status: 200,
     });
-
-    return response;
   } else if (isSignOutRequest(url, method)) {
     if (!isCsrfTokenValid({ cookies, headers })) {
       const response = getCsrfErrorResponse();
@@ -115,7 +111,7 @@ const internalHandler = async (
         access_expires_at: data?.accessExpiresAt,
       } as Partial<ScuteTokenPayload>),
       {
-        status: !data?.access || error ? 403 : 200,
+        status: !data?.access || error ? 401 : 200,
         headers: {
           "Content-Type": "application/json",
         },

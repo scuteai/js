@@ -86,7 +86,7 @@ const VerifyDevice = ({
   });
 
   if (!initialized) {
-     // TODO: loading
+    // TODO: loading
     return (
       <>
         <Inner
@@ -95,7 +95,7 @@ const VerifyDevice = ({
             jc: "center",
             fd: "column",
             textAlign: "center",
-            minHeight: "12rem"
+            minHeight: "12rem",
           }}
         >
           {/* Loading... */}
@@ -123,8 +123,9 @@ const VerifyDevice = ({
 
         {error ? (
           <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-            An error occurred while verifying your identity. You can try again
-            or sign in with magic link.
+            {error}
+            <br />
+            You can try again or sign in with magic link.
           </Text>
         ) : (
           <Text css={{ color: "$textColor" }}>

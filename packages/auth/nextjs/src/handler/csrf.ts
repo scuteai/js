@@ -34,18 +34,17 @@ export const isCsrfTokenValid = ({
   cookies,
   headers,
 }: {
-  cookies: Record<string, string>;
-  headers: Record<string, string>;
+  cookies: Record<string, string | null>;
+  headers: Headers;
 }) => {
   const csrfTokenCookie = cookies[CSRF_TOKEN_KEY];
-  const csrfTokenHeader =
-    headers[CSRF_TOKEN_KEY] || headers[CSRF_TOKEN_KEY.toLowerCase()];
+  const csrfTokenHeader = headers.get(CSRF_TOKEN_KEY);
 
   if (
+    csrfTokenCookie &&
+    csrfTokenCookie.trim().length !== 0 &&
     csrfTokenHeader &&
-    csrfTokenHeader !== "" &&
-    csrfTokenHeader &&
-    csrfTokenHeader !== "" &&
+    csrfTokenHeader.trim().length !== 0 &&
     csrfTokenCookie === csrfTokenHeader
   ) {
     return true;

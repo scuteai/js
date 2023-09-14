@@ -17,8 +17,8 @@ export const AppUserActions = ({ appId, user }: AppUserActionsProps) => {
 
   return (
     <Flex gap="3" align="center" justify="end">
-      <Badge radius="full" color={user.active ? "green" : "red"}>
-        {user.active}
+      <Badge radius="full" color={user.status === "active" ? "green" : "red"}>
+        {user.status}
       </Badge>
       <Flex gap="2" align="center">
         <Link href={userUrl}>
@@ -36,7 +36,7 @@ export const AppUserActions = ({ appId, user }: AppUserActionsProps) => {
             <Link legacyBehavior href={userUrl}>
               <DropdownMenu.Item shortcut="⌘ V">View</DropdownMenu.Item>
             </Link>
-            {user.active ? (
+            {user.status === "active" ? (
               <DropdownMenu.Item shortcut="⌘ D">Deactivate</DropdownMenu.Item>
             ) : (
               <DropdownMenu.Item shortcut="⌘ A">Activate</DropdownMenu.Item>

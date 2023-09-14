@@ -28,7 +28,7 @@ async function ScuteRouteHandler(
       .getAll()
       .map((c) => [c.name, c.value])
   );
-  const headers = Object.fromEntries(context.headers() as any);
+  const headers = context.headers();
 
   const scute = createRouteHandlerClient({ cookies: context.cookies });
   const response = await internalHandler(scute, {
@@ -49,7 +49,7 @@ async function ScuteNodeApiHandler(req: NextApiRequest, res: NextApiResponse) {
   const query = req.query as Record<string, string>;
   const body = req.body;
   const cookies = req.cookies as Record<string, string>;
-  const headers = req.headers as Record<string, string>;
+  const headers = new Headers(req.headers as Record<string, string>);
 
   const scute = createPagesServerClient({ req, res });
   const response = await internalHandler(scute, {
@@ -96,7 +96,7 @@ async function ScuteEdgeApiHandler(req: NextRequest) {
   const cookies = Object.fromEntries(
     req.cookies.getAll().map((c) => [c.name, c.value])
   );
-  const headers = Object.fromEntries(req.headers as any);
+  const headers = req.headers;
 
   const scute = createPagesEdgeRuntimeClient({ request: req });
   const response = await internalHandler(scute, {

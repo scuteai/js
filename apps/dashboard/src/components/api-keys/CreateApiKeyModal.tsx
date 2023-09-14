@@ -123,9 +123,8 @@ export const ApiKeyCreatedDialogContent = ({
               width: "100%",
               height: "1rem",
             }}
-          >
-            {apiKey}
-          </textarea>
+            value={apiKey}
+          />
         </Code>
       </Flex>
 

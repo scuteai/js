@@ -114,8 +114,17 @@ export abstract class ScuteSession {
             await this._handleRefreshError(refreshError);
             session = unAuthenticatedState();
           } else {
-            this.debug("#_getSession", "refreshed");
-            session = refreshedSession;
+            if (refreshedSession.access) {
+              this.debug("#_getSession", "refreshed");
+              session = {
+                access: refreshedSession.access,
+                accessExpiresAt: refreshedSession.accessExpiresAt,
+                refresh: refreshedSession.refresh ?? session.refresh,
+                refreshExpiresAt:
+                  refreshedSession.refreshExpiresAt ?? session.refreshExpiresAt,
+                status: "authenticated",
+              } as AuthenticatedSession;
+            }
           }
         } else {
           this.debug(
@@ -725,7 +734,9 @@ export abstract class ScuteSession {
    * Get credential store for new device checks.
    * @internal
    */
-  private async _getCredentialStore() {
+  private async _getCredentialStore(): Promise<
+    Record<UniqueIdentifier, string[]>
+  > {
     let credData = await this.scuteStorage.getItem(SCUTE_CRED_STORAGE_KEY);
 
     if (!credData && typeof window !== "undefined") {
@@ -767,6 +778,19 @@ export abstract class ScuteSession {
     userId: UniqueIdentifier
   ): Promise<string[]> {
     const store = await this._getCredentialStore();
+
+    return this._getCredentialIds(store, userId);
+  }
+
+  /**
+   *
+   * @internal
+   * @see {@link getCredentialIds}
+   */
+  private _getCredentialIds(
+    store: Awaited<ReturnType<ScuteClient["_getCredentialStore"]>>,
+    userId: UniqueIdentifier
+  ) {
     const userIdStore = store[userId];
 
     if (!userIdStore) {
@@ -786,11 +810,13 @@ export abstract class ScuteSession {
     userId: UniqueIdentifier,
     credentialId: UniqueIdentifier
   ) {
+    const store = await this._getCredentialStore();
+
     const value = JSON.stringify({
-      ...this._getCredentialStore(),
+      ...store,
       [userId]: Array.from(
         new Set(
-          [...(await this.getCredentialIds(userId)), credentialId].filter(
+          [...this._getCredentialIds(store, userId), credentialId].filter(
             Boolean
           )
         )
@@ -810,11 +836,13 @@ export abstract class ScuteSession {
     userId: UniqueIdentifier,
     credentialId: UniqueIdentifier
   ) {
+    const store = await this._getCredentialStore();
+
     const value = JSON.stringify({
-      ...this._getCredentialStore(),
+      ...store,
       [userId]: Array.from(
         new Set(
-          [...(await this.getCredentialIds(userId)), credentialId].filter(
+          [...this._getCredentialIds(store, userId), credentialId].filter(
             (item) => Boolean(item) && item !== credentialId
           )
         )

@@ -29,4 +29,4 @@ export {
 export { safelyDefineElement } from "./utils/define";
 export { render, updateProps } from "./utils/render";
 
-export { darkTheme } from "@scute/ui-react";
+export { darkTheme, type Theme } from "@scute/ui-react";

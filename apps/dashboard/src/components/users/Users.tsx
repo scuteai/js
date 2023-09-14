@@ -53,7 +53,7 @@ export const Users = ({ appId, users }: UsersProps) => {
     columnHelper.accessor("email", {
       header: () => <span>Email</span>,
     }),
-    columnHelper.accessor("active", {
+    columnHelper.accessor("status", {
       header: () => <span>Active</span>,
     }),
     columnHelper.display({

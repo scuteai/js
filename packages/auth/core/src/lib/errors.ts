@@ -407,7 +407,7 @@ export class LoginRequiredError extends CustomScuteError {
 }
 export class UnknownSignInError extends CustomScuteError {
   constructor() {
-    super("Unknown sign in.", "unknown-sign-in");
+    super("Unknown sign in error.", "unknown-sign-in");
     Object.setPrototypeOf(this, UnknownSignInError.prototype);
   }
 }

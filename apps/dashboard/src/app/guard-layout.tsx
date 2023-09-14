@@ -22,7 +22,9 @@ export default async function GuardLayout({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect(PATHS.HOME);
+    // redirect handled in middleware, so always authenticated
+    // invariant
+    throw new Error("Something went wrong.");
   }
 
   const appData = params?.appId ? await getApp(params.appId) : undefined;

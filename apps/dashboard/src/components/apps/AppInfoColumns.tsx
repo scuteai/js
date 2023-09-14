@@ -54,9 +54,8 @@ export const AppInfoColumns = ({ appData }: { appData: ScuteAppData }) => {
                     width: "100%",
                     height: "1rem",
                   }}
-                >
-                  {appData.id}
-                </textarea>
+                  value={appData.id}
+                />
               </Code>
               <Button
                 size="1"

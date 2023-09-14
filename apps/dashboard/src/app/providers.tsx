@@ -1,6 +1,6 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { PATHS } from "./routes";
 import { createClientComponentClient } from "@scute/nextjs";
 import { AuthContextProvider, useAuth } from "@scute/react";
@@ -38,17 +38,18 @@ const ClientAuthGuard = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
   const { session } = useAuth();
 
-  const guard = () =>
-    (pathname.startsWith(PATHS.APPS) || pathname.startsWith(PATHS.PROFILE)) &&
-    session.status === "unauthenticated";
+  const guard = useCallback(
+    () =>
+      (pathname.startsWith(PATHS.APPS) || pathname.startsWith(PATHS.PROFILE)) &&
+      session.status === "unauthenticated",
+    [session.status, pathname]
+  );
 
   useEffect(() => {
     if (guard()) {
       router.push(PATHS.HOME);
-    } else if (session.status === "authenticated" && pathname === PATHS.HOME) {
-      router.push(PATHS.APPS);
     }
-  }, [guard, session]);
+  }, [guard]);
 
   if (guard()) {
     return null;

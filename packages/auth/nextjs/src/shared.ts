@@ -13,7 +13,7 @@ export type ScuteNextjsClientConfig = Prettify<
     appId?: UniqueIdentifier;
   } & {
     preferences?: Prettify<
-      Omit<ScuteClientPreferences, "autoRefreshToken" | "persistSession"> & {
+      Omit<ScuteClientPreferences, "persistSession"> & {
         httpOnlyRefresh?: boolean;
       }
     >;
@@ -35,15 +35,27 @@ export const createScuteClient = (config: ScuteNextjsClientConfig) => {
     });
   }
 
-  return createClient({
+  const scuteClient = createClient({
     ...config,
     appId,
     baseUrl,
     secretKey,
     preferences: {
       ...config.preferences,
-      autoRefreshToken: browser,
       persistSession: true,
     },
   });
+
+  [scuteClient["wretcher"], scuteClient.admin["wretcher"]].forEach(
+    (wretcher) => {
+      wretcher._middlewares.push((next) => (url, opts) => {
+        // disable nextjs cache
+        (opts as RequestInit).cache = "no-store";
+
+        return next(url, opts);
+      });
+    }
+  );
+
+  return scuteClient;
 };

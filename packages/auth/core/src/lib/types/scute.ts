@@ -70,7 +70,7 @@ export type ScuteUser = {
 
 export type ScuteUserData = {
   id: UniqueIdentifier;
-  active: boolean;
+  status: "active" | "inactive"
   email: string | null;
   email_verified: boolean;
   phone: string | null;
@@ -123,10 +123,11 @@ export type ScuteUserSession = {
   platform: string;
   browser: string;
   user_agent_shortname: string;
-  app_name: string;
-  app_slug: string;
-  app_logo: string;
-  app_origin: string;
+  // TODO
+  // app_name: string;
+  // app_slug: string;
+  // app_logo: string;
+  // app_origin: string;
   nickname: string;
 };
 

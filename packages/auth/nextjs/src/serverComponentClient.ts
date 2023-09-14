@@ -1,4 +1,8 @@
-import { ScuteCookieStorage, type CookieAttributes } from "@scute/core";
+import {
+  isBrowser,
+  ScuteCookieStorage,
+  type CookieAttributes,
+} from "@scute/core";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 
@@ -35,10 +39,13 @@ export const createServerComponentClient = (
   },
   config?: ScuteNextjsClientConfig
 ) => {
+  const browser = isBrowser();
+
   return createScuteClient({
     ...config,
     preferences: {
       ...config?.preferences,
+      autoRefreshToken: browser,
       sessionStorageAdapter: new ScuteNextServerComponentStorage(context, {
         secure: process.env.NODE_ENV === "production",
       }),

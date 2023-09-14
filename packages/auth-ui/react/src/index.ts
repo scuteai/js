@@ -11,4 +11,4 @@ export {
 // TODO export { default as SocialAuth, type SocialAuthProps } from "./SocialAuth";
 
 export { ThemeProvider, useTheme } from "./ThemeContext";
-export { darkTheme } from "@scute/ui-shared";
+export { darkTheme, type Theme } from "@scute/ui-shared";

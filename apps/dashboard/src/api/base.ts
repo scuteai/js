@@ -1,4 +1,4 @@
-import 'server-only'
+import "server-only";
 
 import { cookies } from "next/headers";
 import {
@@ -30,14 +30,6 @@ export const getScuteClient = (() => {
         appId,
       }
     );
-
-    //@ts-ignore
-    scuteClient.wretcher._middlewares.push((next) => (url, opts) => {
-      // disable nextjs cache
-      (opts as RequestInit).cache = "no-store";
-
-      return next(url, opts);
-    });
 
     clientMap.set(key, scuteClient);
 
