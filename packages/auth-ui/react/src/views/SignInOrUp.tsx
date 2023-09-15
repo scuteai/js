@@ -2,7 +2,6 @@ import {
   type ScuteClient,
   type ScuteIdentifier,
   type ScuteAppData,
-  type ScuteUserMetaDataSchema,
   type UniqueIdentifier,
   getMeaningfulError,
   ScuteIdentifierType,
@@ -43,6 +42,10 @@ interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   getMagicLinkIdCallback?: (magicLinkId: UniqueIdentifier) => void;
 }
 
+type IdentifierInput = {
+  identifier: ScuteIdentifier;
+};
+
 const SignInOrUp = (props: SignInOrUpProps) => {
   const {
     scuteClient,
@@ -50,30 +53,42 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     setIdentifier,
     setAuthView,
     appData,
-    mode = "sign_in_or_up",
+    mode: _mode = "sign_in_or_up",
     webauthnEnabled = true,
     setIsFatalError,
     getMagicLinkIdCallback,
   } = props;
 
+  const [mode] = useState<SignInOrUpProps["mode"]>(() =>
+    appData.public_signup !== false ? _mode : "sign_in"
+  );
+
   const registerFormProps: SignInOrUpProps = { ...props };
+  const [shouldSkipRegisterForm] = useState(
+    () =>
+      appData.allowed_identifiers.length === 1 &&
+      appData.user_meta_data_schema.length === 0
+  );
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid },
-  } = useForm({
+    setError,
+    clearErrors,
+    formState: { errors, isDirty, isValid },
+  } = useForm<IdentifierInput>({
+    criteriaMode: "all",
     defaultValues: {
       identifier: "",
     },
   });
+  const isError = Object.keys(errors).length !== 0;
 
   const [showRegisterForm, setShowRegisterForm] = useState(false);
 
-  const [error, setError] = useState<string | null>(null);
-
   const {
     signInOrUpText,
+    allowedIdentifiers,
     identifierLabelText,
     isEmailIdentifierAllowed,
     isPhoneIdentifierAllowed,
@@ -85,21 +100,29 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   const isWebauthnAvailable =
     webauthnEnabled && scuteClient.isWebauthnSupported();
 
-  const handleValidSubmit: SubmitHandler<FieldValues> = async (values) => {
-    const identifier = values.identifier;
+  const handleValidSubmit: SubmitHandler<IdentifierInput> = async (values) => {
+    const identifier =
+      values.identifier.length !== 0
+        ? values.identifier
+        : rememberedIdentifier ?? values.identifier;
 
-    const _identifier = (
-      identifier ? identifier : rememberedIdentifier
-    ) as string;
-
-    setIdentifier(_identifier);
-    const user = await scuteClient.identifierExists(_identifier);
+    setIdentifier(identifier);
+    const user = await scuteClient.identifierExists(identifier);
 
     if (!user && mode === "sign_in") {
-      setError(new IdentifierNotRecognizedError().message);
+      const error = new IdentifierNotRecognizedError();
+      setError("root.serverError", {
+        type: String(error.code),
+        message: error.message,
+      });
+
       return;
     } else if (user && mode === "sign_up") {
-      setError(new IdentifierAlreadyExistsError().message);
+      const error = new IdentifierAlreadyExistsError();
+      setError("root.serverError", {
+        type: String(error.code),
+        message: error.message,
+      });
       return;
     }
 
@@ -109,13 +132,16 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         setAuthView(VIEWS.WEBAUTHN_VERIFY);
       } else {
         const { data, error: magicLinkError } =
-          await scuteClient.sendLoginMagicLink(_identifier);
+          await scuteClient.sendLoginMagicLink(identifier);
 
         if (magicLinkError) {
           const { isFatal, message: errorMsg } =
             getMeaningfulError(magicLinkError);
           setIsFatalError?.(isFatal);
-          setError(errorMsg);
+          setError("root.serverError", {
+            type: String(magicLinkError.code),
+            message: errorMsg,
+          });
           return;
         }
 
@@ -123,7 +149,28 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       }
     } else {
       // register
-      setShowRegisterForm(true);
+      if (!shouldSkipRegisterForm) {
+        setShowRegisterForm(true);
+      } else {
+        const { data: pollingData, error: signUpError } =
+          await scuteClient.signUp(identifier);
+
+        if (signUpError) {
+          const { isFatal, message: errorMsg } =
+            getMeaningfulError(signUpError);
+          setIsFatalError?.(isFatal);
+          setError("root.serverError", {
+            type: String(signUpError.code),
+            message: errorMsg,
+          });
+          return;
+        }
+
+        if (pollingData) {
+          const magicLinkId = pollingData.magic_link.id;
+          getMagicLinkIdCallback?.(magicLinkId);
+        }
+      }
     }
   };
 
@@ -134,7 +181,12 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       </Header>
       <Inner>
         {!showRegisterForm ? (
-          <form onSubmit={handleSubmit(handleValidSubmit)}>
+          <form
+            onSubmit={handleSubmit(handleValidSubmit)}
+            onChange={() => {
+              clearErrors("root.serverError");
+            }}
+          >
             {mode !== "sign_up" && rememberedIdentifier ? (
               <>
                 <Heading size="1" css={{ color: "$headingColor" }}>
@@ -182,29 +234,39 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                       required: "Identifier is required.",
                       validate: {
                         maxLength: (v) => {
-                          const identifierType = getIdentifierType(v);
+                          let isValidOrError: boolean | string = true;
 
-                          if (identifierType === "email") {
-                            return (
+                          if (allowedIdentifiers.includes("email")) {
+                            isValidOrError =
                               v.length <= 50 ||
-                              "The email should have at most 50 characters"
-                            );
-                          } else {
-                            return true;
+                              "The email should have at most 50 characters";
                           }
+
+                          if (allowedIdentifiers.includes("phone")) {
+                            const isValidPhoneOrError: boolean | string = true;
+                            isValidOrError =
+                              isValidPhoneOrError || isValidOrError;
+                          }
+
+                          return isValidOrError;
                         },
                         matchPattern: (v) => {
-                          const identifierType = getIdentifierType(v);
+                          let isValidOrError: boolean | string = true;
 
-                          if (identifierType === "email") {
-                            return (
+                          if (allowedIdentifiers.includes("email")) {
+                            isValidOrError =
                               /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(
                                 v
-                              ) || "Email address must be a valid address"
-                            );
-                          } else {
-                            return true;
+                              ) || "Email address must be a valid address";
                           }
+
+                          if (allowedIdentifiers.includes("phone")) {
+                            const isValidPhoneOrError: boolean | string = true;
+                            isValidOrError =
+                              isValidPhoneOrError || isValidOrError;
+                          }
+
+                          return isValidOrError;
                         },
                       },
                     })}
@@ -212,14 +274,17 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                     autoComplete={`webauthn ${
                       isEmailIdentifierAllowed ? "email" : ""
                     }${isPhoneIdentifierAllowed ? "tel" : ""}`}
-                    state={error ? "invalid" : "valid"}
+                    state={isError ? "invalid" : "valid"}
                   />
-                  {error ||
-                    (!isValid && errors.identifier ? (
-                      <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                        <>{error || errors.identifier.message}</>
-                      </Text>
-                    ) : null)}
+                  {isError ? (
+                    <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                      <>
+                        {errors.identifier?.message ||
+                          errors.root?.serverError.message ||
+                          "Unknown error"}
+                      </>
+                    </Text>
+                  ) : null}
                 </Group>
               </>
             )}
@@ -229,7 +294,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                 <Button
                   size="2"
                   type="submit"
-                  disabled={!!error || (!rememberedIdentifier && !isValid)}
+                  disabled={!rememberedIdentifier && !isDirty && !isValid}
                 >
                   <span>Continue</span>
                   {isWebauthnAvailable ? (
@@ -260,10 +325,14 @@ const RegisterForm = ({
   setIsFatalError,
   getMagicLinkIdCallback,
 }: SignInOrUpProps) => {
-  const { register, handleSubmit, formState } = useForm();
-  const { errors, isValid } = formState;
-
-  const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    setError,
+    clearErrors,
+    handleSubmit,
+    formState: { errors, isDirty, isValid },
+  } = useForm();
+  const isError = Object.keys(errors).length !== 0;
 
   const {
     allowedIdentifiers,
@@ -283,7 +352,10 @@ const RegisterForm = ({
     if (signUpError) {
       const { isFatal, message: errorMsg } = getMeaningfulError(signUpError);
       setIsFatalError?.(isFatal);
-      setError(errorMsg);
+      setError("root.serverError", {
+        type: String(signUpError.code),
+        message: errorMsg,
+      });
       return;
     }
 
@@ -294,19 +366,19 @@ const RegisterForm = ({
   };
 
   return (
-    <form onSubmit={handleSubmit(handleSignUp)}>
+    <form
+      onSubmit={handleSubmit(handleSignUp)}
+      onChange={() => {
+        clearErrors("root.serverError");
+      }}
+    >
       <div>
         <span>Let's get you set up. We'll need following information:</span>
-        {error ||
-          (errors && (
-            <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-              {error
-                ? error
-                : Object.keys(errors).length !== 0
-                ? "Please correct all highlighted errors."
-                : null}
-            </Text>
-          ))}
+        {isError ? (
+          <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+            Please correct all highlighted errors.
+          </Text>
+        ) : null}
       </div>
       <br />
       <div>
@@ -344,28 +416,54 @@ const RegisterForm = ({
           </>
         ) : // )
         null}
-        {appData.user_meta_data_schema.map(({ field_name, name, type }) => (
-          <Group key={field_name}>
-            <Label>{name}</Label>
-            <TextField
-              placeholder={name}
-              type={type}
-              {...register(field_name, {
-                required: "This field is required.",
-                valueAsNumber: type === "number" ? true : undefined,
-              })}
-              size="2"
-            />
-            {errors[field_name] ? (
-              <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                <>{errors[field_name]?.message}</>
-              </Text>
-            ) : null}
-          </Group>
-        ))}
+        {appData.user_meta_data_schema.map(
+          ({ field_name, name, field_type, required }) => {
+            if (field_type === "phone") {
+              field_type = "tel" as any;
+            }
+
+            return (
+              <Group key={field_name}>
+                <Label>{name}</Label>
+                {field_type === "boolean" ? (
+                  <>
+                    <br />
+                    <input
+                      type="checkbox"
+                      {...register(field_name, {
+                        required: required
+                          ? "This field is required."
+                          : undefined,
+                      })}
+                    />
+                  </>
+                ) : (
+                  <TextField
+                    placeholder={name}
+                    type={field_type}
+                    {...register(field_name, {
+                      required: required
+                        ? "This field is required."
+                        : undefined,
+                      valueAsNumber:
+                        field_type === "integer" ? true : undefined,
+                    })}
+                    size="2"
+                  />
+                )}
+                {errors[field_name] ? (
+                  <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                    <>{errors[field_name]?.message}</>
+                  </Text>
+                ) : null}
+              </Group>
+            );
+          }
+        )}
       </div>
+
       <br />
-      <Button size="2" type="submit" disabled={!!error || !isValid}>
+      <Button size="2" type="submit" disabled={!isDirty && !isValid}>
         <span>Continue</span>
       </Button>
     </form>

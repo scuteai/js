@@ -39,11 +39,19 @@ export type ScuteAppData = {
 export interface ScuteUserMetaDataSchema {
   id: UniqueIdentifier;
   name: string;
+  field_type:
+    | "string"
+    | "boolean"
+    | "integer"
+    | "date"
+    | "phone"
+    | "email"
+    | "text"
+    | "url";
+  field_name: string;
   visible_profile: boolean;
   visible_registration: boolean;
-  slug: string;
-  type: string;
-  field_name: string;
+  required: boolean;
 }
 
 export type ScuteTokenPayload = {
@@ -70,7 +78,7 @@ export type ScuteUser = {
 
 export type ScuteUserData = {
   id: UniqueIdentifier;
-  status: "active" | "inactive"
+  status: "active" | "inactive";
   email: string | null;
   email_verified: boolean;
   phone: string | null;

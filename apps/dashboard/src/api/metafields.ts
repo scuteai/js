@@ -1,12 +1,12 @@
 import "server-only";
 
 import { getInternalApiClient } from "./base";
-import type { Metafield, UniqueIdentifier } from "@/types";
+import type { UniqueIdentifier, ScuteUserMetaDataSchema } from "@/types";
 
 export const getMetaFields = async (appId: UniqueIdentifier) => {
   const { api } = await getInternalApiClient(appId);
   const data = (await api.get(`/v1/apps/${appId}/user_meta_fields`)) as {
-    user_meta_data_schema: Metafield[];
+    user_meta_data_schema: ScuteUserMetaDataSchema[];
   };
 
   return data.user_meta_data_schema;
@@ -14,31 +14,33 @@ export const getMetaFields = async (appId: UniqueIdentifier) => {
 
 export const createMetaField = async (
   appId: UniqueIdentifier,
-  metafield: Omit<Partial<Metafield>, "id">
+  metafield: Omit<Partial<ScuteUserMetaDataSchema>, "id">
 ) => {
   const { api } = await getInternalApiClient(appId);
   const data = (await api
     .url(`/v1/apps/${appId}/user_meta_fields`)
-    .post({ user_meta_field: metafield })) as Metafield | null;
+    .post({ user_meta_field: metafield })) as ScuteUserMetaDataSchema | null;
 
   return data;
 };
 
 export const updateMetaField = async (
   appId: UniqueIdentifier,
-  metafield: Omit<Partial<Metafield>, "id"> & { id: UniqueIdentifier }
+  metafield: Omit<Partial<ScuteUserMetaDataSchema>, "id"> & {
+    id: UniqueIdentifier;
+  }
 ) => {
   const { api } = await getInternalApiClient(appId);
   const data = (await api
     .url(`/v1/apps/${appId}/user_meta_fields/${metafield.id}`)
-    .put({ user_meta_field: metafield })) as Metafield | null;
+    .put({ user_meta_field: metafield })) as ScuteUserMetaDataSchema | null;
 
   return data;
 };
 
 export const deleteMetaField = async (
   appId: UniqueIdentifier,
-  id: Metafield["id"]
+  id: ScuteUserMetaDataSchema["id"]
 ) => {
   const { api } = await getInternalApiClient(appId);
 

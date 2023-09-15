@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { Metafield, UniqueIdentifier } from "@/types";
+import type { UniqueIdentifier, ScuteUserMetaDataSchema } from "@/types";
 
 import { useForm, Controller } from "react-hook-form";
 
@@ -26,22 +26,22 @@ import {
 import { toast } from "sonner";
 
 type MetaFieldInputs = {
-  name: Metafield["name"];
-  field_type: Metafield["field_type"];
-  visible_registration: Metafield["visible_registration"];
-  visible_profile: Metafield["visible_profile"];
-  required: Metafield["required"];
+  name: ScuteUserMetaDataSchema["name"];
+  field_type: ScuteUserMetaDataSchema["field_type"];
+  visible_registration: ScuteUserMetaDataSchema["visible_registration"];
+  visible_profile: ScuteUserMetaDataSchema["visible_profile"];
+  required: ScuteUserMetaDataSchema["required"];
 };
 
 type MetaFieldRowProps = {
-  metafield?: Metafield;
+  metafield?: ScuteUserMetaDataSchema;
   viewMode?: "add" | "display" | "edit";
   variant?: "surface" | "ghost";
-  addMetaField: (metafiled: Partial<Metafield>) => Promise<Metafield | null>;
+  addMetaField: (metafiled: Partial<ScuteUserMetaDataSchema>) => Promise<ScuteUserMetaDataSchema | null>;
   editMetaField: (
-    metafiled: Omit<Partial<Metafield>, "id"> & { id: UniqueIdentifier }
-  ) => Promise<Metafield | null>;
-  removeMetaField: (id: Metafield["id"]) => Promise<boolean>;
+    metafiled: Omit<Partial<ScuteUserMetaDataSchema>, "id"> & { id: UniqueIdentifier }
+  ) => Promise<ScuteUserMetaDataSchema | null>;
+  removeMetaField: (id: ScuteUserMetaDataSchema["id"]) => Promise<boolean>;
 };
 
 export const MetaFieldRow = ({
@@ -94,6 +94,7 @@ const AddOrEditMetaFieldView = ({
     visible_registration: true,
     visible_profile: true,
     field_type: "string",
+    required: false
   };
 
   const {

@@ -52,12 +52,14 @@ export const NewAppContainer = ({ createApp }: NewAppContainerProps) => {
                 title="Application name"
                 description="Give your application a friendly, human-readable name. You can always edit this later. "
                 placeholder="My awesome app"
+                type="text"
                 {...register("name", { required: true })}
               />
               <STextField
                 title="Domain of your app"
                 description={`Enter the domain that you will use Scute on. Some examples are 'https://example.com' or 'http://localhost:8080'. `}
                 placeholder="https://myawesomeapp.com"
+                type="url"
                 {...register("origin", { required: true })}
               />
               <Flex style={{ marginTop: "20pxx" }} />

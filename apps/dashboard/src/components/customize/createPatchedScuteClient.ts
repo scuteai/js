@@ -1,7 +1,8 @@
 import {
   ScuteClient,
-  ScuteUserData,
   type ScuteAppData,
+  ScuteUserData,
+  type ScuteUserMetaDataSchema,
   type Session,
 } from "@scute/nextjs";
 
@@ -71,6 +72,7 @@ export const createPatchedScuteClient = ({
                 logo,
                 required_identifiers,
                 allowed_identifiers,
+                user_meta_data_schema: [] as ScuteUserMetaDataSchema[],
               } as ScuteAppData)
             );
           }
