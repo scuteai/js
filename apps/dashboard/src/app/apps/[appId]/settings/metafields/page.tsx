@@ -5,7 +5,7 @@ import {
   updateMetaField,
   deleteMetaField,
 } from "@/api";
-import type {  UniqueIdentifier, ScuteUserMetaDataSchema } from "@/types";
+import type { UniqueIdentifier, ScuteUserMetaDataSchema } from "@/types";
 import { Container, Heading, Card, Flex, Text } from "@radix-ui/themes";
 import { MetaFieldRow } from "@/components/metafields/MetafieldRow";
 import { PATHS } from "@/app/routes";
@@ -17,20 +17,25 @@ export default async function MetafieldsSettings({
 }) {
   const metafields = await getMetaFields(params.appId);
 
-  const createMetaFieldAction = async (metafield: Partial<ScuteUserMetaDataSchema>) => {
+  const createMetaFieldAction = async (
+    metafield: Partial<ScuteUserMetaDataSchema>
+  ) => {
     "use server";
     const data = await createMetaField(params.appId, metafield);
     if (data) {
       revalidatePath(
         PATHS.APP_METAFIELD_SETTINGS.replace("[appId]", params.appId as string)
       );
+      revalidatePath(PATHS.PROFILE);
     }
 
     return data;
   };
 
   const updateMetaFieldAction = async (
-    metafield: Omit<Partial<ScuteUserMetaDataSchema>, "id"> & { id: UniqueIdentifier }
+    metafield: Omit<Partial<ScuteUserMetaDataSchema>, "id"> & {
+      id: UniqueIdentifier;
+    }
   ) => {
     "use server";
     const data = await updateMetaField(params.appId, metafield);
@@ -38,6 +43,7 @@ export default async function MetafieldsSettings({
       revalidatePath(
         PATHS.APP_METAFIELD_SETTINGS.replace("[appId]", params.appId as string)
       );
+      revalidatePath(PATHS.PROFILE);
     }
 
     return data;
@@ -50,6 +56,7 @@ export default async function MetafieldsSettings({
       revalidatePath(
         PATHS.APP_METAFIELD_SETTINGS.replace("[appId]", params.appId as string)
       );
+      revalidatePath(PATHS.PROFILE);
     }
 
     return isSuccess;

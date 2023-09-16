@@ -416,8 +416,9 @@ const RegisterForm = ({
           </>
         ) : // )
         null}
-        {appData.user_meta_data_schema.map(
-          ({ field_name, name, field_type, required }) => {
+        {appData.user_meta_data_schema
+          .filter((metadata) => metadata.visible_registration)
+          .map(({ field_name, name, field_type, required }) => {
             if (field_type === "phone") {
               field_type = "tel" as any;
             }
@@ -458,8 +459,7 @@ const RegisterForm = ({
                 ) : null}
               </Group>
             );
-          }
-        )}
+          })}
       </div>
 
       <br />

@@ -38,7 +38,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
 
   useEffect(() => {
     (async () => {
-      const { data: appData } = await scuteClient.getAppData();
+      const { data: appData } = await scuteClient.getAppData(true);
       setAppData(appData);
     })();
 
@@ -60,7 +60,13 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
 
   const providerTheme = useTheme();
 
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMode, _setIsEditMode] = useState(false);
+  const setIsEditMode: typeof _setIsEditMode = (...params) => {
+    if (appData!.profile_management !== false) {
+      _setIsEditMode(...params);
+    }
+  };
+
   const formRef = useRef<HTMLFormElement>(null);
 
   if (session.status === "loading" || !appData) {
@@ -107,24 +113,28 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
                   variant="alt"
                   onClick={async () => {
                     const formData = new FormData(formRef.current!);
-                    const userMeta = Object.fromEntries(formData);
                     setIsEditMode(false);
 
-                    await scuteClient.updateUserMeta(userMeta);
+                    await scuteClient.updateUserMeta({
+                      ...user.meta,
+                      ...Object.fromEntries(formData),
+                    });
                     await scuteClient.refetchSession();
                   }}
                 >
                   Save
                 </Button>
               ) : null}
-              <Button
-                variant="alt"
-                onClick={() => {
-                  setIsEditMode(!isEditMode);
-                }}
-              >
-                {!isEditMode ? "Edit profile" : "Cancel"}
-              </Button>
+              {appData.profile_management !== false ? (
+                <Button
+                  variant="alt"
+                  onClick={() => {
+                    setIsEditMode(!isEditMode);
+                  }}
+                >
+                  {!isEditMode ? "Edit profile" : "Cancel"}
+                </Button>
+              ) : null}
               <Button css={{ ml: "$1" }} onClick={() => scuteClient.signOut()}>
                 Logout
               </Button>
@@ -141,26 +151,35 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
                 py: "$3",
               }}
             >
-              {user.meta
-                ? Object.entries(user.meta).map(([key, value]) => (
-                    <Flex key={key} css={{ gap: "$7" }}>
-                      <Text css={{ fontSize: "$1", opacity: 0.5 }}>
-                        {key === "first_name" || key === "last_name"
-                          ? key === "first_name"
-                            ? "First Name"
-                            : "Last Name"
-                          : appData.user_meta_data_schema.find(
-                              (schema) => schema.field_name === key
-                            )?.name}
-                      </Text>
+              {appData.user_meta_data_schema
+                .filter((metafield) => metafield.visible_profile)
+                .map(({ id, name, field_name, field_type }) => {
+                  const userValue = user.meta?.[field_name];
+
+                  return (
+                    <Flex key={id} css={{ gap: "$7" }}>
+                      <Text css={{ fontSize: "$1", opacity: 0.5 }}>{name}</Text>
                       {isEditMode ? (
-                        <TextField defaultValue={value as any} name={key} />
+                        field_type === "boolean" ? (
+                          <input type="checkbox" />
+                        ) : (
+                          <TextField
+                            defaultValue={userValue as string | undefined}
+                            name={field_name}
+                          />
+                        )
+                      ) : field_type === "boolean" ? (
+                        <input
+                          type="checkbox"
+                          readOnly
+                          checked={userValue === true}
+                        />
                       ) : (
-                        <Text css={{ fontSize: "$1" }}>{value}</Text>
+                        <Text css={{ fontSize: "$1" }}>{userValue}</Text>
                       )}
                     </Flex>
-                  ))
-                : null}
+                  );
+                })}
             </Flex>
           </form>
         </Flex>

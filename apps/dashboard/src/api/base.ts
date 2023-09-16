@@ -26,7 +26,7 @@ export const getScuteClient = (() => {
       { cookies },
       {
         // defaults
-        ...{},
+        baseUrl,
         appId,
       }
     );

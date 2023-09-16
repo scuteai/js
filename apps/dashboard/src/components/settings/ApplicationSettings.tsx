@@ -95,14 +95,14 @@ export const AppSettings = ({
               />
               <STextField
                 title="Callback URL"
-                description="The name of your application."
+                description="The callback url of your application."
                 placeholder="/"
                 separator
                 {...register("callback_url")}
               />
               <STextField
                 title="Login URL"
-                description="The name of your application."
+                description="The login url of your application."
                 placeholder="/"
                 {...register("login_url")}
               />

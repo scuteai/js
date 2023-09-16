@@ -8,7 +8,13 @@ export const config = {
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
-  const scuteClient = createMiddlewareClient({ req, res });
+  const scuteClient = createMiddlewareClient(
+    { req, res },
+    {
+      appId: process.env.NEXT_PUBLIC_SCUTE_APP_ID,
+      baseUrl: process.env.NEXT_PUBLIC_SCUTE_BASE_URL,
+    }
+  );
 
   const {
     data: { session },
