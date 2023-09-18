@@ -52,7 +52,10 @@ export default async function ApiKeysSettings({
           : apiKeys.map((apiKey) => (
               <ApiKeyRow
                 key={apiKey.id}
-                {...apiKey}
+                id={apiKey.id}
+                nickname={apiKey.nickname}
+                bearer_id={apiKey.nickname}
+                created_at={apiKey.created_at}
                 updateApiKey={updateApiKeyAction}
                 revokeApiKey={revokeApiKeyAction}
               />
