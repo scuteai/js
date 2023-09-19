@@ -85,6 +85,10 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
     return <>Login Required.</>;
   }
 
+  const visibleUserMetadataSchema = appData.user_meta_data_schema.filter(
+    (metafield) => metafield.visible_profile
+  );
+
   return (
     <div
       style={{ maxWidth: "640px", margin: "0 auto" }}
@@ -125,7 +129,8 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
                   Save
                 </Button>
               ) : null}
-              {appData.profile_management !== false ? (
+              {appData.profile_management !== false &&
+              visibleUserMetadataSchema.length > 0 ? (
                 <Button
                   variant="alt"
                   onClick={() => {
@@ -140,48 +145,52 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
               </Button>
             </Flex>
           </Flex>
-          <form ref={formRef}>
-            <Flex
-              css={{
-                fd: "column",
-                gap: "$3",
-                borderTop: "1px solid rgba(0,0,0,0.1)",
-                borderBottom: "1px solid rgba(0,0,0,0.1)",
-                width: "100%",
-                py: "$3",
-              }}
-            >
-              {appData.user_meta_data_schema
-                .filter((metafield) => metafield.visible_profile)
-                .map(({ id, name, field_name, field_type }) => {
-                  const userValue = user.meta?.[field_name];
+          {visibleUserMetadataSchema.length > 0 ? (
+            <form ref={formRef}>
+              <Flex
+                css={{
+                  fd: "column",
+                  gap: "$3",
+                  borderTop: "1px solid rgba(0,0,0,0.1)",
+                  borderBottom: "1px solid rgba(0,0,0,0.1)",
+                  width: "100%",
+                  py: "$3",
+                }}
+              >
+                {visibleUserMetadataSchema.map(
+                  ({ id, name, field_name, field_type }) => {
+                    const userValue = user.meta?.[field_name];
 
-                  return (
-                    <Flex key={id} css={{ gap: "$7" }}>
-                      <Text css={{ fontSize: "$1", opacity: 0.5 }}>{name}</Text>
-                      {isEditMode ? (
-                        field_type === "boolean" ? (
-                          <input type="checkbox" />
-                        ) : (
-                          <TextField
-                            defaultValue={userValue as string | undefined}
-                            name={field_name}
+                    return (
+                      <Flex key={id} css={{ gap: "$7" }}>
+                        <Text css={{ fontSize: "$1", opacity: 0.5 }}>
+                          {name}
+                        </Text>
+                        {isEditMode ? (
+                          field_type === "boolean" ? (
+                            <input type="checkbox" />
+                          ) : (
+                            <TextField
+                              defaultValue={userValue as string | undefined}
+                              name={field_name}
+                            />
+                          )
+                        ) : field_type === "boolean" ? (
+                          <input
+                            type="checkbox"
+                            readOnly
+                            checked={userValue === true}
                           />
-                        )
-                      ) : field_type === "boolean" ? (
-                        <input
-                          type="checkbox"
-                          readOnly
-                          checked={userValue === true}
-                        />
-                      ) : (
-                        <Text css={{ fontSize: "$1" }}>{userValue}</Text>
-                      )}
-                    </Flex>
-                  );
-                })}
-            </Flex>
-          </form>
+                        ) : (
+                          <Text css={{ fontSize: "$1" }}>{userValue}</Text>
+                        )}
+                      </Flex>
+                    );
+                  }
+                )}
+              </Flex>
+            </form>
+          ) : null}
         </Flex>
         <Flex css={{ fd: "column", gap: "$1", mt: "$3" }}>
           <Flex css={{ jc: "space-between", ai: "center" }}>
