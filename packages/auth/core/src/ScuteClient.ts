@@ -78,7 +78,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   protected readonly config: {
     persistSession: ScuteClientPreferences["persistSession"];
-    autoRefreshToken: ScuteClientPreferences["autoRefreshToken"];
+    autoRefreshToken: boolean;
     refetchOnWindowFocus: ScuteClientPreferences["refetchOnWindowFocus"];
     refetchInverval: ScuteClientPreferences["refetchInverval"];
   };
@@ -133,7 +133,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     this.config = {
       persistSession: config.preferences?.persistSession !== false,
-      autoRefreshToken: config.preferences?.autoRefreshToken !== false,
+      autoRefreshToken: true, // default
       refetchOnWindowFocus: config.preferences?.refetchOnWindowFocus !== false,
       refetchInverval: config.preferences?.refetchInverval ?? 60 * 5,
     };
@@ -187,6 +187,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
             // only when persisting the session and running in the browser
             this._setupSessionBroadcast();
           }
+          
+          this.config.autoRefreshToken = this.appData.auto_refresh !== false;
 
           await this.registerVisibilityChange();
           await this.registerRefetchInterval();

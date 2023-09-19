@@ -16,8 +16,6 @@ export type ScuteSessionConfig = {
 
 export type ScuteClientPreferences = {
   /** @default true */
-  autoRefreshToken?: boolean;
-  /** @default true */
   persistSession?: boolean;
   sessionStorageAdapter?: ScuteStorage;
   /** @default true */

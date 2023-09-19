@@ -26,7 +26,8 @@ export type ScuteAppData = {
   public_signup: boolean;
   access_expiration: number;
   refresh_expiration: number;
-  refresh_enabled: boolean;
+  refresh_payload: boolean;
+  auto_refresh: boolean;
   magic_link_expiration: number;
   session_timeout: number;
   scute_branding: boolean;
@@ -85,6 +86,8 @@ export type ScuteUserData = {
   phone_verified: boolean;
   webauthn_enabled: boolean;
   meta: Metadata | null;
+  last_used_at: string;
+  signup_date: string;
   webauthn_types: string[]; // TODO
   sessions: ScuteUserSession[];
 };

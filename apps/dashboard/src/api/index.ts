@@ -21,4 +21,5 @@ export {
   updateMetaField,
   deleteMetaField,
 } from "./metafields";
+export { getEvents } from "./activity";
 export { getUsers } from "./user";

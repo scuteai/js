@@ -1,7 +1,7 @@
 import { getUsers } from "@/api";
 import type { UniqueIdentifier } from "@/types";
-
-import { Users } from "@/components/users/Users";
+import { Container } from "@radix-ui/themes";
+import { UsersTable } from "@/components/users/UsersTable";
 
 export default async function AppUsers({
   params,
@@ -11,5 +11,9 @@ export default async function AppUsers({
   // TODO: error handling
   const users = (await getUsers(params.appId)) ?? [];
 
-  return <Users appId={params.appId} users={users} />;
+  return (
+    <Container size="3">
+      <UsersTable appId={params.appId} users={users} />
+    </Container>
+  );
 }

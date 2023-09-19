@@ -29,6 +29,7 @@ export const AuthSettings = ({ appData, updateApp }: AuthSettingsProps) => {
     register,
     control,
     handleSubmit,
+    watch,
     reset,
     formState: { errors, isDirty, isSubmitting, isValid },
   } = useForm<AuthSettingsInputs>({
@@ -180,7 +181,7 @@ export const AuthSettings = ({ appData, updateApp }: AuthSettingsProps) => {
               {...register("access_expiration")}
             />
             <SettingSectionShell
-              title="Enable refresh token"
+              title="Enable auto refresh"
               description="Use refresh tokens to safely enable long-lived sessions. "
               flexRow={true}
               separator
@@ -188,7 +189,7 @@ export const AuthSettings = ({ appData, updateApp }: AuthSettingsProps) => {
               <Flex>
                 <Controller
                   control={control}
-                  name="refresh_enabled"
+                  name="auto_refresh"
                   render={({ field }) => (
                     <Switch
                       color="lime"
@@ -198,6 +199,33 @@ export const AuthSettings = ({ appData, updateApp }: AuthSettingsProps) => {
                       onCheckedChange={field.onChange}
                     />
                   )}
+                />
+              </Flex>
+            </SettingSectionShell>
+            <SettingSectionShell
+              title="Disable refresh token in payload"
+              description="You should disable refresh token in payload if you want to use httpOnly refresh token (refresh proxy mode) for maximum security."
+              flexRow={true}
+              separator
+            >
+              <Flex>
+                <Controller
+                  control={control}
+                  name="refresh_payload"
+                  render={({ field }) => {
+                    return (
+                      <Switch
+                        color="lime"
+                        {...field}
+                        disabled={!watch("auto_refresh")}
+                        value={undefined}
+                        checked={!field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(!checked);
+                        }}
+                      />
+                    );
+                  }}
                 />
               </Flex>
             </SettingSectionShell>

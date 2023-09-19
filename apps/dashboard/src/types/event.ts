@@ -1,10 +1,16 @@
+import { ScuteUserData } from "@scute/nextjs";
 import type { UniqueIdentifier } from "./general";
 
 export type ScuteEvent = {
-  user_id: UniqueIdentifier;
-  email: string;
-  event: string;
-  created_at: string;
+  id: UniqueIdentifier;
+  slug: string;
   ip_address: string;
   user_agent: string;
-} & Record<string, unknown>;
+  // controller: any;
+  // params: any;
+  // action: any;
+  // note: any;
+  app_id: UniqueIdentifier;
+  created_at: string;
+  user: ScuteUserData;
+};
