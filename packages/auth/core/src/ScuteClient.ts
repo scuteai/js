@@ -139,7 +139,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     };
 
     this.scuteStorage =
-      browser && typeof window !== "undefined"
+      browser && typeof window !== "undefined" && window.localStorage
         ? // supressing, sync -> async
           (window.localStorage as any)
         : ScuteNoneStorage;

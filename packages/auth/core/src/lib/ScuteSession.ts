@@ -687,7 +687,7 @@ export abstract class ScuteSession {
       SCUTE_LAST_LOGIN_STORAGE_KEY
     );
 
-    if (!identifier && typeof window !== "undefined") {
+    if (!identifier && typeof window !== "undefined" && window.localStorage) {
       // fallback method
       return window.localStorage.getItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
     }
@@ -699,7 +699,7 @@ export abstract class ScuteSession {
    * Clear remembered (last logged) identifier.
    */
   async clearRememberedIdentifier() {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && window.localStorage) {
       // fallback method
       window.localStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
     }
@@ -718,7 +718,7 @@ export abstract class ScuteSession {
   protected async setRememberedIdentifier(
     identifier: ScuteIdentifier
   ): Promise<void> {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && window.localStorage) {
       // fallback method
       window.localStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier);
     }
@@ -739,7 +739,7 @@ export abstract class ScuteSession {
   > {
     let credData = await this.scuteStorage.getItem(SCUTE_CRED_STORAGE_KEY);
 
-    if (!credData && typeof window !== "undefined") {
+    if (!credData && typeof window !== "undefined" && window.localStorage) {
       // fallback method
       credData = window.localStorage.getItem(SCUTE_CRED_STORAGE_KEY);
     }
@@ -757,7 +757,7 @@ export abstract class ScuteSession {
    * @internal
    */
   private async _saveCredentialStore(value: string) {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && window.localStorage) {
       // fallback method
       window.localStorage.setItem(SCUTE_CRED_STORAGE_KEY, value);
     }

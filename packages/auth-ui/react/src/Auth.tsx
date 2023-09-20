@@ -57,6 +57,7 @@ function Auth(props: AuthProps) {
   const [_authView, setAuthView] = useState<Views>(() => {
     if (
       typeof window !== "undefined" &&
+      typeof URLSearchParams !== "undefined" &&
       new URL(window.location.href).searchParams.has(SCUTE_MAGIC_PARAM)
     ) {
       return VIEWS.MAGIC_LOADING;

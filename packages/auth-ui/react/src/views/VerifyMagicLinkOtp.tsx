@@ -51,7 +51,7 @@ const VerifyMagicLinkOtp = ({
   const [magicLinkToken] = useState(
     () =>
       _magicLinkToken ??
-      (typeof window !== "undefined"
+      (typeof window !== "undefined" && typeof URLSearchParams !== "undefined"
         ? new URL(window.location.href).searchParams.get(SCUTE_MAGIC_PARAM)
         : null)
   );
