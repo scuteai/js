@@ -40,15 +40,22 @@ export const createServerComponentClient = (
   config?: ScuteNextjsClientConfig
 ) => {
   const browser = isBrowser();
-
-  return createScuteClient({
-    ...config,
-    preferences: {
-      ...config?.preferences,
-      autoRefreshToken: browser,
-      sessionStorageAdapter: new ScuteNextServerComponentStorage(context, {
-        secure: process.env.NODE_ENV === "production",
-      }),
+  const scuteClient = createScuteClient(
+    {
+      ...config,
+      preferences: {
+        ...config?.preferences,
+        sessionStorageAdapter: new ScuteNextServerComponentStorage(context, {
+          secure: process.env.NODE_ENV === "production",
+        }),
+      },
     },
-  });
+    function onBeforeInitialize() {
+      this["config"].autoRefreshToken = browser
+        ? this["config"].autoRefreshToken
+        : false;
+    }
+  );
+
+  return scuteClient;
 };
