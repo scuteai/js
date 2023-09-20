@@ -6,7 +6,7 @@ import {
   SCUTE_LAST_LOGIN_STORAGE_KEY,
   SCUTE_REFRESH_STORAGE_KEY,
 } from "./constants";
-import { LoginRequiredError, ScuteError } from "./errors";
+import { InvalidAuthTokenError, LoginRequiredError, ScuteError } from "./errors";
 import {
   decodeAccessToken,
   decodeRefreshToken,
@@ -404,7 +404,7 @@ export abstract class ScuteSession {
    */
   protected async _getAuthToken(session: Session) {
     if (!session.access) {
-      return { data: null, error: new LoginRequiredError() };
+      return { data: null, error: new InvalidAuthTokenError() };
     }
 
     return { data: { access: session.access }, error: null };

@@ -1,11 +1,16 @@
 import {
   type ScuteClient,
-  ScuteError,
   SCUTE_ACCESS_STORAGE_KEY,
+  ScuteUserData,
+  InvalidAuthTokenError,
 } from "@scute/core";
+import type * as express from "express";
 import type { IncomingMessage } from "http";
-import type { RequestHandler } from "express";
 import { parse as parseCookies } from "cookie";
+
+export interface AuthenticatedRequest extends express.Request {
+  user: ScuteUserData;
+}
 
 export const authenticateRequest = async (
   req: IncomingMessage,
@@ -18,24 +23,37 @@ export const authenticateRequest = async (
     token = cookies[SCUTE_ACCESS_STORAGE_KEY];
 
     if (!token) {
-      return {
-        data: null,
-        error: new ScuteError({ message: "Token not found" }),
-      };
+      throw new InvalidAuthTokenError();
     }
   }
 
-  return scuteClient.getUser(token);
+  const { data, error } = await scuteClient.getUser(token);
+
+  if (error) {
+    if (error instanceof InvalidAuthTokenError) {
+      throw error;
+    } else {
+      throw new Error("Unknown authenticate error");
+    }
+  }
+
+  return data.user;
 };
 
 export const scuteAuthMiddleware = (scuteClient: ScuteClient) => {
-  const middleware: RequestHandler = async (req, res, next) => {
-    const { data: user, error } = await authenticateRequest(req, scuteClient);
-    if (!error) {
-      // user authenticated
-      (req as any).user = user;
+  const middleware = async function (
+    req: express.Request,
+    _res: express.Response,
+    next: express.NextFunction
+  ) {
+    try {
+      const user = await authenticateRequest(req, scuteClient);
+      (req as AuthenticatedRequest).user = user;
+      next();
+    } catch (e) {
+      // failed to authenticate
+      next(e);
     }
-    next(error ? error : undefined);
   };
 
   return middleware;

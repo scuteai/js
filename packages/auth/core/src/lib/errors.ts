@@ -362,6 +362,7 @@ export type CustomScuteErrorCode =
   | "identifier-already-exists"
   | "new-device"
   | "login-required"
+  | "invalid-auth-token"
   | "unknown-sign-in"
   | "invalid-magic-link";
 
@@ -405,6 +406,14 @@ export class LoginRequiredError extends CustomScuteError {
     Object.setPrototypeOf(this, LoginRequiredError.prototype);
   }
 }
+
+export class InvalidAuthTokenError extends CustomScuteError {
+  constructor() {
+    super("Invalid auth token.", "invalid-auth-token");
+    Object.setPrototypeOf(this, InvalidAuthTokenError.prototype);
+  }
+}
+
 export class UnknownSignInError extends CustomScuteError {
   constructor() {
     super("Unknown sign in error.", "unknown-sign-in");

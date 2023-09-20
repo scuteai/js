@@ -5,6 +5,8 @@ import {
   createClient,
   authenticateRequest,
   scuteAuthMiddleware,
+  type AuthenticatedRequest,
+  InvalidAuthTokenError,
 } from "@scute/node";
 
 const scute = createClient({
@@ -21,18 +23,32 @@ app.get("/", (req, res) => {
 });
 
 app.get("/authenticated-route", async (req, res) => {
-  const { data: user } = await authenticateRequest(req, scute);
-  res.send(user);
+  try {
+    const user = await authenticateRequest(req, scute);
+    res.send(user);
+  } catch (e) {
+    // failed to authenticate
+    res.status(401).send("Could not authenticate user!");
+  }
 });
 
 app.get(
   "/authenticated-route-middleware",
   scuteAuthMiddleware(scute),
   async (req, res) => {
-    const user = (req as any).user;
+    const user = (req as AuthenticatedRequest).user;
     res.send(user);
   }
 );
+
+app.use(((error, req, res, next) => {
+  if (error instanceof InvalidAuthTokenError) {
+    res.status(401).json({
+      error: "Could not authenticate user!",
+    });
+  }
+  next();
+}) as express.ErrorRequestHandler);
 
 app.listen(5000, () => {
   console.log("Listening to 5000");

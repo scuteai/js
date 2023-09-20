@@ -38,6 +38,7 @@ import {
   identifyRegistrationError,
   InvalidMagicLinkError,
   LoginRequiredError,
+  InvalidAuthTokenError,
   NewDeviceError,
   ScuteError,
   TechnicalError,
@@ -796,7 +797,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (error) {
       return {
         data: { user: null },
-        error: error.code === 401 ? new LoginRequiredError() : error,
+        error: error.code === 401 ? new InvalidAuthTokenError() : error,
       };
     }
 
