@@ -1,17 +1,12 @@
 "use client";
 
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
-import { Button, Flex, TextField } from "@radix-ui/themes";
+import { Button, Flex } from "@radix-ui/themes";
+import { SearchUser } from "./SearchUser";
 
 export const UsersTitleBarContent = () => {
   return (
     <Flex gap="3" justify="end">
-      <TextField.Root>
-        <TextField.Slot>
-          <MagnifyingGlassIcon height="16" width="16" />
-        </TextField.Slot>
-        <TextField.Input placeholder="Search users" />
-      </TextField.Root>
+      <SearchUser />
       <Button variant="outline">Create new user</Button>
       <Button variant="outline" color="gray">
         Import users

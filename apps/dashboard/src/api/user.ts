@@ -3,9 +3,9 @@ import "server-only";
 import { getInternalApiClient } from "./base";
 import type { UniqueIdentifier, ScuteUserData } from "@/types";
 
-export const getUsers = async (appId: UniqueIdentifier) => {
+export const getUsers = async (appId: UniqueIdentifier, params?: any) => {
   const { scuteClient } = await getInternalApiClient(appId);
-  const { data } = await scuteClient.admin.getUsers();
+  const { data } = await scuteClient.admin.listUsers(params);
 
-  return data as ScuteUserData[] | null;
+  return data;
 };

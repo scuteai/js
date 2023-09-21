@@ -4,6 +4,7 @@ import { accessTokenHeader, refreshTokenHeaders } from "./lib/helpers";
 import type {
   ScuteAppData,
   ScuteIdentifier,
+  ScutePaginationMeta,
   ScuteUser,
   ScuteUserData,
   ScuteUserSession,
@@ -56,12 +57,47 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   /**
-   * Get all users.
+   * Get a list of users.
    */
-  async getUsers() {
-    return this.get<ScuteUserData[]>(`${this._v1Path}/users`, {
-      ...this._authorizationHeader,
-    });
+  async listUsers(params?: any) {
+    // {
+    //   limit: "3",
+    //   page: "1",
+    //   //identifier: ""
+    //   //order_by: ""
+    //   //created_before
+    //   //status
+    //   //email_verified
+    //   //id
+    //   //last_login_at
+    //   //login_count
+    // };
+
+    const { data, error } = await this.get<
+      {
+        users: ScuteUserData[];
+      } & ScutePaginationMeta
+    >(
+      `${this._v1Path}/users` +
+        (params ? `?${new URLSearchParams(params)}` : ""),
+      {
+        ...this._authorizationHeader,
+      }
+    );
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    const { users, ...pagination } = data;
+
+    return {
+      data: {
+        users,
+        pagination,
+      },
+      error: null,
+    };
   }
 
   /**
@@ -215,9 +251,12 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async listUserSessions(id: string) {
-    return this.get<ScuteUserSession[]>(`${this._appsPath}/users/${id}/sessions`, {
-      ...this._authorizationHeader,
-    });
+    return this.get<ScuteUserSession[]>(
+      `${this._appsPath}/users/${id}/sessions`,
+      {
+        ...this._authorizationHeader,
+      }
+    );
   }
 
   /**
@@ -247,15 +286,15 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   private get _v1Path() {
-    return `/v1/${this.appId}`;
+    return `/v1/${this.appId}` as const;
   }
 
   private get _appsPath() {
-    return `/v1/apps/${this.appId}`;
+    return `/v1/apps/${this.appId}` as const;
   }
 
   private get _authPath() {
-    return `/v1/auth/${this.appId}`;
+    return `/v1/auth/${this.appId}` as const;
   }
 }
 

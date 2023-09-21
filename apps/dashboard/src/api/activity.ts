@@ -1,14 +1,24 @@
 import "server-only";
 
-import type { ScuteEvent, UniqueIdentifier } from "@/types";
+import type {
+  ScuteEvent,
+  ScutePaginationMeta,
+  UniqueIdentifier,
+} from "@/types";
 import { getInternalApiClient } from "./base";
 
-export const getEvents = async (appId: UniqueIdentifier) => {
+export const getEvents = async (appId: UniqueIdentifier, params?: any) => {
   const { api } = await getInternalApiClient(appId);
 
-  const data = (await api.get(`/v1/apps/${appId}/events`)) as {
+  const { events, ...pagination } = (await api.get(
+    `/v1/apps/${appId}/events` +
+      (params ? `?${new URLSearchParams(params)}` : "")
+  )) as ScutePaginationMeta & {
     events: ScuteEvent[];
   };
 
-  return data;
+  return {
+    pagination,
+    events,
+  };
 };

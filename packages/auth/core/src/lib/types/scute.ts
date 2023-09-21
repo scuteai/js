@@ -134,11 +134,6 @@ export type ScuteUserSession = {
   platform: string;
   browser: string;
   user_agent_shortname: string;
-  // TODO
-  // app_name: string;
-  // app_slug: string;
-  // app_logo: string;
-  // app_origin: string;
   nickname: string;
 };
 
@@ -148,3 +143,11 @@ export type ScuteSessionType =
   | "xlogin"
   | "oauth"
   | "misc";
+
+export type ScutePaginationMeta = {
+  total_pages: number;
+  current_page: number;
+  next_page: number | null;
+  prev_page: number | null;
+  per_page: number;
+};
