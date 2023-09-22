@@ -79,7 +79,7 @@ export type ScuteUser = {
 
 export type ScuteUserData = {
   id: UniqueIdentifier;
-  status: "active" | "inactive";
+  status: "active" | "pending" | "inactive";
   email: string | null;
   email_verified: boolean;
   phone: string | null;

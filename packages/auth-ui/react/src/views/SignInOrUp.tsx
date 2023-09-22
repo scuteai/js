@@ -1,12 +1,16 @@
 import {
   type ScuteClient,
-  type ScuteIdentifier,
   type ScuteAppData,
+  type ScuteIdentifier,
   type UniqueIdentifier,
+  type ScuteIdentifierType,
+  type ScuteMagicLinkIdResponse,
+  type ScuteTokenPayload,
+  decodeMagicLinkToken,
   getMeaningfulError,
-  ScuteIdentifierType,
   IdentifierAlreadyExistsError,
   IdentifierNotRecognizedError,
+  SCUTE_MAGIC_PARAM,
 } from "@scute/core";
 
 import { useEffect, useState } from "react";
@@ -29,17 +33,18 @@ import {
 
 import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
 import { getIdentifierType } from "../helpers/identifierType";
-import PhoneInput from "../components/PhoneInput";
+// import PhoneInput from "../components/PhoneInput";
 import { VIEWS } from "@scute/ui-shared";
 import { AppLogo } from "../components/AppLogo";
 
 interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   identifier: ScuteIdentifier;
   setIdentifier: React.Dispatch<React.SetStateAction<ScuteIdentifier>>;
-  mode?: "sign_in" | "sign_up" | "sign_in_or_up";
+  mode?: "sign_in" | "sign_up" | "sign_in_or_up" | "confirm_invite";
   appData: ScuteAppData;
   webauthnEnabled?: boolean;
   getMagicLinkIdCallback?: (magicLinkId: UniqueIdentifier) => void;
+  getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
 }
 
 type IdentifierInput = {
@@ -59,8 +64,10 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     getMagicLinkIdCallback,
   } = props;
 
-  const [mode] = useState<SignInOrUpProps["mode"]>(() =>
-    appData.public_signup !== false ? _mode : "sign_in"
+  const [mode] = useState<NonNullable<SignInOrUpProps["mode"]>>(() =>
+    appData.public_signup !== false || _mode === "confirm_invite"
+      ? _mode
+      : "sign_in"
   );
 
   const registerFormProps: SignInOrUpProps = { ...props };
@@ -84,7 +91,9 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   });
   const isError = Object.keys(errors).length !== 0;
 
-  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(
+    mode === "confirm_invite" ? true : false
+  );
 
   const {
     signInOrUpText,
@@ -320,10 +329,12 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 const RegisterForm = ({
   scuteClient,
   identifier,
+  setAuthView,
   appData,
   mode,
   setIsFatalError,
   getMagicLinkIdCallback,
+  getAuthPayloadCallback,
 }: SignInOrUpProps) => {
   const {
     register,
@@ -341,33 +352,66 @@ const RegisterForm = ({
     maybeNeededIdentifierLabel,
   } = useSignInOrUpFormHelpers(identifier, appData, mode);
 
-  const handleSignUp: SubmitHandler<FieldValues> = async (values) => {
-    const { data: pollingData, error: signUpError } = await scuteClient.signUp(
-      identifier,
-      {
-        userMeta: values,
-      }
-    );
+  const handleContinue: SubmitHandler<FieldValues> = async (values) => {
+    let data: ScuteMagicLinkIdResponse | ScuteTokenPayload | null = null;
+    let error;
 
-    if (signUpError) {
-      const { isFatal, message: errorMsg } = getMeaningfulError(signUpError);
+    if (mode !== "confirm_invite") {
+      ({ data, error } = await scuteClient.signUp(identifier, {
+        userMeta: values,
+      }));
+    } else {
+      const magicToken = new URL(window.location.href).searchParams.get(
+        SCUTE_MAGIC_PARAM
+      )!;
+      const magicPayload = decodeMagicLinkToken(magicToken)!;
+
+      ({ data, error } = await scuteClient.confirmInvite(magicToken, values));
+
+      if (data) {
+        const isWebauthnAvailable =
+          scuteClient.isWebauthnSupported() &&
+          magicPayload.webauthnEnabled !== false;
+
+        if (isWebauthnAvailable) {
+          setAuthView(VIEWS.WEBAUTHN_REGISTER);
+        } else {
+          // login
+          const { error: signInError } =
+            await scuteClient.signInWithTokenPayload(data);
+          error = signInError;
+        }
+
+        getAuthPayloadCallback?.(data);
+      }
+
+      if (error) {
+        // TODO: error
+        // TODO: super temp
+        alert("Unknown Error");
+        return;
+      }
+    }
+
+    if (error) {
+      const { isFatal, message: errorMsg } = getMeaningfulError(error);
       setIsFatalError?.(isFatal);
       setError("root.serverError", {
-        type: String(signUpError.code),
+        type: String(error.code),
         message: errorMsg,
       });
       return;
     }
 
-    if (pollingData) {
-      const magicLinkId = pollingData.magic_link.id;
+    if (data && "magic_link" in data) {
+      const magicLinkId = data.magic_link.id;
       getMagicLinkIdCallback?.(magicLinkId);
     }
   };
 
   return (
     <form
-      onSubmit={handleSubmit(handleSignUp)}
+      onSubmit={handleSubmit(handleContinue)}
       onChange={() => {
         clearErrors("root.serverError");
       }}

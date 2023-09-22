@@ -24,6 +24,7 @@ export {
   isBrowser,
   accessTokenHeader,
   refreshTokenHeaders,
+  decodeMagicLinkToken,
 } from "./lib/helpers";
 export type { CookieAttributes, UniqueIdentifier } from "./lib/types/general";
 export * from "./lib/types/scute";

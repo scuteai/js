@@ -6,7 +6,6 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
   type PaginationState,
@@ -139,9 +138,7 @@ export const UsersTable = ({
       handlePaginationChange(newPagination);
     },
     pageCount: paginationMeta.total_pages,
-    // TODO: backend
-    //manualFiltering: true,
-    getFilteredRowModel: getFilteredRowModel(),
+    manualFiltering: true,
     onGlobalFilterChange: setGlobalFilter,
     getSortedRowModel: getSortedRowModel(),
   });

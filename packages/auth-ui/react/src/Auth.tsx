@@ -8,6 +8,7 @@ import {
   type ScuteAppData,
   AUTH_CHANGE_EVENTS,
   SCUTE_MAGIC_PARAM,
+  decodeMagicLinkToken,
 } from "@scute/core";
 import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
 import {
@@ -60,7 +61,16 @@ function Auth(props: AuthProps) {
       typeof URLSearchParams !== "undefined" &&
       new URL(window.location.href).searchParams.has(SCUTE_MAGIC_PARAM)
     ) {
-      return VIEWS.MAGIC_LOADING;
+      const magicPayload = decodeMagicLinkToken(
+        new URL(window.location.href).searchParams.get(SCUTE_MAGIC_PARAM)!
+      );
+      if (magicPayload) {
+        if (magicPayload.user_status === "pending") {
+          return VIEWS.CONFIRM_INVITE;
+        } else {
+          return VIEWS.MAGIC_LOADING;
+        }
+      }
     }
 
     return view;
@@ -196,6 +206,23 @@ function Auth(props: AuthProps) {
             setIsFatalError={setIsFatalError}
             webauthnEnabled={webauthn !== "disabled"}
             getMagicLinkIdCallback={(id) => setMagicLinkId(id)}
+          />
+        </Container>
+      );
+    case VIEWS.CONFIRM_INVITE:
+      return (
+        <Container {...containerProps}>
+          <SignInOrUp
+            scuteClient={scuteClient}
+            mode="confirm_invite"
+            setAuthView={setAuthView}
+            identifier={identifier}
+            setIdentifier={setIdentifier}
+            appData={appData}
+            setIsFatalError={setIsFatalError}
+            webauthnEnabled={webauthn !== "disabled"}
+            getMagicLinkIdCallback={(id) => setMagicLinkId(id)}
+            getAuthPayloadCallback={(payload) => setAuthPayload(payload)}
           />
         </Container>
       );

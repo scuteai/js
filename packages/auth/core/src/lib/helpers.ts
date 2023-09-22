@@ -79,7 +79,9 @@ export const decodeRefreshToken = (refreshToken: string) => {
   }
 };
 
-export const decodeMagicLinkToken = (token: string) => {
+export const decodeMagicLinkToken = (
+  token: string
+): _ScuteMagicLinkTokenPayload | null => {
   try {
     const payload = jwtDecode<_ScuteMagicLinkTokenPayload>(token);
     if (payload.uuid === undefined || payload.webauthnEnabled === undefined) {
@@ -87,8 +89,9 @@ export const decodeMagicLinkToken = (token: string) => {
     }
 
     return {
-      webauthnEnabled: payload.webauthnEnabled,
       uuid: payload.uuid,
+      user_status: payload.user_status,
+      webauthnEnabled: payload.webauthnEnabled,
     };
   } catch {
     return null;

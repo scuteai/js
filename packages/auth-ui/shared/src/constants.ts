@@ -4,6 +4,7 @@ export const VIEWS = {
   SIGN_IN_OR_UP: "sign-in-or-up",
   SIGN_IN: "sign-in",
   SIGN_UP: "sign-up",
+  CONFIRM_INVITE: "confirm-invite",
   WEBAUTHN_REGISTER: "webauthn-register",
   WEBAUTHN_VERIFY: "webauthn-verify",
   MAGIC_LOADING: "magic-loading",

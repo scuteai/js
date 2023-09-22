@@ -561,6 +561,21 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     });
   }
 
+  // TODO: super temp
+  async confirmInvite(token: string, userMeta: Record<string, any>) {
+    const { data } = await this.verifyMagicLinkToken(token);
+    if (!data?.authPayload) {
+      // TODO
+      return {
+        data: null,
+        error: new ScuteError({ message: "unknown error" }),
+      };
+    }
+
+    await this._updateUserMeta(userMeta, data.authPayload.access);
+    return { data: data.authPayload, error: null };
+  }
+
   /**
    * Register device for webauthn. This method will trigger the browser popup.
    * @returns Scute Device
