@@ -15,7 +15,7 @@ export default async function Customize({
   }
 
   return (
-    <Container size="3">
+    <Container size="4">
       <CustomizeCard appData={appData} />
     </Container>
   );

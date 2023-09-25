@@ -26,7 +26,7 @@ export const SettingSectionShell = ({
             direction="column"
             style={{ marginBottom: "var(--space-3)" }}
           >
-            {title ? <Heading size="3">{title}</Heading> : null}
+            {title ? <Text size="3">{title}</Text> : null}
 
             {description ? (
               <Text color="gray" size="1">

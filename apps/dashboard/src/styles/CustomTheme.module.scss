@@ -1,0 +1,38 @@
+.ThemePanelSwatch,
+.ThemePanelRadioCard {
+  position: relative;
+}
+
+.ThemePanelSwatchInput,
+.ThemePanelRadioCardInput {
+  appearance: none;
+  margin: 0;
+  outline: none;
+  outline-width: 2px;
+  outline-offset: 2px;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.ThemePanelRadioCard {
+  border-radius: var(--radius-1);
+  box-shadow: 0 0 0 1px var(--accent-a8);
+}
+
+.ThemePanelRadioCardInput {
+  &:where(:checked) {
+    box-shadow: inset 0 0 0 1px var(--accent-a11), 0 0 0 1px var(--accent-a11);
+  }
+  &:where(:focus-visible) {
+    background-color: var(--accent-a3);
+    box-shadow: inset 0 0 0 1px var(--accent-9), 0 0 0 1px var(--accent-9);
+  }
+}
+
+.ThemePanelRadioCardInput {
+  cursor: pointer;
+  &:hover {
+    background-color: var(--accent-a3);
+  }
+}

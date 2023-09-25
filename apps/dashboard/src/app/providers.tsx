@@ -60,7 +60,7 @@ const ClientAuthGuard = ({ children }: { children: ReactNode }) => {
 
 function RadixThemeProvider({ children }: { children: ReactNode }) {
   return (
-    <RadixTheme accentColor="teal" grayColor="mauve" scaling="110%">
+    <RadixTheme accentColor="lime" grayColor="mauve" scaling="100%">
       {children}
     </RadixTheme>
   );
