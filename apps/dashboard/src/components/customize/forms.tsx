@@ -1,3 +1,4 @@
+"use client";
 import {
   Heading,
   Tabs,
@@ -13,10 +14,6 @@ import {
 import { CaretDownIcon } from "@radix-ui/react-icons";
 import { useState } from "react";
 import { ChromePicker } from "react-color";
-
-
-
-
 
 export const FontPicker = () => {
   return (
@@ -38,13 +35,15 @@ export const FontPicker = () => {
   );
 };
 
-
 interface ColorPickerProps {
   color: string;
   onChange?: (color: string) => void;
 }
 
-export const ColorPickerPop = ({color='#ff0000', onChange} : ColorPickerProps ) => {
+export const ColorPickerPop = ({
+  color = "#ff0000",
+  onChange,
+}: ColorPickerProps) => {
   return (
     <Popover.Root>
       <Popover.Trigger>
@@ -64,6 +63,7 @@ export const ColorPickerPop = ({color='#ff0000', onChange} : ColorPickerProps ) 
       </Popover.Trigger>
       <Popover.Content size="1" style={{ padding: "4px" }}>
         <Flex>
+          {/* @ts-ignore // TODO */}
           <ChromePicker
             color={color}
             onChange={(color) => onChange?.(color.hex)}

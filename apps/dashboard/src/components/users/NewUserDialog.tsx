@@ -49,7 +49,6 @@ export const NewUserDialog = ({ inviteUser }: NewUserDialogProps) => {
             <Button
               onClick={async () => {
                 const user = await inviteUser(identifier);
-                console.log(user);
                 if (user) {
                   toast.success("success! [invite]");
                 } else {
