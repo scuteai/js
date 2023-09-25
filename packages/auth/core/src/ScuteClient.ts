@@ -71,6 +71,7 @@ import type {
   ScuteTokenPayload,
   ScuteUser,
   ScuteUserData,
+  UserMeta,
 } from "./lib/types/scute";
 
 class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
@@ -188,7 +189,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
             // only when persisting the session and running in the browser
             this._setupSessionBroadcast();
           }
-          
+
           this.config.autoRefreshToken = this.appData.auto_refresh !== false;
 
           await this.registerVisibilityChange();
@@ -559,21 +560,6 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     return this.patch<ScuteTokenPayload>("/magic_links/authenticate", {
       token,
     });
-  }
-
-  // TODO: super temp
-  async confirmInvite(token: string, userMeta: Record<string, any>) {
-    const { data } = await this.verifyMagicLinkToken(token);
-    if (!data?.authPayload) {
-      // TODO
-      return {
-        data: null,
-        error: new ScuteError({ message: "unknown error" }),
-      };
-    }
-
-    await this._updateUserMeta(userMeta, data.authPayload.access);
-    return { data: data.authPayload, error: null };
   }
 
   /**
@@ -1085,7 +1071,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   async sendRegisterMagicLink(
     identifier: ScuteIdentifier,
-    userMeta?: Record<string, any>,
+    userMeta?: UserMeta,
     webauthnEnabled?: boolean,
     emitEvent: boolean = true
   ) {
@@ -1109,13 +1095,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   /**
    * Send register magic link.
    * @param identifier {ScuteIdentifier}
+   * @param userMeta {UserMeta}
    * @param webauthnEnabled {boolean}
    * @internal
    * @see {@link sendRegisterMagicLink}
    */
   private async _sendRegisterMagicLink(
     identifier: ScuteIdentifier,
-    userMeta?: Record<string, any>,
+    userMeta?: UserMeta,
     webauthnEnabled?: boolean
   ) {
     return this._sendMagicLinkRequest(
@@ -1135,7 +1122,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   private async _sendMagicLinkRequest(
     identifier: ScuteIdentifier,
     method: "register" | "login" = "login",
-    userMeta?: Record<string, any>,
+    userMeta?: UserMeta,
     webauthnEnabled = isWebauthnSupported()
   ) {
     return this.post<ScuteMagicLinkIdResponse>(`/magic_links/${method}`, {
@@ -1157,9 +1144,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   /**
    * Update user meta for the current user.
-   * @param meta
+   * @param meta {UserMeta}
    */
-  async updateUserMeta(meta: Record<string, any>) {
+  async updateUserMeta(meta: UserMeta) {
     const { data, error } = await this.getAuthToken();
 
     if (error) {
@@ -1171,14 +1158,11 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   /**
    * Update user meta.
-   * @param meta Meta fields
-   * @param accessToken Access Token
-   * @returns
+   * @param meta {UserMeta} - Meta fields
+   * @param accessToken - Access Token
+   * @see {@link updateUserMeta}
    */
-  protected async _updateUserMeta(
-    meta: Record<string, any>,
-    accessToken: string
-  ) {
+  protected async _updateUserMeta(meta: UserMeta, accessToken: string) {
     return this.patch<{ user: ScuteUserData }>(
       "/current_user/meta",
       {
@@ -1186,6 +1170,28 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       },
       accessTokenHeader(accessToken)
     );
+  }
+
+  /**
+   * Confirm invite.
+   * @param token Magic link token
+   * @param userMeta {UserMeta} Meta fields
+   */
+  async confirmInvite(token: string, userMeta: UserMeta) {
+    return this._confirmInvite(token, userMeta);
+  }
+
+  /**
+   * Confirm invite.
+   * @param token Magic link token
+   * @param userMeta {UserMeta} Meta fields
+   * @see {@link confirmInvite}
+   */
+  protected async _confirmInvite(token: string, userMeta?: UserMeta) {
+    return this.post<ScuteTokenPayload>("/magic_links/confirm_invite", {
+      token,
+      user_meta: userMeta,
+    });
   }
 
   /**

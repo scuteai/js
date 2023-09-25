@@ -2,13 +2,17 @@
 
 import { Button, Flex } from "@radix-ui/themes";
 import { SearchUser } from "./SearchUser";
-import { NewUserDialog } from "./NewUserDialog";
+import { NewUserDialog, NewUserDialogProps } from "./NewUserDialog";
 
-export const UsersTitleBarContent = () => {
+interface UsersTitleBarContentProps extends NewUserDialogProps {}
+
+export const UsersTitleBarContent = ({
+  inviteUser,
+}: UsersTitleBarContentProps) => {
   return (
     <Flex gap="3" justify="end">
       <SearchUser />
-      <NewUserDialog />
+      <NewUserDialog inviteUser={inviteUser} />
       <Button variant="outline" color="gray">
         Import users
       </Button>

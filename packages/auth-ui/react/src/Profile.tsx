@@ -121,7 +121,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
 
                     await scuteClient.updateUserMeta({
                       ...user.meta,
-                      ...Object.fromEntries(formData),
+                      ...(Object.fromEntries(formData) as any),
                     });
                     await scuteClient.refetchSession();
                   }}

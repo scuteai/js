@@ -7,13 +7,15 @@ import {
   type ScuteMagicLinkIdResponse,
   type ScuteTokenPayload,
   decodeMagicLinkToken,
+  SCUTE_MAGIC_PARAM,
+  type ScuteError,
   getMeaningfulError,
   IdentifierAlreadyExistsError,
   IdentifierNotRecognizedError,
-  SCUTE_MAGIC_PARAM,
 } from "@scute/core";
 
 import { useEffect, useState } from "react";
+import useEffectOnce from "../helpers/useEffectOnce";
 import { FingerprintIcon, MagicMailIcon, BellIcon } from "../assets/icons";
 import type { CommonViewProps } from "./common";
 import {
@@ -29,6 +31,7 @@ import {
   Badge,
   IconHolder,
   Panel,
+  LargeSpinner,
 } from "../components";
 
 import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
@@ -58,42 +61,41 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     setIdentifier,
     setAuthView,
     appData,
-    mode: _mode = "sign_in_or_up",
+    mode: __mode = "sign_in_or_up",
     webauthnEnabled = true,
     setIsFatalError,
     getMagicLinkIdCallback,
   } = props;
 
-  const [mode] = useState<NonNullable<SignInOrUpProps["mode"]>>(() =>
+  const [_mode, _setMode] =
+    useState<NonNullable<SignInOrUpProps["mode"]>>(__mode);
+
+  const mode =
     appData.public_signup !== false || _mode === "confirm_invite"
       ? _mode
-      : "sign_in"
-  );
+      : "sign_in";
 
-  const registerFormProps: SignInOrUpProps = { ...props };
   const [shouldSkipRegisterForm] = useState(
     () =>
       appData.allowed_identifiers.length === 1 &&
       appData.user_meta_data_schema.length === 0
   );
 
-  const {
-    register,
-    handleSubmit,
-    setError,
-    clearErrors,
-    formState: { errors, isDirty, isValid },
-  } = useForm<IdentifierInput>({
-    criteriaMode: "all",
-    defaultValues: {
-      identifier: "",
-    },
-  });
-  const isError = Object.keys(errors).length !== 0;
-
   const [showRegisterForm, setShowRegisterForm] = useState(
     mode === "confirm_invite" ? true : false
   );
+
+  const backToLogin = () => {
+    _setMode("sign_in_or_up");
+    setShowRegisterForm(false);
+  };
+
+  const registerFormProps: RegisterFormProps = {
+    ...props,
+    mode,
+    backToLogin,
+    shouldSkipRegisterForm,
+  };
 
   const {
     signInOrUpText,
@@ -108,6 +110,20 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   const isWebauthnAvailable =
     webauthnEnabled && scuteClient.isWebauthnSupported();
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    clearErrors,
+    formState: { errors, isDirty, isValid },
+  } = useForm<IdentifierInput>({
+    criteriaMode: "all",
+    defaultValues: {
+      identifier: "",
+    },
+  });
+  const isError = Object.keys(errors).length !== 0;
 
   const handleValidSubmit: SubmitHandler<IdentifierInput> = async (values) => {
     const identifier =
@@ -326,16 +342,23 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   );
 };
 
+interface RegisterFormProps extends SignInOrUpProps {
+  shouldSkipRegisterForm: boolean;
+  backToLogin: () => void;
+}
+
 const RegisterForm = ({
   scuteClient,
   identifier,
   setAuthView,
   appData,
   mode,
+  shouldSkipRegisterForm,
+  backToLogin,
   setIsFatalError,
   getMagicLinkIdCallback,
   getAuthPayloadCallback,
-}: SignInOrUpProps) => {
+}: RegisterFormProps) => {
   const {
     register,
     setError,
@@ -352,9 +375,15 @@ const RegisterForm = ({
     maybeNeededIdentifierLabel,
   } = useSignInOrUpFormHelpers(identifier, appData, mode);
 
+  useEffectOnce(() => {
+    if (shouldSkipRegisterForm) {
+      handleContinue({});
+    }
+  });
+
   const handleContinue: SubmitHandler<FieldValues> = async (values) => {
     let data: ScuteMagicLinkIdResponse | ScuteTokenPayload | null = null;
-    let error;
+    let error: ScuteError | null = null;
 
     if (mode !== "confirm_invite") {
       ({ data, error } = await scuteClient.signUp(identifier, {
@@ -367,7 +396,6 @@ const RegisterForm = ({
       const magicPayload = decodeMagicLinkToken(magicToken)!;
 
       ({ data, error } = await scuteClient.confirmInvite(magicToken, values));
-
       if (data) {
         const isWebauthnAvailable =
           scuteClient.isWebauthnSupported() &&
@@ -384,14 +412,11 @@ const RegisterForm = ({
 
         getAuthPayloadCallback?.(data);
       }
-
-      if (error) {
-        // TODO: error
-        // TODO: super temp
-        alert("Unknown Error");
-        return;
-      }
     }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete(SCUTE_MAGIC_PARAM);
+    window.history.replaceState(window.history.state, "", url.toString());
 
     if (error) {
       const { isFatal, message: errorMsg } = getMeaningfulError(error);
@@ -408,6 +433,32 @@ const RegisterForm = ({
       getMagicLinkIdCallback?.(magicLinkId);
     }
   };
+
+  if (isError) {
+    return (
+      <>
+        <Text
+          size="2"
+          css={{ color: "$errorColor", mb: "$1", textAlign: "center" }}
+        >
+          {errors.root?.serverError.message}
+        </Text>
+        <Flex css={{ jc: "center", mt: "2rem" }}>
+          <Button
+            variant="alt"
+            size="2"
+            onClick={() => {
+              backToLogin();
+            }}
+          >
+            Back to login
+          </Button>
+        </Flex>
+      </>
+    );
+  } else if (shouldSkipRegisterForm) {
+    return <LargeSpinner spinnerColor="green" />;
+  }
 
   return (
     <form

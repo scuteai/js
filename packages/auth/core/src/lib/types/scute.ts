@@ -92,7 +92,9 @@ export type ScuteUserData = {
   sessions: ScuteUserSession[];
 };
 
-type Metadata = Record<string, boolean | string | number>;
+type Metadata = Record<string, string | boolean | number>;
+
+export type UserMeta = Metadata;
 
 /**
  * Identifier that is an email or phone number.

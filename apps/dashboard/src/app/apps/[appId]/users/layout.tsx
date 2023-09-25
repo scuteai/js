@@ -1,6 +1,7 @@
 import { type Metadata } from "next";
 import GuardLayout from "@/app/guard-layout";
-import type { UniqueIdentifier } from "@/types";
+import type { UniqueIdentifier, ScuteIdentifier } from "@/types";
+import { inviteUser } from "@/api";
 import { UsersTitleBarContent } from "@/components/users/UsersTitleBarContent";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,10 +17,15 @@ export default async function UsersLayout({
   children: React.ReactNode;
   params: { appId: UniqueIdentifier };
 }) {
+  const inviteUserAction = async (identifier: ScuteIdentifier) => {
+    "use server";
+    return inviteUser(params.appId, identifier);
+  };
+
   return (
     <GuardLayout
       params={params}
-      titleBarContent={<UsersTitleBarContent />}
+      titleBarContent={<UsersTitleBarContent inviteUser={inviteUserAction} />}
       pageTitle="Users"
     >
       {children}

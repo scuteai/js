@@ -84,7 +84,7 @@ export const decodeMagicLinkToken = (
 ): _ScuteMagicLinkTokenPayload | null => {
   try {
     const payload = jwtDecode<_ScuteMagicLinkTokenPayload>(token);
-    if (payload.uuid === undefined || payload.webauthnEnabled === undefined) {
+    if (payload.uuid === undefined) {
       return null;
     }
 

@@ -8,6 +8,7 @@ import type {
   ScuteUser,
   ScuteUserData,
   ScuteUserSession,
+  UserMeta,
 } from "./lib/types/scute";
 import type { ScuteAdminApiConfig } from "./lib/types/config";
 import type { UniqueIdentifier } from "./lib/types/general";
@@ -107,9 +108,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
   async getUser(id: string) {
     return this.get<{ user: ScuteUserData | null }>(
       `${this._v1Path}/users/${id}`,
-      {
-        ...this._authorizationHeader,
-      }
+      this._authorizationHeader
     );
   }
 
@@ -137,18 +136,18 @@ class ScuteAdminApi extends ScuteBaseHttp {
 
   /**
    * Create a user (with optional user metadata).
-   * * Unauthenticated
    * @param identifier {ScuteIdentifier}
-   * @param meta - User meta
+   * @param meta {UserMeta} - User meta
    */
-  async createUser(
-    identifier: string,
-    meta?: Record<string, boolean | string | number>
-  ) {
-    return this.post<{ user: ScuteUser }>(`${this._authPath}/users`, {
-      identifier,
-      user_meta: meta,
-    });
+  async createUser(identifier: ScuteIdentifier, meta?: UserMeta) {
+    return this.post<{ user: ScuteUser }>(
+      `${this._authPath}/users`,
+      {
+        identifier,
+        user_meta: meta,
+      },
+      this._authorizationHeader
+    );
   }
 
   /**
@@ -160,9 +159,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
     return this.patch<{ user: ScuteUserData }>(
       `${this._v1Path}/users/${id}`,
       data,
-      {
-        ...this._authorizationHeader,
-      }
+      this._authorizationHeader
     );
   }
 
@@ -174,9 +171,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
     return this.post<{ user: ScuteUserData }>(
       `${this._v1Path}/users/${id}/activate`,
       null,
-      {
-        ...this._authorizationHeader,
-      }
+      this._authorizationHeader
     );
   }
 
@@ -188,9 +183,28 @@ class ScuteAdminApi extends ScuteBaseHttp {
     return this.post<{ user: ScuteUserData }>(
       `${this._v1Path}/users/${id}/deactivate`,
       null,
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Create a user with pending status and send invitation. (a pending user will not be able to log in).
+   *
+   * @param identifier {ScuteIdentifier}
+   * @param meta {UserMeta} - User meta
+   */
+  async inviteUser(
+    identifier: ScuteIdentifier,
+    meta?: UserMeta
+  ) {
+    // TODO: user meta errors
+    return this.post<{ user: ScuteUserData, user_meta_errors?: any }>(
+      `${this._v1Path}/users/invite`,
       {
-        ...this._authorizationHeader,
-      }
+        identifier,
+        user_meta: meta,
+      },
+      this._authorizationHeader
     );
   }
 

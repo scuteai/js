@@ -1,8 +1,17 @@
 "use client";
 
+import { useState } from "react";
+import type { ScuteIdentifier } from "@/types";
 import { Button, Flex, Dialog, Text, TextField } from "@radix-ui/themes";
+import { toast } from "sonner";
 
-export const NewUserDialog = () => {
+export interface NewUserDialogProps {
+  inviteUser: (identifier: ScuteIdentifier) => Promise<any>;
+}
+
+export const NewUserDialog = ({ inviteUser }: NewUserDialogProps) => {
+  const [identifier, setIdentifier] = useState<ScuteIdentifier>("");
+
   return (
     <Dialog.Root>
       <Dialog.Trigger>
@@ -16,13 +25,15 @@ export const NewUserDialog = () => {
         </Dialog.Description>
 
         <Flex direction="column" gap="3">
-         
           <label>
             <Text as="div" size="2" mb="1" weight="bold">
               Email
             </Text>
             <TextField.Input
-              defaultValue=""
+              onChange={(e) => {
+                setIdentifier(e.target.value);
+              }}
+              value={identifier}
               placeholder="Enter user's email"
             />
           </label>
@@ -35,7 +46,19 @@ export const NewUserDialog = () => {
             </Button>
           </Dialog.Close>
           <Dialog.Close>
-            <Button>Save</Button>
+            <Button
+              onClick={async () => {
+                const user = await inviteUser(identifier);
+                console.log(user);
+                if (user) {
+                  toast.success("success! [invite]");
+                } else {
+                  toast.error("error! [invite]");
+                }
+              }}
+            >
+              Save
+            </Button>
           </Dialog.Close>
         </Flex>
       </Dialog.Content>
