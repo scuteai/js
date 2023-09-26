@@ -22,4 +22,4 @@ export {
   deleteMetaField,
 } from "./metafields";
 export { getEvents } from "./activity";
-export { getUsers, inviteUser } from "./user";
+export { getUsers, activateUser, deactivateUser, inviteUser } from "./user";

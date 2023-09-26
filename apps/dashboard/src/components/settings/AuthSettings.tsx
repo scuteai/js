@@ -1,5 +1,5 @@
 "use client";
-import { type UpdateAppBodyParams } from "@/api";
+import type { UpdateAppBodyParams } from "@/api";
 import type { ScuteAppData } from "@/types";
 
 import { Controller, useForm } from "react-hook-form";

@@ -1,7 +1,9 @@
-import { getUsers } from "@/api";
-import type { UniqueIdentifier } from "@/types";
+import { activateUser, deactivateUser, getUsers } from "@/api";
+import type { ListUsersRequestParams, UniqueIdentifier } from "@/types";
 import { Container } from "@radix-ui/themes";
 import { UsersTable } from "@/components/users/UsersTable";
+import { revalidatePath } from "next/cache";
+import { PATHS } from "@/app/routes";
 
 export const dynamic = "force-dynamic";
 
@@ -10,13 +12,51 @@ export default async function AppUsers({
   searchParams,
 }: {
   params: { appId: UniqueIdentifier };
-  searchParams: { q?: string; page?: string; limit?: string };
+  searchParams: ListUsersRequestParams & Record<string, any>;
 }) {
-  const data = await getUsers(params.appId, {
-    // TODO
-    page: searchParams.page ?? 1,
-    limit: searchParams.limit ?? 10,
-  });
+  const reqParams: ListUsersRequestParams = {
+    id: searchParams.id,
+    email: searchParams.q || searchParams.email,
+    phone: searchParams.phone,
+    created_before: searchParams.created_before,
+    status: searchParams.status,
+    page: (searchParams.page ?? 1) as number,
+    limit: (searchParams.limit ?? 10) as number,
+  };
+
+  const data = await getUsers(
+    params.appId,
+    // remove undefined values
+    JSON.parse(JSON.stringify(reqParams))
+  );
+
+  const activateUserAction = async (id: UniqueIdentifier) => {
+    "use server";
+
+    const user = await activateUser(params.appId, id);
+
+    if (user) {
+      revalidatePath(
+        PATHS.APP_USERS.replace("[appId]", params.appId as string)
+      );
+    }
+
+    return user;
+  };
+
+  const deactivateUserAction = async (id: UniqueIdentifier) => {
+    "use server";
+
+    const user = await deactivateUser(params.appId, id);
+
+    if (user) {
+      revalidatePath(
+        PATHS.APP_USERS.replace("[appId]", params.appId as string)
+      );
+    }
+
+    return user;
+  };
 
   if (!data) {
     // TODO: error handling
@@ -28,6 +68,8 @@ export default async function AppUsers({
       <UsersTable
         appId={params.appId}
         users={data.users}
+        activateUser={activateUserAction}
+        deactivateUser={deactivateUserAction}
         pagination={data.pagination}
       />
     </Container>

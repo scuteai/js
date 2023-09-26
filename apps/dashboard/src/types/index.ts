@@ -9,4 +9,5 @@ export type {
   ScuteUserMetaDataSchema,
   UserMeta,
   ScutePaginationMeta,
+  ListUsersRequestParams
 } from "@scute/nextjs";

@@ -18,7 +18,7 @@ import { STextField } from "./STextField";
 import { SCardBottom } from "./SCardBottom";
 import { useRouter } from "next/navigation";
 import { SaveBar } from "@/components/shared/SaveBar";
-import { UpdateAppBodyParams } from "@/api/app";
+import type { UpdateAppBodyParams } from "@/api";
 
 export type AppSettingsInputs = Pick<
   UpdateAppBodyParams,

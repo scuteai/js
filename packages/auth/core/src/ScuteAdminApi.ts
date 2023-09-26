@@ -2,6 +2,7 @@ import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
 import { accessTokenHeader, refreshTokenHeaders } from "./lib/helpers";
 
 import type {
+  ListUsersRequestParams,
   ScuteAppData,
   ScuteIdentifier,
   ScutePaginationMeta,
@@ -60,27 +61,16 @@ class ScuteAdminApi extends ScuteBaseHttp {
   /**
    * Get a list of users.
    */
-  async listUsers(params?: any) {
-    // {
-    //   limit: "3",
-    //   page: "1",
-    //   //identifier: ""
-    //   //order_by: ""
-    //   //created_before
-    //   //status
-    //   //email_verified
-    //   //id
-    //   //last_login_at
-    //   //login_count
-    // };
-
+  async listUsers(params?: ListUsersRequestParams) {
     const { data, error } = await this.get<
       {
         users: ScuteUserData[];
       } & ScutePaginationMeta
     >(
       `${this._v1Path}/users` +
-        (params ? `?${new URLSearchParams(params)}` : ""),
+        (params
+          ? `?${new URLSearchParams(params as Record<string, any>)}`
+          : ""),
       {
         ...this._authorizationHeader,
       }
@@ -105,7 +95,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * Get a user's information (including any defined user metadata).
    * @param id User ID
    */
-  async getUser(id: string) {
+  async getUser(id: UniqueIdentifier) {
     return this.get<{ user: ScuteUserData | null }>(
       `${this._v1Path}/users/${id}`,
       this._authorizationHeader
@@ -155,7 +145,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    * @param data any
    */
-  async updateUser(id: string, data: any) {
+  async updateUser(id: UniqueIdentifier, data: any) {
     return this.patch<{ user: ScuteUserData }>(
       `${this._v1Path}/users/${id}`,
       data,
@@ -167,7 +157,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * Activate a user.
    * @param id User ID
    */
-  async activateUser(id: string) {
+  async activateUser(id: UniqueIdentifier) {
     return this.post<{ user: ScuteUserData }>(
       `${this._v1Path}/users/${id}/activate`,
       null,
@@ -179,7 +169,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * Deactivate a user (a deactivated user will not be able to log in).
    * @param id User ID
    */
-  async deactivateUser(id: string) {
+  async deactivateUser(id: UniqueIdentifier) {
     return this.post<{ user: ScuteUserData }>(
       `${this._v1Path}/users/${id}/deactivate`,
       null,
@@ -193,12 +183,9 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param identifier {ScuteIdentifier}
    * @param meta {UserMeta} - User meta
    */
-  async inviteUser(
-    identifier: ScuteIdentifier,
-    meta?: UserMeta
-  ) {
+  async inviteUser(identifier: ScuteIdentifier, meta?: UserMeta) {
     // TODO: user meta errors
-    return this.post<{ user: ScuteUserData, user_meta_errors?: any }>(
+    return this.post<{ user: ScuteUserData; user_meta_errors?: any }>(
       `${this._v1Path}/users/invite`,
       {
         identifier,
@@ -212,7 +199,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * Delete a user.
    * @param id User ID
    */
-  async deleteUser(id: string) {
+  async deleteUser(id: UniqueIdentifier) {
     return this.delete(`${this._v1Path}/users/${id}`, {
       ...this._authorizationHeader,
     });
@@ -264,7 +251,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * List all sessions for a user.
    * @param id User ID
    */
-  async listUserSessions(id: string) {
+  async listUserSessions(id: UniqueIdentifier) {
     return this.get<ScuteUserSession[]>(
       `${this._appsPath}/users/${id}/sessions`,
       {
@@ -278,7 +265,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param userId User ID
    * @param sessionId Session ID
    */
-  async revokeUserSession(userId: string, sessionId: string) {
+  async revokeUserSession(userId: UniqueIdentifier, sessionId: UniqueIdentifier) {
     return this.delete(
       `${this._v1Path}/users/${userId}/sessions/${sessionId}`,
       {

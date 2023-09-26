@@ -12,6 +12,7 @@ import {
   getMeaningfulError,
   IdentifierAlreadyExistsError,
   IdentifierNotRecognizedError,
+  UnknownSignInError,
 } from "@scute/core";
 
 import { useEffect, useState } from "react";
@@ -152,6 +153,16 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     }
 
     if (user) {
+      if (user.status === "inactive") {
+        // TODO
+        const error = new UnknownSignInError();
+        setError("root.serverError", {
+          type: String(error.code),
+          message: error.message,
+        });
+        return;
+      }
+
       // login
       if (webauthnEnabled && user.webauthn_enabled) {
         setAuthView(VIEWS.WEBAUTHN_VERIFY);

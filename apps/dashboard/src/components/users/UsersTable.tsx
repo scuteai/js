@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -9,6 +9,9 @@ import {
   getSortedRowModel,
   useReactTable,
   type PaginationState,
+  type ColumnFiltersState,
+  Column,
+  Table,
 } from "@tanstack/react-table";
 
 import type {
@@ -19,15 +22,17 @@ import type {
 
 import { shortString } from "@/utils/string";
 import { toast } from "sonner";
-import { Flex, IconButton, Kbd, Tooltip } from "@radix-ui/themes";
+import { Badge, Flex, IconButton, Kbd, Tooltip } from "@radix-ui/themes";
 import styles from "@/styles/Table.module.scss";
 import { CopyIcon } from "@radix-ui/react-icons";
 import { AppUserActions } from "./AppUserActions";
 
-interface UsersProps {
+export interface UsersTableProps {
   appId: UniqueIdentifier;
   users: ScuteUserData[];
   pagination: ScutePaginationMeta;
+  activateUser: (id: UniqueIdentifier) => Promise<any>;
+  deactivateUser: (id: UniqueIdentifier) => Promise<any>;
 }
 
 const paginationDefaults = {
@@ -40,8 +45,10 @@ const columnHelper = createColumnHelper<ScuteUserData>();
 export const UsersTable = ({
   appId,
   users,
+  activateUser,
+  deactivateUser,
   pagination: paginationMeta,
-}: UsersProps) => {
+}: UsersTableProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -73,23 +80,38 @@ export const UsersTable = ({
       ),
       header: () => <span>User ID</span>,
     }),
-
     columnHelper.accessor("email", {
       header: () => <span>Email</span>,
     }),
     columnHelper.accessor("last_used_at", {
       header: () => <span>Last login</span>,
+      enableColumnFilter: false,
     }),
     columnHelper.accessor("signup_date", {
       header: () => <span>Signup date</span>,
     }),
     columnHelper.accessor("status", {
       header: () => <span>Active</span>,
+      cell: (props) => {
+        const status = props.getValue();
+        return (
+          <Flex>
+            <Badge radius="full" color={status === "active" ? "green" : "red"}>
+              {status}
+            </Badge>
+          </Flex>
+        );
+      },
     }),
     columnHelper.display({
       id: "actions",
       cell: (props) => (
-        <AppUserActions appId={appId} user={props.row.original} />
+        <AppUserActions
+          appId={appId}
+          user={props.row.original}
+          activateUser={activateUser}
+          deactivateUser={deactivateUser}
+        />
       ),
     }),
   ]);
@@ -103,15 +125,46 @@ export const UsersTable = ({
       : paginationDefaults.pageSize,
   });
 
-  const [globalFilter, setGlobalFilter] = useState<any>(searchParams.get("q"));
-  useEffect(() => {
-    setGlobalFilter(searchParams.get("q"));
-  }, [searchParams]);
-
   const handlePaginationChange = (pagination: PaginationState) => {
     const params = new URLSearchParams(window.location.search);
     params.set("page", String(pagination.pageIndex + 1));
     params.set("limit", String(pagination.pageSize));
+
+    startTransition(() => {
+      router.replace(`${pathname}?${params}`);
+    });
+  };
+
+  const [globalFilter, setGlobalFilter] = useState<any>(searchParams.get("q"));
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+  useEffect(() => {
+    setGlobalFilter(searchParams.get("q"));
+    const columnFilters: ColumnFiltersState = [];
+    searchParams.forEach((value, id) => {
+      columnFilters.push({
+        id,
+        value,
+      });
+    });
+    setColumnFilters(columnFilters);
+  }, [searchParams]);
+
+  const handleColumnFiltersChange = (columnFilters: ColumnFiltersState) => {
+    const params = new URLSearchParams(window.location.search);
+    table.getAllColumns().forEach((column) => {
+      if (column.getCanFilter()) {
+        params.delete(column.id);
+      }
+    });
+
+    columnFilters.forEach((columnFilter) => {
+      let id: string = columnFilter.id;
+      if (columnFilter.id === "signup_date") {
+        id = "created_before";
+      }
+      params.set(id, columnFilter.value as string);
+    });
 
     startTransition(() => {
       router.replace(`${pathname}?${params}`);
@@ -123,6 +176,7 @@ export const UsersTable = ({
     columns,
     state: {
       pagination,
+      columnFilters,
       globalFilter,
     },
     getCoreRowModel: getCoreRowModel(),
@@ -140,46 +194,64 @@ export const UsersTable = ({
     pageCount: paginationMeta.total_pages,
     manualFiltering: true,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnFiltersChange: (updater) => {
+      let newColumnFilters: ColumnFiltersState;
+      if (typeof updater === "function") {
+        newColumnFilters = updater(columnFilters);
+      } else {
+        newColumnFilters = updater;
+      }
+      setColumnFilters(newColumnFilters);
+      handleColumnFiltersChange(newColumnFilters);
+    },
     getSortedRowModel: getSortedRowModel(),
   });
 
   return (
     <>
-      <table className={styles.table}>
+      <table>
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <th
-                  key={header.id}
-                  colSpan={header.colSpan}
-                  className={styles.th}
-                >
-                  {header.isPlaceholder ? null : (
-                    <div
-                      {...{
-                        className: header.column.getCanSort()
-                          ? "cursor-pointer select-none"
-                          : "",
-                        onClick: header.column.getToggleSortingHandler(),
-                      }}
-                    >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                      {{
-                        asc: " 🔼",
-                        desc: " 🔽",
-                      }[header.column.getIsSorted() as string] ?? null}
-                    </div>
-                  )}
-                </th>
-              ))}
+              {headerGroup.headers.map((header) => {
+                return (
+                  <th
+                    key={header.id}
+                    colSpan={header.colSpan}
+                    className={styles.th}
+                  >
+                    {header.isPlaceholder ? null : (
+                      <>
+                        <div
+                          {...{
+                            className: header.column.getCanSort()
+                              ? "cursor-pointer select-none"
+                              : "",
+                            onClick: header.column.getToggleSortingHandler(),
+                          }}
+                        >
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                          {{
+                            asc: " 🔼",
+                            desc: " 🔽",
+                          }[header.column.getIsSorted() as string] ?? null}
+                        </div>
+                        {header.column.getCanFilter() ? (
+                          <div>
+                            <Filter column={header.column} table={table} />
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           ))}
         </thead>
-
         <tbody className={styles.tbody}>
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id} className={styles.tr}>
@@ -259,3 +331,85 @@ export const UsersTable = ({
     </>
   );
 };
+
+function Filter({
+  column,
+  table,
+}: {
+  column: Column<any, unknown>;
+  table: Table<any>;
+}) {
+  const firstValue = table
+    .getPreFilteredRowModel()
+    .flatRows[0]?.getValue(column.id);
+
+  const columnFilterValue = column.getFilterValue();
+
+  const sortedUniqueValues = useMemo(
+    () =>
+      typeof firstValue === "number"
+        ? []
+        : Array.from(column.getFacetedUniqueValues().keys()).sort(),
+    [column.getFacetedUniqueValues()]
+  );
+
+  return typeof firstValue === "number" ? (
+    <div>
+      <div className="flex space-x-2">
+        <input
+          type="number"
+          min={Number(column.getFacetedMinMaxValues()?.[0] ?? "")}
+          max={Number(column.getFacetedMinMaxValues()?.[1] ?? "")}
+          value={(columnFilterValue as [number, number])?.[0] ?? ""}
+          onChange={(e) => {
+            const value = e.target.value;
+            column.setFilterValue((old: [number, number]) => [value, old?.[1]]);
+          }}
+          placeholder={`Min ${
+            column.getFacetedMinMaxValues()?.[0]
+              ? `(${column.getFacetedMinMaxValues()?.[0]})`
+              : ""
+          }`}
+          className="w-24 border shadow rounded"
+        />
+        <input
+          type="number"
+          min={Number(column.getFacetedMinMaxValues()?.[0] ?? "")}
+          max={Number(column.getFacetedMinMaxValues()?.[1] ?? "")}
+          value={(columnFilterValue as [number, number])?.[1] ?? ""}
+          onChange={(e) => {
+            const value = e.target.value;
+            column.setFilterValue((old: [number, number]) => [old?.[0], value]);
+          }}
+          placeholder={`Max ${
+            column.getFacetedMinMaxValues()?.[1]
+              ? `(${column.getFacetedMinMaxValues()?.[1]})`
+              : ""
+          }`}
+          className="w-24 border shadow rounded"
+        />
+      </div>
+    </div>
+  ) : (
+    <>
+      <datalist id={column.id + "list"}>
+        {sortedUniqueValues.slice(0, 5000).map((value: any) => (
+          <option value={value} key={value} />
+        ))}
+      </datalist>
+      <input
+        type="text"
+        value={(columnFilterValue ?? "") as string}
+        onChange={(e) => {
+          const value = e.target.value;
+          column.setFilterValue(value);
+        }}
+        //placeholder={`Search... (${column.getFacetedUniqueValues().size})`}
+        placeholder={`Search...`}
+        className="w-36 border shadow rounded"
+        list={column.id + "list"}
+      />
+      <div className="h-1" />
+    </>
+  );
+}

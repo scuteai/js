@@ -69,17 +69,17 @@ export type ScuteSendMagicLinkResponse = {
 
 export type ScuteUser = {
   id: UniqueIdentifier;
+  status: "active" | "pending" | "inactive";
   email: string | null;
   email_verified: boolean;
   phone: string | null;
   phone_verified: boolean;
   webauthn_enabled: boolean;
-  meta: Metadata | null;
 };
 
 export type ScuteUserData = {
   id: UniqueIdentifier;
-  status: "active" | "pending" | "inactive";
+  status: ScuteUser["status"];
   email: string | null;
   email_verified: boolean;
   phone: string | null;
@@ -152,4 +152,14 @@ export type ScutePaginationMeta = {
   next_page: number | null;
   prev_page: number | null;
   per_page: number;
+};
+
+export type ListUsersRequestParams = {
+  id?: UniqueIdentifier;
+  email?: string;
+  phone?: string;
+  created_before?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
 };
