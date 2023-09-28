@@ -1,4 +1,5 @@
 import {
+  AUTH_CHANGE_EVENTS,
   ScuteBrowserCookieStorage,
   UnknownSignInError,
   type ScuteTokenPayload,
@@ -37,7 +38,8 @@ export const createClientComponentClient = (
 
     if (config?.preferences?.httpOnlyRefresh !== false) {
       const originalSignInWithTokenPayload = scute["signInWithTokenPayload"];
-
+      // patch `signInWithTokenPayload`
+      // wait for the next api route / route handler to respond
       const signInWithTokenPayload = async (payload: ScuteTokenPayload) => {
         const res = await fetchWithCsrf(
           SIGN_IN_HANDLER,
@@ -71,8 +73,8 @@ export const createClientComponentClient = (
       const handlersPrefix = config?.handlersPrefix;
       scute.onAuthStateChange(async (event) => {
         switch (event) {
-          case "session_expired":
-          case "signed_out":
+          case AUTH_CHANGE_EVENTS.SESSION_EXPIRED:
+          case AUTH_CHANGE_EVENTS.SIGNED_OUT:
             await fetchWithCsrf(
               SIGN_OUT_HANDLER,
               {

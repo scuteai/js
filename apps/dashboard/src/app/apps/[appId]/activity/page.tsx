@@ -1,6 +1,6 @@
 import { getEvents } from "@/api";
 import { ActivitiyTable } from "@/components/activity/ActivityTable";
-import type { UniqueIdentifier } from "@/types";
+import type { UniqueIdentifier, ListEventsParams } from "@/types";
 import { Container } from "@radix-ui/themes";
 
 export default async function AppActivities({
@@ -8,10 +8,9 @@ export default async function AppActivities({
   searchParams,
 }: {
   params: { appId: UniqueIdentifier };
-  searchParams: { q?: string; page?: string; limit?: string };
+  searchParams: ListEventsParams & Record<string, unknown>;
 }) {
   const data = await getEvents(params.appId, {
-    // TODO
     page: searchParams.page ?? 1,
     limit: searchParams.limit ?? 10,
   });

@@ -20,7 +20,6 @@ export type ScuteAppData = {
   login_url: string;
   logo: string;
   logo_dark: string;
-  colors: any; // TODO
   public_key: any; // TODO
   profile_management: boolean;
   public_signup: boolean;
@@ -107,16 +106,16 @@ export type ScuteWebauthnOption = "strict" | "optional" | "disabled";
 
 export type ScuteSignInOptions = {
   webauthn?: ScuteWebauthnOption;
-} & Record<string, any>; // TODO
+} & Record<string, unknown>; // TODO
 
 export type ScuteSignUpOptions = {
   webauthn?: ScuteWebauthnOption;
-  userMeta?: Record<string, any>;
-} & Record<string, any>; // TODO
+  userMeta?: Metadata;
+} & Record<string, unknown>; // TODO
 
 export type ScuteSignInOrUpOptions = {
   webauthn?: ScuteWebauthnOption;
-} & Record<string, any>; // TODO
+} & Record<string, unknown>; // TODO
 
 export type ScuteMagicLinkIdResponse = {
   magic_link: { id: UniqueIdentifier };

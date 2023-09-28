@@ -14,3 +14,9 @@ export type ScuteEvent = {
   created_at: string;
   user: ScuteUserData;
 };
+
+
+export type ListEventsParams = {
+  page?: number;
+  limit?: number;
+};

@@ -1,4 +1,5 @@
 import {
+  AUTH_CHANGE_EVENTS,
   getMeaningfulError,
   NewDeviceError,
   UniqueIdentifier,
@@ -14,6 +15,7 @@ import {
   Header,
   Heading,
   Inner,
+  LargeSpinner,
   Text,
 } from "../../components";
 import useEffectOnce from "../../helpers/useEffectOnce";
@@ -73,7 +75,7 @@ const VerifyDevice = ({
 
   useEffect(() => {
     return scuteClient.onAuthStateChange((event) => {
-      if (event === "webauthn_verify_start") {
+      if (event === AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_START) {
         // no error on initialize
         setInitialized(true);
       }
@@ -86,7 +88,6 @@ const VerifyDevice = ({
   });
 
   if (!initialized) {
-    // TODO: loading
     return (
       <>
         <Inner
@@ -98,7 +99,7 @@ const VerifyDevice = ({
             minHeight: "12rem",
           }}
         >
-          {/* Loading... */}
+          <LargeSpinner />
         </Inner>
       </>
     );
