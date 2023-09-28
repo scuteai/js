@@ -1,7 +1,0 @@
-{
-  "root": true,
-  "extends": ["@scute/eslint-config", "next/babel", "next/core-web-vitals"],
-  "rules": {
-    "@next/next/no-html-link-for-pages": "off"
-  }
-}

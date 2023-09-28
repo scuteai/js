@@ -3,8 +3,6 @@
 ## Monorepo Structure
 
 ```
-├── apps
-│   ├── dashboard
 ├── examples
 │   ├── with-nextjs
 │   ├── with-nodejs
