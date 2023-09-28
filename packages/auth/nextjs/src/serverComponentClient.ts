@@ -1,4 +1,8 @@
-import { ScuteCookieStorage, type CookieAttributes } from "@scute/react";
+import {
+  isBrowser,
+  ScuteCookieStorage,
+  type CookieAttributes,
+} from "@scute/core";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 
@@ -35,22 +39,23 @@ export const createServerComponentClient = (
   },
   config?: ScuteNextjsClientConfig
 ) => {
-  const appId = config?.appId ?? process.env.NEXT_PUBLIC_SCUTE_APP_ID;
-  const baseUrl = config?.baseUrl ?? process.env.NEXT_PUBLIC_SCUTE_BASE_URL;
-
-  if (!appId) {
-    throw new Error("either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!");
-  }
-
-  return createScuteClient({
-    ...config,
-    appId,
-    baseUrl,
-    preferences: {
-      ...config?.preferences,
-      sessionStorageAdapter: new ScuteNextServerComponentStorage(context, {
-        secure: process.env.NODE_ENV === "production",
-      }),
+  const browser = isBrowser();
+  const scuteClient = createScuteClient(
+    {
+      ...config,
+      preferences: {
+        ...config?.preferences,
+        sessionStorageAdapter: new ScuteNextServerComponentStorage(context, {
+          secure: process.env.NODE_ENV === "production",
+        }),
+      },
     },
-  });
+    function onBeforeInitialize() {
+      this["config"].autoRefreshToken = browser
+        ? this["config"].autoRefreshToken
+        : false;
+    }
+  );
+
+  return scuteClient;
 };

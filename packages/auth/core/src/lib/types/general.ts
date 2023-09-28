@@ -12,13 +12,13 @@ export interface CookieAttributes {
   secure?: boolean;
 }
 
-export type BaseResponse<T = any> = Promise<
+export type BaseResponse<T = any, K = BaseHttpError> = Promise<
   | {
       data: T;
       error: null;
     }
   | {
       data: null;
-      error: BaseHttpError;
+      error: K;
     }
 >;

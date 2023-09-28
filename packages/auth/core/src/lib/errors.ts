@@ -1,21 +1,45 @@
 import { isValidDomain } from "./helpers";
+import type webauthn from "./webauthn";
 
-export const getMeaningfulError = (error: ScuteError) => {
+export const getMeaningfulError = (error: ScuteError | Error) => {
   const nonFatalWebauthn: WebAuthnErrorCode[] = [
     "ERROR_CEREMONY_ABORTED",
     "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY",
   ];
 
-  const isFatal =
-    error instanceof TechnicalError ||
-    (error instanceof BaseHttpError &&
-      !(error.code >= 200 && error.code < 300)) ||
-    (error instanceof WebAuthnError && !nonFatalWebauthn.includes(error.code));
+  let message = error.message ? error.message : "Something went wrong.";
+  let isFatal = false;
 
-  const message =
-    error instanceof TechnicalError || !error.message
-      ? "Something went wrong."
-      : error.message;
+  if (error instanceof TechnicalError) {
+    isFatal = true;
+    message = "Something went wrong.";
+  } else if (
+    error instanceof BaseHttpError &&
+    !(error.code >= 200 && error.code < 300)
+  ) {
+    isFatal = true;
+    const serverErrorMsg = error.json?.error?.message; // TODO
+    message = serverErrorMsg;
+
+    if (error.code === 500) {
+      message = "Something went wrong.";
+    } else if (
+      error.code === 404 &&
+      serverErrorMsg === "Magic link not found or expired"
+    ) {
+      // TODO: improve error message, error handling
+      message = serverErrorMsg;
+      isFatal = false;
+    }
+  } else if (
+    error instanceof WebAuthnError &&
+    !nonFatalWebauthn.includes(error.code)
+  ) {
+    isFatal = true;
+  } else if (error instanceof CustomScuteError) {
+    message = error.message;
+    isFatal = false;
+  }
 
   return {
     isFatal,
@@ -52,28 +76,34 @@ export class ScuteError extends Error {
 
 export class BaseHttpError extends ScuteError {
   code: number;
+  json?: Record<string, any>;
 
   constructor({
     message,
-    cause,
     code,
+    cause,
+    json,
   }: {
     message: ScuteError["message"];
-    cause: ScuteError["cause"];
     code: number;
+    json?: Record<string, any>;
+    cause?: ScuteError["cause"];
   }) {
     super({ message, cause, code });
     this.code = code;
+    this.json = json;
     Object.setPrototypeOf(this, BaseHttpError.prototype);
   }
 }
 
 export class TechnicalError extends ScuteError {
-  constructor(cause: Error) {
+  constructor(cause?: Error) {
     super({ message: "Technical Error", cause });
     Object.setPrototypeOf(this, TechnicalError.prototype);
   }
 }
+
+export const NETWORK_ERROR_CODES = [502, 503, 504];
 
 // https://github.com/MasterKale/SimpleWebAuthn/blob/9757b8172d8d025eade46bd62be0e6c3c2216ea3/packages/browser/src/helpers/webAuthnError.ts
 /**
@@ -140,7 +170,7 @@ export function identifyRegistrationError({
   options,
 }: {
   error: Error;
-  options: CredentialCreationOptions;
+  options: CredentialCreationOptions | webauthn.CredentialCreationOptionsJSON;
 }): WebAuthnError | Error {
   const { publicKey } = options;
 
@@ -234,7 +264,11 @@ export function identifyRegistrationError({
       });
     }
   } else if (error.name === "TypeError") {
-    if (publicKey.user.id.byteLength < 1 || publicKey.user.id.byteLength > 64) {
+    const userId = publicKey.user.id;
+    const userIdLength =
+      typeof userId !== "string" ? userId.byteLength : userId.length;
+
+    if (userIdLength < 1 || userIdLength > 64) {
       // https://www.w3.org/TR/webauthn-2/#sctn-createCredential (Step 5)
       return new WebAuthnError({
         message: "User ID was not between 1 and 64 characters",
@@ -265,7 +299,7 @@ export function identifyAuthenticationError({
   options,
 }: {
   error: Error;
-  options: CredentialRequestOptions;
+  options: CredentialRequestOptions | webauthn.CredentialRequestOptionsJSON;
 }): WebAuthnError | Error {
   const { publicKey } = options;
 
@@ -321,4 +355,75 @@ export function identifyAuthenticationError({
   }
 
   return error;
+}
+
+export type CustomScuteErrorCode =
+  | "identifier-not-recognized"
+  | "identifier-already-exists"
+  | "new-device"
+  | "login-required"
+  | "invalid-auth-token"
+  | "unknown-sign-in"
+  | "invalid-magic-link";
+
+export class CustomScuteError extends ScuteError {
+  constructor(
+    message: ScuteError["message"],
+    code: CustomScuteErrorCode & ScuteError["code"]
+  ) {
+    super({ message, code });
+    Object.setPrototypeOf(this, CustomScuteError.prototype);
+  }
+}
+
+export class IdentifierNotRecognizedError extends CustomScuteError {
+  constructor() {
+    super("Identifier is not recognized.", "identifier-not-recognized");
+    Object.setPrototypeOf(this, IdentifierNotRecognizedError.prototype);
+  }
+}
+
+export class IdentifierAlreadyExistsError extends CustomScuteError {
+  constructor() {
+    super(
+      "User with this identifier already exists.",
+      "identifier-already-exists"
+    );
+    Object.setPrototypeOf(this, IdentifierAlreadyExistsError.prototype);
+  }
+}
+
+export class NewDeviceError extends CustomScuteError {
+  constructor() {
+    super("New Device.", "new-device");
+    Object.setPrototypeOf(this, NewDeviceError.prototype);
+  }
+}
+
+export class LoginRequiredError extends CustomScuteError {
+  constructor() {
+    super("Login Required.", "login-required");
+    Object.setPrototypeOf(this, LoginRequiredError.prototype);
+  }
+}
+
+export class InvalidAuthTokenError extends CustomScuteError {
+  constructor() {
+    super("Invalid auth token.", "invalid-auth-token");
+    Object.setPrototypeOf(this, InvalidAuthTokenError.prototype);
+  }
+}
+
+export class UnknownSignInError extends CustomScuteError {
+  constructor() {
+    super("Unknown sign in error.", "unknown-sign-in");
+    Object.setPrototypeOf(this, UnknownSignInError.prototype);
+  }
+}
+
+export class InvalidMagicLinkError extends CustomScuteError {
+  constructor() {
+    super("Invalid magic link.", "invalid-magic-link");
+    Object.setPrototypeOf(this, InvalidMagicLinkError.prototype);
+  }
 }

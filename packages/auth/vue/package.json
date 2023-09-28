@@ -1,0 +1,33 @@
+{
+  "name": "@scute/vue",
+  "version": "0.1.1",
+  "publishConfig": {},
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "exports": {
+    "require": "./dist/index.js",
+    "import": "./dist/index.mjs"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "tsup-build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "pnpm tsup-build --dts-resolve",
+    "dev": "pnpm tsup-build --watch",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@scute/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "vue": "^3"
+  },
+  "devDependencies": {
+    "@scute/tsconfig": "workspace:*",
+    "vue": "^3.3.4",
+    "typescript": "4.9.5",
+    "tsup": "^7.0.0"
+  }
+}

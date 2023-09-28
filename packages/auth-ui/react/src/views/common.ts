@@ -1,9 +1,9 @@
-import type { ScuteClient } from "@scute/react";
+import type { ScuteClient, ScuteIdentifier } from "@scute/core";
 import type { Views } from "@scute/ui-shared";
 
 export interface CommonViewProps {
   scuteClient: ScuteClient;
-  email: string;
+  identifier: ScuteIdentifier;
   setAuthView: (view: Views) => void;
-  error?: string | null;
+  setIsFatalError?: React.Dispatch<React.SetStateAction<boolean>>;
 }

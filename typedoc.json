@@ -1,0 +1,8 @@
+{
+  "extends": ["./typedoc.base.json"],
+  "entryPoints": ["packages/**"],
+  "name": "Scute",
+  "entryPointStrategy": "packages"
+  // Potentially useful for debugging
+  // "logLevel": "Verbose"
+}

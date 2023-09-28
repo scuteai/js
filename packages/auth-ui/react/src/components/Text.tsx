@@ -7,7 +7,7 @@ export const Text = styled("span", {
   fontFamily: "$main",
   fontVariantNumeric: "tabular-nums",
   display: "block",
-
+  fontWeight:'normal',
   variants: {
     size: {
       "1": {

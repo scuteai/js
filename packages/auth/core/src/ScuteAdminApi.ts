@@ -1,7 +1,20 @@
-import { ScuteBaseHttp } from "./lib";
-import type { UniqueIdentifier, ScuteAdminApiConfig } from "./lib/types";
+import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
+import { accessTokenHeader, refreshTokenHeaders } from "./lib/helpers";
 
-export class ScuteAdminApi extends ScuteBaseHttp {
+import type {
+  ListUsersRequestParams,
+  ScuteAppData,
+  ScuteIdentifier,
+  ScutePaginationMeta,
+  ScuteUser,
+  ScuteUserData,
+  ScuteUserSession,
+  UserMeta,
+} from "./lib/types/scute";
+import type { ScuteAdminApiConfig } from "./lib/types/config";
+import type { UniqueIdentifier } from "./lib/types/general";
+
+class ScuteAdminApi extends ScuteBaseHttp {
   protected appId: UniqueIdentifier;
   protected secretKey?: string;
 
@@ -15,10 +28,13 @@ export class ScuteAdminApi extends ScuteBaseHttp {
     });
 
     this.appId = appId;
-    this.secretKey = secretKey;
+
+    if (secretKey) {
+      this.setSecretKey(secretKey);
+    }
 
     // set default headers
-    this.wretcher = this.wretcher.headers({ ...this._authorizationHeader() });
+    this.wretcher = this.wretcher.headers({ ...this._authorizationHeader });
   }
 
   /**
@@ -26,31 +42,102 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param secretKey Secret Key
    */
   async setSecretKey(secretKey: string) {
+    if (typeof window !== "undefined" && secretKey) {
+      console.warn(
+        "[Scute] DANGER! You are setting API Secret Key likely in the browser. This is extremely dangerous for production."
+      );
+    }
+
     this.secretKey = secretKey;
+  }
+
+  /**
+   * Get app config data.
+   */
+  async getAppData() {
+    return this.get<ScuteAppData>(`${this._appsPath}`);
+  }
+
+  /**
+   * Get a list of users.
+   */
+  async listUsers(params?: ListUsersRequestParams) {
+    const { data, error } = await this.get<
+      {
+        users: ScuteUserData[];
+      } & ScutePaginationMeta
+    >(
+      `${this._v1Path}/users` +
+        (params
+          ? `?${new URLSearchParams(params as Record<string, any>)}`
+          : ""),
+      {
+        ...this._authorizationHeader,
+      }
+    );
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    const { users, ...pagination } = data;
+
+    return {
+      data: {
+        users,
+        pagination,
+      },
+      error: null,
+    };
   }
 
   /**
    * Get a user's information (including any defined user metadata).
    * @param id User ID
    */
-  async getUser(id: string) {
-    return this.get<any>(`${this._appsPath}/users/${id}`);
+  async getUser(id: UniqueIdentifier) {
+    return this.get<{ user: ScuteUserData | null }>(
+      `${this._v1Path}/users/${id}`,
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Get user's basic information by identifier.
+   * * Unauthenticated
+   * @param identifier {ScuteIdentifier}
+   */
+  async getUserByIdentifier(identifier: ScuteIdentifier) {
+    return this.get<{ user: ScuteUser | null }>(
+      `${this._authPath}/users?identifier=${identifier}`
+    );
+  }
+
+  /**
+   * Get user's basic information by user id.
+   * * Unauthenticated
+   * @param userId {UniqueIdentifier}
+   */
+  async getUserByUserId(userId: UniqueIdentifier) {
+    return this.get<{ user: ScuteUser | null }>(
+      `${this._authPath}/users?user_id=${userId}`
+    );
   }
 
   /**
    * Create a user (with optional user metadata).
-   * @param attributes any
+   * @param identifier {ScuteIdentifier}
+   * @param meta {UserMeta} - User meta
    */
-  async createUser(attributes: any) {
-    return this.post(`${this._appsPath}/users`, attributes);
-  }
-
-  /**
-   * Activate or deactivate a user (a deactivated user will not be able to log in).
-   * @param id User ID
-   */
-  async activateUser(id: string) {
-    return this.post<any>(`${this._appsPath}/users/${id}/activate`, null);
+  async createUser(identifier: ScuteIdentifier, meta?: UserMeta) {
+    return this.post<{ user: ScuteUser }>(
+      `${this._authPath}/users`,
+      {
+        identifier,
+        user_meta: meta,
+      },
+      this._authorizationHeader
+    );
   }
 
   /**
@@ -58,17 +145,64 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    * @param data any
    */
-  async updateUser(id: string, data: any) {
-    // or patch
-    return this.put<any>(`${this._appsPath}/users/${id}`, data);
+  async updateUser(id: UniqueIdentifier, data: any) {
+    return this.patch<{ user: ScuteUserData }>(
+      `${this._v1Path}/users/${id}`,
+      data,
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Activate a user.
+   * @param id User ID
+   */
+  async activateUser(id: UniqueIdentifier) {
+    return this.post<{ user: ScuteUserData }>(
+      `${this._v1Path}/users/${id}/activate`,
+      null,
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Deactivate a user (a deactivated user will not be able to log in).
+   * @param id User ID
+   */
+  async deactivateUser(id: UniqueIdentifier) {
+    return this.post<{ user: ScuteUserData }>(
+      `${this._v1Path}/users/${id}/deactivate`,
+      null,
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Create a user with pending status and send invitation. (a pending user will not be able to log in).
+   *
+   * @param identifier {ScuteIdentifier}
+   * @param meta {UserMeta} - User meta
+   */
+  async inviteUser(identifier: ScuteIdentifier, meta?: UserMeta) {
+    // TODO: user meta errors
+    return this.post<{ user: ScuteUserData; user_meta_errors?: any }>(
+      `${this._v1Path}/users/invite`,
+      {
+        identifier,
+        user_meta: meta,
+      },
+      this._authorizationHeader
+    );
   }
 
   /**
    * Delete a user.
    * @param id User ID
    */
-  async deleteUser(id: string) {
-    return this.post<any>(`${this._appsPath}/users/${id}/delete`, null);
+  async deleteUser(id: UniqueIdentifier) {
+    return this.delete(`${this._v1Path}/users/${id}`, {
+      ...this._authorizationHeader,
+    });
   }
 
   /**
@@ -76,37 +210,75 @@ export class ScuteAdminApi extends ScuteBaseHttp {
    * @param accessToken JWT access_token
    */
   async signOut(accessToken: string) {
-    return this.post<any>(
-      `${this._authPath}/users/logout`,
-      null,
-      this._accessTokenHeader(accessToken)
-    );
+    return this.delete(`${this._authPath}/current_user`, {
+      ...accessTokenHeader(accessToken),
+    });
   }
 
   /**
-   * List all devices for a user.
+   * Refresh
+   * @param refreshToken JWT refresh_token
+   */
+  async refresh(refreshToken: string) {
+    return this.post<any>(`${this._authPath}/tokens/refresh`, null, {
+      ...refreshTokenHeaders(refreshToken),
+    });
+  }
+
+  /**
+   * Refresh with access_token
+   * @param accessToken JWT access_token
+   */
+  async refreshWithAccess(accessToken: string) {
+    return this.post<any>(`${this._authPath}/tokens/rotate_access`, null, {
+      ...accessTokenHeader(accessToken),
+      ...this._authorizationHeader,
+    });
+  }
+
+  /**
+   * Generates new access_token with refresh_token
+   * @param refreshToken JWT refresh_token
+   */
+  async forceRefresh(refreshToken: string) {
+    return this.post<any>(`${this._authPath}/tokens/force_refresh`, null, {
+      ...refreshTokenHeaders(refreshToken),
+      ...this._authorizationHeader,
+    });
+  }
+
+  /**
+   * List all sessions for a user.
    * @param id User ID
    */
-  async listUserDevices(id: string) {
-    return this.get<any>(`${this._appsPath}/users/${id}/devices`);
-  }
-
-  /**
-   * Revoke a particular device from a user.
-   * @param userId User ID
-   * @param deviceId Device ID
-   */
-  async revokeUserDevice(userId: string, deviceId: string) {
-    return this.get<any>(
-      `${this._appsPath}/users/${userId}/devices/${deviceId}/revoke`
+  async listUserSessions(id: UniqueIdentifier) {
+    return this.get<ScuteUserSession[]>(
+      `${this._appsPath}/users/${id}/sessions`,
+      {
+        ...this._authorizationHeader,
+      }
     );
   }
 
   /**
-   * Set authorization header for admin (management) API.
+   * Revoke a particular session from a user.
+   * @param userId User ID
+   * @param sessionId Session ID
+   */
+  async revokeUserSession(userId: UniqueIdentifier, sessionId: UniqueIdentifier) {
+    return this.delete(
+      `${this._v1Path}/users/${userId}/sessions/${sessionId}`,
+      {
+        ...this._authorizationHeader,
+      }
+    );
+  }
+
+  /**
+   * Get authorization header for admin (management) API.
    * @private
    */
-  private _authorizationHeader(): HeadersInit {
+  private get _authorizationHeader(): HeadersInit {
     if (!this.secretKey) return {};
 
     return {
@@ -114,23 +286,17 @@ export class ScuteAdminApi extends ScuteBaseHttp {
     };
   }
 
-  /**
-   * Set current_user by jwt access_token.
-   * @param jwt access_token
-   */
-  private _accessTokenHeader(jwt?: string): HeadersInit {
-    if (!jwt) return {};
-
-    return {
-      "X-Authorization": `Bearer ${jwt}`,
-    };
+  private get _v1Path() {
+    return `/v1/${this.appId}` as const;
   }
 
   private get _appsPath() {
-    return `/v1/apps/${this.appId}`;
+    return `/v1/apps/${this.appId}` as const;
   }
 
   private get _authPath() {
-    return `/v1/auth/${this.appId}`;
+    return `/v1/auth/${this.appId}` as const;
   }
 }
+
+export default ScuteAdminApi;

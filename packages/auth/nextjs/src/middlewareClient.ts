@@ -1,4 +1,4 @@
-import { ScuteCookieStorage, type CookieAttributes } from "@scute/react";
+import { ScuteCookieStorage, type CookieAttributes } from "@scute/core";
 import type { NextRequest, NextResponse } from "next/server";
 import { parse as parseCookies, serialize as serializeCookie } from "cookie";
 import { splitCookiesString } from "set-cookie-parser";
@@ -41,14 +41,14 @@ class ScuteNextMiddlewareStorage extends ScuteCookieStorage {
   }
 
   private _setCookie(name: string, value: string, options?: CookieAttributes) {
-    const newSessionStr = serializeCookie(name, value, {
+    const cookieStr = serializeCookie(name, value, {
       ...this.defaultCookieOptions,
       ...options,
     });
 
     if (this.context.res.headers) {
-      this.context.res.headers.append("set-cookie", newSessionStr);
-      this.context.res.headers.append("cookie", newSessionStr);
+      this.context.res.headers.append("set-cookie", cookieStr);
+      this.context.res.headers.append("cookie", cookieStr);
     }
   }
 }
@@ -57,17 +57,8 @@ export const createMiddlewareClient = (
   context: { req: NextRequest; res: NextResponse },
   config?: ScuteNextjsClientConfig
 ) => {
-  const appId = config?.appId ?? process.env.NEXT_PUBLIC_SCUTE_APP_ID;
-  const baseUrl = config?.baseUrl ?? process.env.NEXT_PUBLIC_SCUTE_BASE_URL;
-
-  if (!appId) {
-    throw new Error("either NEXT_PUBLIC_SCUTE_APP_ID or appId is required!");
-  }
-
   return createScuteClient({
     ...config,
-    appId,
-    baseUrl,
     preferences: {
       ...config?.preferences,
       sessionStorageAdapter: new ScuteNextMiddlewareStorage(context, {

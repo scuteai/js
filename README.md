@@ -3,12 +3,12 @@
 ## Monorepo Structure
 
 ```
-├── apps
-│   ├── dashboard
 ├── examples
 │   ├── with-nextjs
 │   ├── with-nodejs
 │   ├── with-react
+│   ├── with-vanilla
+│   ├── with-vue
 ├── packages
 │   ├── auth
 │   │   ├── core
@@ -16,9 +16,12 @@
 │   │   ├── nextjs
 │   │   ├── node
 │   │   ├── react
+│   │   ├── vue
 │   ├── auth-ui
+│   │   ├── elements
 │   │   ├── react
 │   │   ├── shared
+│   │   ├── vue
 ├── package.json
 ├── pnpm-lock.yaml
 ├── pnpm-workspace.yaml
@@ -29,7 +32,7 @@
 
 ## Examples
 
-`with-nextjs`, `with-nodejs`,`with-react`
+`with-nextjs`, `with-nodejs`,`with-react`, `with-vue`, `with-vanilla`
 
 Install with no lockfile.
 ```bash

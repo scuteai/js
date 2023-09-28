@@ -1,4 +1,4 @@
-import type { ScuteStorage } from "../ScuteBaseStorage";
+import type { ScuteStorage } from "../ScuteStorage";
 import type { UniqueIdentifier } from "./general";
 
 export type ScuteClientConfig = {
@@ -7,19 +7,23 @@ export type ScuteClientConfig = {
   /** IMPORTANT: Do not expose to the browser */
   secretKey?: string;
   preferences?: ScuteClientPreferences;
+  debug?: boolean;
 };
 
 export type ScuteSessionConfig = {
-  appId: UniqueIdentifier;
   storage: ScuteStorage;
 };
 
 export type ScuteClientPreferences = {
   /** @default true */
-  autoRefreshToken?: boolean;
-  detectSessionInUrl?: boolean;
   persistSession?: boolean;
   sessionStorageAdapter?: ScuteStorage;
+  /** @default true */
+  refetchOnWindowFocus?: boolean;
+  /**
+   * Refetch interval in seconds
+   * @default 300 */
+  refetchInverval?: number;
 };
 
 export type ScuteAdminApiConfig = {

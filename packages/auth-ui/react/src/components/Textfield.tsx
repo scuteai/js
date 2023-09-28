@@ -23,7 +23,7 @@ export const TextField = styled("input", {
   width: "100%",
   WebkitTapHighlightColor: "rgba(0,0,0,0)",
   transition: "all .2s ease",
-  fontWeight: "300",
+  fontWeight: "normal",
   "&::before": {
     boxSizing: "border-box",
   },

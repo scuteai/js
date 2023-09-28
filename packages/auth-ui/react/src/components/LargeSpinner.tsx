@@ -1,7 +1,7 @@
 import { styled, keyframes } from "../stitches.config";
 import { Flex } from "./Flex";
-import { EmailIcon } from "../assets/icons";
 import { SpinnerIcon } from "../assets/icons";
+import type { ReactElement } from "react";
 
 const spin = keyframes({
   "0%": { transform: "rotate(0deg)" },
@@ -16,8 +16,11 @@ const Holder = styled("div", {
   animation: `${spin} 1s infinite linear`,
 });
 
-export const LargeSpinner = (props: any) => {
-  const { iconColor, spinnerColor, icon } = props;
+export const LargeSpinner = (props: {
+  icon?: ReactElement;
+  spinnerColor?: string;
+}) => {
+  const { spinnerColor, icon } = props;
   return (
     <Flex
       css={{
@@ -28,8 +31,7 @@ export const LargeSpinner = (props: any) => {
       }}
     >
       <Flex css={{ width: "24px", marginTop: "24px", position: "absolute" }}>
-        {/* TODO: super temp */}
-        {icon !== undefined ? icon : <EmailIcon color={iconColor} />}
+        {icon}
       </Flex>
       <Holder css={{ position: "absolute" }}>
         <SpinnerIcon color={spinnerColor} />

@@ -1,9 +1,10 @@
 import { Auth } from "@scute/ui-react";
+import { useScuteClient, useAuth } from "@scute/react";
 import AuthenticatedRoute from "./Authenticated";
 
 export default function WithScuteUI() {
-  const { session } = Auth.useAuth();
-  const scute = Auth.useScuteClient();
+  const { session } = useAuth();
+  const scute = useScuteClient();
 
   if (session.status === "authenticated") {
     return <AuthenticatedRoute />;

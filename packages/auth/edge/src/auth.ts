@@ -1,6 +1,6 @@
 import {
   type ScuteClient,
-  ScuteError,
+  InvalidAuthTokenError,
   SCUTE_ACCESS_STORAGE_KEY,
 } from "@scute/core";
 import { parse as parseCookies } from "cookie";
@@ -15,12 +15,19 @@ export const authenticateRequest = async (
     token = cookies[SCUTE_ACCESS_STORAGE_KEY];
 
     if (!token) {
-      return {
-        data: null,
-        error: new ScuteError({ message: "Token not found" }),
-      };
+      throw new InvalidAuthTokenError();
     }
   }
 
-  return scuteClient.getUser(token);
+  const { data, error } = await scuteClient.getUser(token);
+
+  if (error) {
+    if (error instanceof InvalidAuthTokenError) {
+      throw error;
+    } else {
+      throw new Error("Unknown authenticate error");
+    }
+  }
+
+  return data.user;
 };
