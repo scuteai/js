@@ -8,7 +8,7 @@ import { splitCookiesString } from "set-cookie-parser";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import type { NextFetchEvent, NextRequest } from "next/server";
-
+import { BaseNextResponse } from "next/dist/server/base-http";
 type RouteHandlerContext = {
   cookies: () => ReadonlyRequestCookies;
   headers: () => Headers;
@@ -68,10 +68,10 @@ async function ScuteNodeApiHandler(req: NextApiRequest, res: NextApiResponse) {
     // The append handling is special cased for `set-cookie`.
     if (key.toLowerCase() === "set-cookie") {
       for (const cookie of splitCookiesString(value)) {
-        res.appendHeader(key, cookie);
+        (res as unknown as BaseNextResponse).appendHeader(key, cookie);
       }
     } else {
-      res.appendHeader(key, value);
+      (res as unknown as BaseNextResponse).appendHeader(key, value);
     }
   });
 
