@@ -1,5 +1,5 @@
 {
-  "name": "scute-monorepo",
+  "name": "scute-js",
   "private": true,
   "scripts": {
     "build": "pnpm turbo\\ run build",
