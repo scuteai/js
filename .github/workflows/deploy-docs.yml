@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies (if the cached directory was not found)
         if: steps.node-cache.outputs.cache-hit != 'true'
-        run: pnpm ci
+        run: pnpm i
 
       - name: Test to see if the project compiles
         run: pnpm build
