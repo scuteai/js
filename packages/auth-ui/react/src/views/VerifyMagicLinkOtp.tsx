@@ -1,4 +1,5 @@
 import {
+  AUTH_CHANGE_EVENTS,
   getMeaningfulError,
   SCUTE_MAGIC_PARAM,
   type ScuteIdentifier,
@@ -7,7 +8,7 @@ import {
 } from "@scute/core";
 
 import { VIEWS } from "@scute/ui-shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EmailIcon } from "../assets/icons";
 
 import {
@@ -48,6 +49,8 @@ const VerifyMagicLinkOtp = ({
   const [isVerifyCalled, setIsVerifyCalled] = useState(false);
   const [identifier, setIdentifier] = useState(_identifier);
 
+  const isBroadcastMagicVerified = useRef<boolean>(false);
+
   const [magicLinkToken] = useState(
     () =>
       _magicLinkToken ??
@@ -60,6 +63,16 @@ const VerifyMagicLinkOtp = ({
     setIsPolling(Boolean(magicLinkId));
   }, [magicLinkId]);
 
+  useEffect(() => {
+    const unsubscribe = scuteClient.onAuthStateChange(async (event) => {
+      if (event === AUTH_CHANGE_EVENTS.MAGIC_VERIFIED) {
+        isBroadcastMagicVerified.current = true;
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   useInterval(
     async () => {
       if (magicLinkId) {
@@ -67,12 +80,17 @@ const VerifyMagicLinkOtp = ({
           await scuteClient.getMagicLinkStatus(magicLinkId);
 
         if (!magicLinkIdLoginError) {
-          setIsPolling(false);
-          handleLogin(payload);
+          if (isBroadcastMagicVerified.current) {
+            setIsPolling(false);
+          } else {
+            handleLogin(payload);
+          }
         }
       }
     },
-    isPolling && magicLinkToken === null ? 5000 : null
+    !isBroadcastMagicVerified.current && isPolling && magicLinkToken === null
+      ? 5000
+      : null
   );
 
   const handleLogin = async (payload: ScuteTokenPayload) => {

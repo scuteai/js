@@ -544,6 +544,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: verifyError };
     }
 
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_VERIFIED);
+
     return {
       data: { authPayload, magicPayload: decodedMagicLinkToken },
       error: null,
