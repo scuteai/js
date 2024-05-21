@@ -29,6 +29,7 @@ import {
 } from "./views";
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
+import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -227,9 +228,7 @@ function Auth(props: AuthProps) {
         </Container>
       );
     case VIEWS.WEBAUTHN_REGISTER:
-      if (!authPayload) return null;
-
-      return (
+      return !!authPayload ? (
         <Container {...containerProps}>
           <RegisterDevice
             scuteClient={scuteClient}
@@ -238,6 +237,15 @@ function Auth(props: AuthProps) {
             setIsFatalError={setIsFatalError}
             webauthn={webauthn}
             authPayload={authPayload}
+          />
+        </Container>
+      ) : (
+        <Container {...containerProps}>
+          <RegisterDeviceInProgress
+            scuteClient={scuteClient}
+            setAuthView={setAuthView}
+            setIsFatalError={setIsFatalError}
+            identifier={identifier}
           />
         </Container>
       );
