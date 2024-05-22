@@ -12,6 +12,7 @@ export const AUTH_CHANGE_EVENTS = {
   TOKEN_REFRESHED: "token_refreshed",
   MAGIC_PENDING: "magic_pending",
   MAGIC_NEW_DEVICE_PENDING: "magic_new_device_pending",
+  MAGIC_VERIFIED: "magic_verified",
   WEBAUTHN_REGISTER_START: "webauthn_register_start",
   WEBAUTHN_REGISTER_SUCCESS: "webauthn_register_success",
   WEBAUTHN_VERIFY_START: "webauthn_verify_start",
