@@ -310,3 +310,28 @@ export const BellIcon = () => (
     />
   </svg>
 );
+
+export const CircleCheckIcon = (props: any) => (
+  <svg
+    width="103"
+    height="103"
+    viewBox="0 0 103 103"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M72.8334 49.5834V51.5C72.8309 55.9926 71.3761 60.3639 68.6862 63.9622C65.9963 67.5604 62.2153 70.1927 57.9071 71.4665C53.5989 72.7403 48.9944 72.5873 44.7802 71.0304C40.5661 69.4735 36.9681 66.5961 34.5229 62.8273C32.0777 59.0584 30.9163 54.6002 31.2119 50.1174C31.5075 45.6346 33.2443 41.3674 36.1632 37.9523C39.0821 34.5372 43.0267 32.1571 47.4088 31.167C51.7909 30.1769 56.3756 30.6299 60.4793 32.4584"
+      stroke={props.color || "#444444"}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M72.8333 34.8334L52 55.6875L45.75 49.4375"
+      stroke={props.color || "#444444"}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);

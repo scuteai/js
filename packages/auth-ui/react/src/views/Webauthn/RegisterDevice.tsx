@@ -5,7 +5,7 @@ import {
 } from "@scute/core";
 
 import { useEffect, useState } from "react";
-import { BiometricsIcon } from "../../assets/icons";
+import { BiometricsIcon, CircleCheckIcon } from "../../assets/icons";
 import {
   Badge,
   Button,
@@ -20,6 +20,7 @@ import { type CommonViewProps } from "../common";
 interface RegisterDeviceProps extends CommonViewProps {
   webauthn?: ScuteWebauthnOption;
   authPayload: ScuteTokenPayload;
+  isWebauthnSupported: boolean;
 }
 
 const RegisterDevice = ({
@@ -28,6 +29,7 @@ const RegisterDevice = ({
   setIsFatalError,
   webauthn = "optional",
   authPayload,
+  isWebauthnSupported,
 }: RegisterDeviceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [identifier, setIdentifier] = useState<string | null>(_identifier);
@@ -50,20 +52,33 @@ const RegisterDevice = ({
   }, [identifier]);
 
   const handleRegisterDevice = async () => {
-    const { error: registerDeviceError } =
-      await scuteClient.signInWithRegisterDevice(authPayload);
+    if (isWebauthnSupported) {
+      const { error: registerDeviceError } =
+        await scuteClient.signInWithRegisterDevice(authPayload);
 
-    if (registerDeviceError) {
-      const { isFatal, message: errorMsg } =
-        getMeaningfulError(registerDeviceError);
-      setIsFatalError?.(isFatal);
-      setError(errorMsg);
+      if (registerDeviceError) {
+        const { isFatal, message: errorMsg } =
+          getMeaningfulError(registerDeviceError);
+        setIsFatalError?.(isFatal);
+        setError(errorMsg);
+      }
+    } else {
+      const { error: signInError } = await scuteClient.signInWithTokenPayload(
+        authPayload
+      );
+
+      if (signInError) {
+        const { isFatal, message: errorMsg } = getMeaningfulError(signInError);
+        setIsFatalError?.(isFatal);
+        setError(errorMsg);
+      }
     }
   };
 
   const handleSkipAndLogin = async () => {
     const { error: signInError } = await scuteClient.signInWithTokenPayload(
-      authPayload
+      authPayload,
+      false
     );
 
     if (signInError) {
@@ -76,7 +91,11 @@ const RegisterDevice = ({
   return (
     <>
       <Header>
-        <BiometricsIcon color="var(--scute-colors-contrast8)" />
+        {isWebauthnSupported ? (
+          <BiometricsIcon color="var(--scute-colors-contrast8)" />
+        ) : (
+          <CircleCheckIcon color="var(--scute-colors-contrast8)" />
+        )}
       </Header>
       <Inner
         css={{
@@ -87,7 +106,9 @@ const RegisterDevice = ({
         }}
       >
         <Heading size="1" css={{ color: "$headingColor" }}>
-          Let&#39;s register your device
+          {isWebauthnSupported
+            ? "Let&#39;s register your device"
+            : "Do you trust this device? "}
         </Heading>
         {error ? (
           <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
@@ -95,8 +116,9 @@ const RegisterDevice = ({
           </Text>
         ) : (
           <Text css={{ color: "$textColor" }}>
-            Log into your account with the method you already use to unlock your
-            device
+            {isWebauthnSupported
+              ? "Log into your account with the method you already use to unlock your device"
+              : "We'll keep you signed in on this device. To keep your account secure, use this option on your personal devices only."}
           </Text>
         )}
         <Flex css={{ jc: "center", py: "$5" }}>
@@ -104,11 +126,17 @@ const RegisterDevice = ({
         </Flex>
         <Flex css={{ jc: "space-around" }}>
           <Button variant="alt" onClick={() => handleRegisterDevice()}>
-            {!error ? "Register Device" : "Try Again"}
+            {!error
+              ? isWebauthnSupported
+                ? "Register Device"
+                : "Yes, trust device"
+              : "Try Again"}
           </Button>
           {webauthn === "optional" || error ? (
             <Button variant="alt" onClick={() => handleSkipAndLogin()}>
-              Skip and login
+              {isWebauthnSupported
+                ? "Skip and login"
+                : "No, don't trust device"}
             </Button>
           ) : null}
         </Flex>

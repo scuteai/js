@@ -237,6 +237,7 @@ function Auth(props: AuthProps) {
             setIsFatalError={setIsFatalError}
             webauthn={webauthn}
             authPayload={authPayload}
+            isWebauthnSupported={false && scuteClient.isWebauthnSupported()}
           />
         </Container>
       ) : (
