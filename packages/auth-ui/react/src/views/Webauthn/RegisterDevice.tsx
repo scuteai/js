@@ -77,8 +77,7 @@ const RegisterDevice = ({
 
   const handleSkipAndLogin = async () => {
     const { error: signInError } = await scuteClient.signInWithTokenPayload(
-      authPayload,
-      false
+      authPayload
     );
 
     if (signInError) {

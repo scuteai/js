@@ -667,18 +667,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * Log in with the auth payload.
    * @param payload {ScuteTokenPayload} - Scute auth payload
    */
-  async signInWithTokenPayload(
-    payload: ScuteTokenPayload,
-    remember: boolean = true
-  ) {
-    const sessionData = {
-      ...payload,
-      refresh: remember ? payload.refresh : null,
-    };
-
-    const session = (await this.setSession(
-      sessionData
-    )) as AuthenticatedSession;
+  async signInWithTokenPayload(payload: ScuteTokenPayload) {
+    const session = (await this.setSession(payload)) as AuthenticatedSession;
     const { data, error: getUserError } = await this.getCurrentUser(
       session.access
     );
