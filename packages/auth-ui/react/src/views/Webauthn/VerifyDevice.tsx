@@ -2,6 +2,8 @@ import {
   AUTH_CHANGE_EVENTS,
   getMeaningfulError,
   NewDeviceError,
+  SCUTE_REMEMBER_STORAGE_KEY,
+  ScuteBrowserCookieStorage,
   UniqueIdentifier,
 } from "@scute/core";
 import { VIEWS } from "@scute/ui-shared";
@@ -35,6 +37,8 @@ const VerifyDevice = ({
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
+  const cookieStore = new ScuteBrowserCookieStorage();
+
   const handleSendMagicLink = async (isNewDevice = false) => {
     const { data, error: sendMagicLinkError } =
       await scuteClient.sendLoginMagicLink(identifier, undefined, !isNewDevice);
@@ -54,6 +58,8 @@ const VerifyDevice = ({
   };
 
   const handleVerifyDevice = async () => {
+    await cookieStore.setItem(SCUTE_REMEMBER_STORAGE_KEY, "true");
+
     const { error: verifyDeviceError } =
       await scuteClient.signInWithVerifyDevice(identifier);
 

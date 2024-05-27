@@ -43,6 +43,7 @@ export const SCUTE_LAST_LOGIN_STORAGE_KEY = "sct_last_login";
 
 export const SCUTE_ACCESS_STORAGE_KEY = "sc-access-token";
 export const SCUTE_REFRESH_STORAGE_KEY = "sc-refresh-token";
+export const SCUTE_REMEMBER_STORAGE_KEY = "sc-remember-me";
 
 export const _SCUTE_ACCESS_HEADER = "X-Authorization";
 export const _SCUTE_REFRESH_HEADER = "X-Refresh-Token";

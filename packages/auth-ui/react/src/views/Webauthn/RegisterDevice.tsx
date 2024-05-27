@@ -1,4 +1,6 @@
 import {
+  SCUTE_REMEMBER_STORAGE_KEY,
+  ScuteBrowserCookieStorage,
   getMeaningfulError,
   type ScuteTokenPayload,
   type ScuteWebauthnOption,
@@ -34,6 +36,8 @@ const RegisterDevice = ({
   const [error, setError] = useState<string | null>(null);
   const [identifier, setIdentifier] = useState<string | null>(_identifier);
 
+  const cookieStore = new ScuteBrowserCookieStorage();
+
   useEffect(() => {
     if (identifier) return;
 
@@ -52,6 +56,8 @@ const RegisterDevice = ({
   }, [identifier]);
 
   const handleRegisterDevice = async () => {
+    await cookieStore.setItem(SCUTE_REMEMBER_STORAGE_KEY, "true");
+
     if (isWebauthnSupported) {
       const { error: registerDeviceError } =
         await scuteClient.signInWithRegisterDevice(authPayload);
@@ -76,6 +82,8 @@ const RegisterDevice = ({
   };
 
   const handleSkipAndLogin = async () => {
+    await cookieStore.removeItem(SCUTE_REMEMBER_STORAGE_KEY);
+
     const { error: signInError } = await scuteClient.signInWithTokenPayload(
       authPayload
     );
