@@ -16,6 +16,8 @@ import {
 } from "@scute/core";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import useEffectOnce from "../helpers/useEffectOnce";
 import { FingerprintIcon, MagicMailIcon, BellIcon } from "../assets/icons";
 import type { CommonViewProps } from "./common";
@@ -67,6 +69,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     setIsFatalError,
     getMagicLinkIdCallback,
   } = props;
+
+  const { t } = useTranslation();
 
   const [_mode, _setMode] =
     useState<NonNullable<SignInOrUpProps["mode"]>>(__mode);
@@ -226,7 +230,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
             {mode !== "sign_up" && rememberedIdentifier ? (
               <>
                 <Heading size="1" css={{ color: "$headingColor" }}>
-                  Welcome back!
+                  {t("signInOrUp.welcomeBack")}
                 </Heading>
                 <Panel css={{ mt: "$4", mb: "$5" }}>
                   <Flex gap={2} css={{ ai: "center", jc: "space-between" }}>
@@ -236,7 +240,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                       </IconHolder>
                       <Flex css={{ fd: "column" }}>
                         <Text size="1" css={{ pl: "$2" }}>
-                          Sign in as
+                          {t("signInOrUp.signInAs")}
                         </Text>
                         <Badge>{rememberedIdentifier}</Badge>
                       </Flex>
@@ -245,7 +249,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                       variant="alt"
                       onClick={() => setRememberedIdentifier(null)}
                     >
-                      Change user
+                      {t("signInOrUp.changeUser")}
                     </Button>
                   </Flex>
                 </Panel>
@@ -332,14 +336,14 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   type="submit"
                   disabled={!rememberedIdentifier && !isDirty && !isValid}
                 >
-                  <span>Continue</span>
+                  <span>{t("signInOrUp.continue")}</span>
                   {isWebauthnAvailable ? (
                     <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
                   ) : null}
                 </Button>
               ) : (
                 <Button size="2" type="submit">
-                  <span>Continue with magic link</span>
+                  <span>{t("signInOrUp.continueWithMagicLink")}</span>
                   <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
                 </Button>
               )}

@@ -30,12 +30,14 @@ import {
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
+import { initI18n } from "./helpers/i18n/config";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
   onSignIn?: () => void;
   view?: Extract<Views, "sign-in-or-up" | "sign-in" | "sign-up">;
   webauthn?: ScuteWebauthnOption;
+  language?: string;
   appearance?: {
     theme?: Theme;
   };
@@ -47,6 +49,7 @@ function Auth(props: AuthProps) {
     appearance: _appearance,
     view = VIEWS.SIGN_IN_OR_UP,
     webauthn = "optional",
+    language,
     onSignIn,
   } = props;
 
@@ -93,6 +96,10 @@ function Auth(props: AuthProps) {
     appearance,
     appData,
   };
+
+  useEffect(() => {
+    initI18n(language);
+  }, [language]);
 
   useEffect(() => {
     if (isFatalError) return;

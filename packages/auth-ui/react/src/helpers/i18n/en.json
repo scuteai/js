@@ -1,0 +1,11 @@
+{
+  "signInOrUp": {
+    "welcomeBack": "Welcome back!",
+    "signInAs": "Sign in as",
+    "changeUser": "Change user",
+    "continue": "Continue",
+    "continueWithMagicLink": "Continue with magic link"
+  },
+
+  "poweredBy": "powered by"
+}
