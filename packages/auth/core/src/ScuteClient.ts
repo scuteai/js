@@ -1242,6 +1242,33 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /**
+   * Remove the specific device credential for the current user
+   * @param id Device Credential ID
+   */
+  async removeDeviceCredential(id: UniqueIdentifier) {
+    const { data: authData, error } = await this.getAuthToken();
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this._removeDeviceCredential(id, authData.access);
+  }
+
+  /**
+   * Remove Device credential.
+   * @param id Device Credential ID
+   * @param accessToken Access Token
+   * @see {@link removeDeviceCredential}
+   */
+  protected async _removeDeviceCredential(
+    id: UniqueIdentifier,
+    accessToken: string
+  ) {
+    return this.delete(`/devices/${id}`, accessTokenHeader(accessToken));
+  }
+
+  /**
    * Get all sessions for the authenticated user.
    */
   async listUserSessions() {
