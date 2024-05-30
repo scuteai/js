@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { BiometricsIcon } from "../../assets/icons";
 import {
   Badge,
@@ -10,6 +12,7 @@ import {
 import { CommonViewProps } from "../common";
 
 const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
+  const { t } = useTranslation();
   return (
     <>
       <Header>
@@ -24,7 +27,7 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
         }}
       >
         <Heading size="1" css={{ color: "$headingColor" }}>
-          A device is being registered in another instance.
+          {t("registerDevice.registerInProgress")}
         </Heading>
 
         <Flex css={{ jc: "center", py: "$5" }}>

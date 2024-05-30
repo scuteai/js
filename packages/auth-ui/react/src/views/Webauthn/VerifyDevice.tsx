@@ -8,6 +8,7 @@ import {
 } from "@scute/core";
 import { VIEWS } from "@scute/ui-shared";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BiometricsIcon } from "../../assets/icons";
 
 import {
@@ -36,6 +37,8 @@ const VerifyDevice = ({
 }: VerifyDeviceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+
+  const { t } = useTranslation();
 
   const cookieStore = new ScuteBrowserCookieStorage();
 
@@ -125,19 +128,18 @@ const VerifyDevice = ({
         }}
       >
         <Heading size="1" css={{ color: "$headingColor" }}>
-          Verify your identity
+          {t("verifyDevice.verifyDeviceTitle")}
         </Heading>
 
         {error ? (
           <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
             {error}
             <br />
-            You can try again or sign in with magic link.
+            {t("verifyDevice.tryAgain")}
           </Text>
         ) : (
           <Text css={{ color: "$textColor" }}>
-            Log into your account with the method you already use to unlock your
-            device
+            {t("verifyDevice.verifyDeviceBody")}
           </Text>
         )}
         <Flex css={{ jc: "center", py: "$5" }}>
@@ -155,10 +157,10 @@ const VerifyDevice = ({
               }
             }}
           >
-            {!error ? "Change email" : "Try Again"}
+            {!error ? t("general.changeEmail") : t("general.tryAgain")}
           </Button>
           <Button variant="alt" onClick={() => handleSendMagicLink()}>
-            Sign in with email link
+            {t("verifyDevice.signInMagicLink")}
           </Button>
         </Flex>
       </Inner>

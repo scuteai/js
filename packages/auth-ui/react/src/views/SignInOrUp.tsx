@@ -271,15 +271,14 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   <TextField
                     placeholder={identifierLabelText}
                     {...register("identifier", {
-                      required: "Identifier is required.",
+                      required: t("signInOrUp.identifierRequired"),
                       validate: {
                         maxLength: (v) => {
                           let isValidOrError: boolean | string = true;
 
                           if (allowedIdentifiers.includes("email")) {
                             isValidOrError =
-                              v.length <= 50 ||
-                              "The email should have at most 50 characters";
+                              v.length <= 50 || t("signInOrUp.emailLimit");
                           }
 
                           if (allowedIdentifiers.includes("phone")) {
@@ -297,7 +296,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                             isValidOrError =
                               /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(
                                 v
-                              ) || "Email address must be a valid address";
+                              ) || t("signInOrUp.emailValid");
                           }
 
                           if (allowedIdentifiers.includes("phone")) {
@@ -321,7 +320,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                       <>
                         {errors.identifier?.message ||
                           errors.root?.serverError.message ||
-                          "Unknown error"}
+                          t("general.unknownError")}
                       </>
                     </Text>
                   ) : null}
@@ -336,14 +335,14 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   type="submit"
                   disabled={!rememberedIdentifier && !isDirty && !isValid}
                 >
-                  <span>{t("signInOrUp.continue")}</span>
+                  <span>{t("general.continue")}</span>
                   {isWebauthnAvailable ? (
                     <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
                   ) : null}
                 </Button>
               ) : (
                 <Button size="2" type="submit">
-                  <span>{t("signInOrUp.continueWithMagicLink")}</span>
+                  <span>{t("general.continueWithMagicLink")}</span>
                   <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
                 </Button>
               )}
@@ -382,6 +381,8 @@ const RegisterForm = ({
     formState: { errors, isDirty, isValid },
   } = useForm();
   const isError = Object.keys(errors).length !== 0;
+
+  const { t } = useTranslation();
 
   const {
     allowedIdentifiers,
@@ -466,7 +467,7 @@ const RegisterForm = ({
               backToLogin();
             }}
           >
-            Back to login
+            {t("registerForm.backToLogin")}
           </Button>
         </Flex>
       </>
@@ -483,10 +484,10 @@ const RegisterForm = ({
       }}
     >
       <div>
-        <span>Let's get you set up. We'll need following information:</span>
+        <span>{t("registerForm.backToLogin")}:</span>
         {isError ? (
           <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-            Please correct all highlighted errors.
+            {t("general.correctErrors")}
           </Text>
         ) : null}
       </div>
@@ -512,7 +513,7 @@ const RegisterForm = ({
                   required: requiredIdentifiers.includes(
                     maybeNeededIdentifierType
                   )
-                    ? "This field is required."
+                    ? t("general.requiredField")
                     : undefined,
                 })}
                 size="2"
@@ -543,7 +544,7 @@ const RegisterForm = ({
                       type="checkbox"
                       {...register(field_name, {
                         required: required
-                          ? "This field is required."
+                          ? t("general.requiredField")
                           : undefined,
                       })}
                     />
@@ -554,7 +555,7 @@ const RegisterForm = ({
                     type={field_type}
                     {...register(field_name, {
                       required: required
-                        ? "This field is required."
+                        ? t("general.requiredField")
                         : undefined,
                       valueAsNumber:
                         field_type === "integer" ? true : undefined,
@@ -574,7 +575,7 @@ const RegisterForm = ({
 
       <br />
       <Button size="2" type="submit" disabled={!isDirty && !isValid}>
-        <span>Continue</span>
+        <span>{t("general.continue")}</span>
       </Button>
     </form>
   );
@@ -585,32 +586,36 @@ const useSignInOrUpFormHelpers = (
   appData: ScuteAppData,
   mode: SignInOrUpProps["mode"]
 ) => {
+  const { t } = useTranslation();
+
   const allowedIdentifiers = appData.allowed_identifiers;
   const requiredIdentifiers = appData.required_identifiers;
   const isPublicSignUpAllowed = appData.public_signup !== false;
   const identifierType = getIdentifierType(identifier);
 
-  let signInOrUpText = "Sign up or Log in";
+  let signInOrUpText = t("general.signInOrUp");
   if (!isPublicSignUpAllowed || mode === "sign_in") {
-    signInOrUpText = "Log in";
+    signInOrUpText = t("general.logIn");
   } else if (mode === "sign_up") {
-    signInOrUpText = "Sign up";
+    signInOrUpText = t("general.signUp");
   }
 
   const isEmailIdentifierAllowed = allowedIdentifiers.includes("email");
   const isPhoneIdentifierAllowed = allowedIdentifiers.includes("phone");
 
-  let identifierLabelText = "Email";
+  let identifierLabelText = t("general.email");
   if (isEmailIdentifierAllowed && isPhoneIdentifierAllowed) {
-    identifierLabelText = "Email or Phone number";
+    identifierLabelText = t("general.emailOrPhone");
   } else if (isPhoneIdentifierAllowed) {
-    identifierLabelText = "Phone number";
+    identifierLabelText = t("general.phone");
   }
 
   const maybeNeededIdentifierType: ScuteIdentifierType =
     identifierType === "email" ? "phone" : "email";
   const maybeNeededIdentifierLabel =
-    maybeNeededIdentifierType === "email" ? "Email" : "Phone number";
+    maybeNeededIdentifierType === "email"
+      ? t("general.email")
+      : t("general.phone");
 
   return {
     isPublicSignUpAllowed,

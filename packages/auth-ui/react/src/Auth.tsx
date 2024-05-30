@@ -11,6 +11,8 @@ import {
   decodeMagicLinkToken,
 } from "@scute/core";
 import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
+import { useTranslation } from "react-i18next";
+
 import {
   Content,
   ElementCard,
@@ -303,7 +305,7 @@ const Container = ({
   children,
 }: ContainerProps) => {
   const providerTheme = useTheme();
-
+  const { t } = useTranslation();
   return (
     <Layout
       className={
@@ -317,7 +319,7 @@ const Container = ({
         {appData?.scute_branding !== false ? (
           <Flex css={{ jc: "center", pb: "$1" }}>
             <FooterCredits>
-              <span>powered by</span>
+              <span>{t("poweredBy")}</span>
               <span>
                 <Logo
                   webauthnAvailable={

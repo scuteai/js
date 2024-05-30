@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { BiometricsIcon } from "../assets/icons";
 import {
   Badge,
@@ -20,6 +22,8 @@ const FatalErrorView = ({
   error,
   tryAgain,
 }: FatalErrorViewProps) => {
+  const { t } = useTranslation();
+
   return (
     <>
       <Header>
@@ -34,10 +38,10 @@ const FatalErrorView = ({
         }}
       >
         <Heading size="1" css={{ color: "$errorColor" }}>
-          {error ?? "Something went wrong"}
+          {error ?? t("general.somethingWentWrong")}
         </Heading>
         <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-          Please try again
+          {t("general.pleaseTryAgain")}
         </Text>
         <Flex css={{ jc: "center", py: "$5" }}>
           <Badge size="1">{identifier}</Badge>
@@ -50,7 +54,7 @@ const FatalErrorView = ({
               tryAgain();
             }}
           >
-            Try again
+            {t("general.tryAgain")}
           </Button>
         </Flex>
       </Inner>
