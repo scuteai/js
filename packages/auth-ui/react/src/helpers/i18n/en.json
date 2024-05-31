@@ -1,0 +1,86 @@
+{
+  "general": {
+    "requiredField": "This field is required",
+    "correctErrors": "Please correct all highlighted errors.",
+    "continue": "Continue",
+    "signInOrUp": "Sign up or Log in",
+    "signUp": "Sign up",
+    "logIn": "Log in",
+    "email": "Email",
+    "emailOrPhone": "Email or phone number",
+    "phone": "Phone number",
+    "continueWithMagicLink": "Continue with magic link",
+    "tryAgain": "Try again",
+    "pleaseTryAgain": "Please try again",
+    "somethingWentWrong": "Something went wrong",
+    "changeEmail": "Change email",
+    "resendEmail": "Resend email",
+    "backToLogin": "Back to login",
+    "loginRequired": "Login required",
+    "save": "Save",
+    "editProfile": "Edit profile",
+    "cancel": "Cancel",
+    "logout": "Log out",
+    "revoke": "Revoke",
+    "unknownError": "Unknown error"
+  },
+
+  "signInOrUp": {
+    "welcomeBack": "Welcome back!",
+    "signInAs": "Sign in as",
+    "changeUser": "Change user",
+    "identifierRequired": "Identifier is required.",
+    "emailLimit": "The email should have at most 50 characters",
+    "emailValid": "Email address must be a valid address"
+  },
+
+  "registerForm": {
+    "backToLogin": "Back to login",
+    "needInfo": "Let's get you set up. We'll need following information"
+  },
+
+  "registerDevice": {
+    "registerDeviceTitle": "Let's register your device",
+    "trustDeviceTitle": "Do you trust this device?",
+    "registerDevice": "Register Device",
+    "trustDevice": "Yes, trust device",
+    "skipAndLogin": "Skip and log in",
+    "dontTrustDevice": "No, don't trust device",
+    "logInWebAuthn": "Log into your account with the method you already use to unlock your device",
+    "logInNoWebAuthn": "We'll keep you signed in on this device. To keep your account secure, use this option on your personal devices only.",
+    "registerInProgress": "A device is being registered in another instance."
+  },
+
+  "verifyDevice": {
+    "verifyDeviceTitle": "Verify your identity",
+    "tryAgain": "You can try again or sign in with magic link.",
+    "verifyDeviceBody": "Log into your account with the method you already use to unlock yourdevice.",
+    "signInMagicLink": "Sign in with email link"
+  },
+
+  "verifyOTP": {
+    "newDeviceTitle": "This is a new device, to remember it we need to register it first",
+    "checkEmailTitle": "Check your email to login",
+    "bodyP1Part1": "We’ve sent an email to your inbox with",
+    "bodyP1Part2": "a one-time link.",
+    "bodyP2": "You will be automatically signed in here once you click that link.",
+    "loading": {
+      "title": "We are logging you in"
+    }
+  },
+
+  "profile": {
+    "myProfile": "My profile",
+    "sessions": "Sessions",
+    "noSessions": " no sessions",
+    "confirmRevoke": "Do you really want to revoke this session?",
+    "success": "Success!",
+    "lastUsed": "Last used",
+    "lastIP": "Last IP",
+    "browser": "Browser",
+    "platform": "Platform",
+    "errorTryAgain": "An error occurred. You can try again."
+  },
+
+  "poweredBy": "powered by"
+}

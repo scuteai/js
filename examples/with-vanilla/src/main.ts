@@ -9,6 +9,7 @@ const authElement = render(
   Auth,
   {
     scuteClient: scute,
+    language: "en",
   },
   app,
   "append"

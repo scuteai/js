@@ -11,6 +11,8 @@ import {
   decodeMagicLinkToken,
 } from "@scute/core";
 import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
+import { useTranslation } from "react-i18next";
+
 import {
   Content,
   ElementCard,
@@ -30,12 +32,14 @@ import {
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
+import { initI18n } from "./helpers/i18n/config";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
   onSignIn?: () => void;
   view?: Extract<Views, "sign-in-or-up" | "sign-in" | "sign-up">;
   webauthn?: ScuteWebauthnOption;
+  language?: string;
   appearance?: {
     theme?: Theme;
   };
@@ -47,6 +51,7 @@ function Auth(props: AuthProps) {
     appearance: _appearance,
     view = VIEWS.SIGN_IN_OR_UP,
     webauthn = "optional",
+    language,
     onSignIn,
   } = props;
 
@@ -93,6 +98,10 @@ function Auth(props: AuthProps) {
     appearance,
     appData,
   };
+
+  useEffect(() => {
+    initI18n(language);
+  }, [language]);
 
   useEffect(() => {
     if (isFatalError) return;
@@ -296,7 +305,7 @@ const Container = ({
   children,
 }: ContainerProps) => {
   const providerTheme = useTheme();
-
+  const { t } = useTranslation();
   return (
     <Layout
       className={
@@ -310,7 +319,7 @@ const Container = ({
         {appData?.scute_branding !== false ? (
           <Flex css={{ jc: "center", pb: "$1" }}>
             <FooterCredits>
-              <span>powered by</span>
+              <span>{t("poweredBy")}</span>
               <span>
                 <Logo
                   webauthnAvailable={

@@ -19,7 +19,7 @@ export default function WithScuteUI() {
         height: "100vh",
       }}
     >
-      <Auth scuteClient={scute} />
+      <Auth scuteClient={scute} language="en" />
     </div>
   );
 }

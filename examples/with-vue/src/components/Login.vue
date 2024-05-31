@@ -6,5 +6,5 @@ const scute = useScuteClient();
 </script>
 
 <template>
-  <Auth :scute-client="scute" />
+  <Auth :scute-client="scute" :language="en" />
 </template>

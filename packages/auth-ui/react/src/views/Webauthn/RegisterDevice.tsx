@@ -7,6 +7,8 @@ import {
 } from "@scute/core";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import { BiometricsIcon, CircleCheckIcon } from "../../assets/icons";
 import {
   Badge,
@@ -95,6 +97,8 @@ const RegisterDevice = ({
     }
   };
 
+  const { t } = useTranslation();
+
   return (
     <>
       <Header>
@@ -114,8 +118,8 @@ const RegisterDevice = ({
       >
         <Heading size="1" css={{ color: "$headingColor" }}>
           {isWebauthnSupported
-            ? "Let&#39;s register your device"
-            : "Do you trust this device? "}
+            ? t("registerDevice.registerDeviceTitle")
+            : t("registerDevice.trustDeviceTitle")}
         </Heading>
         {error ? (
           <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
@@ -124,8 +128,8 @@ const RegisterDevice = ({
         ) : (
           <Text css={{ color: "$textColor" }}>
             {isWebauthnSupported
-              ? "Log into your account with the method you already use to unlock your device"
-              : "We'll keep you signed in on this device. To keep your account secure, use this option on your personal devices only."}
+              ? t("registerDevice.logInWebAuthn")
+              : t("registerDevice.logInNoWebAuthn")}
           </Text>
         )}
         <Flex css={{ jc: "center", py: "$5" }}>
@@ -135,15 +139,15 @@ const RegisterDevice = ({
           <Button variant="alt" onClick={() => handleRegisterDevice()}>
             {!error
               ? isWebauthnSupported
-                ? "Register Device"
-                : "Yes, trust device"
-              : "Try Again"}
+                ? t("registerDevice.registerDevice")
+                : t("registerDevice.trustDevice")
+              : t("general.tryAgain")}
           </Button>
           {webauthn === "optional" || error ? (
             <Button variant="alt" onClick={() => handleSkipAndLogin()}>
               {isWebauthnSupported
-                ? "Skip and login"
-                : "No, don't trust device"}
+                ? t("registerDevice.skipAndLogin")
+                : t("registerDevice.dontTrustDevice")}
             </Button>
           ) : null}
         </Flex>

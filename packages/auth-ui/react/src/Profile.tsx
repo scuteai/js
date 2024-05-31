@@ -8,6 +8,7 @@ import {
   ScuteAppData,
 } from "@scute/core";
 import type { Theme } from "@scute/ui-shared";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   ElementCard,
@@ -35,6 +36,8 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
   const [isAnyDeviceRegistered, setIsAnyDeviceRegistered] = useState<
     boolean | null
   >(null);
+
+  const { t } = useTranslation();
 
   useEffect(() => {
     (async () => {
@@ -82,7 +85,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
       </Flex>
     );
   } else if (session.status === "unauthenticated" || !user) {
-    return <>Login Required.</>;
+    return <>{t("general.loginRequired")}</>;
   }
 
   const visibleUserMetadataSchema = appData.user_meta_data_schema.filter(
@@ -98,7 +101,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
           : ""
       }
     >
-      <h1>My Profile</h1>
+      <h1>{t("profile.myProfile")}</h1>
       <ElementCard css={{ p: "$3" }}>
         <Flex css={{ fd: "column" }}>
           <Flex css={{ jc: "space-between", ai: "center" }}>
@@ -126,7 +129,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
                     await scuteClient.refetchSession();
                   }}
                 >
-                  Save
+                  {t("general.save")}
                 </Button>
               ) : null}
               {appData.profile_management !== false &&
@@ -137,11 +140,11 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
                     setIsEditMode(!isEditMode);
                   }}
                 >
-                  {!isEditMode ? "Edit profile" : "Cancel"}
+                  {!isEditMode ? t("general.editProfile") : t("general.cancel")}
                 </Button>
               ) : null}
               <Button css={{ ml: "$1" }} onClick={() => scuteClient.signOut()}>
-                Logout
+                {t("general.logout")}
               </Button>
             </Flex>
           </Flex>
@@ -194,7 +197,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
         </Flex>
         <Flex css={{ fd: "column", gap: "$1", mt: "$3" }}>
           <Flex css={{ jc: "space-between", ai: "center" }}>
-            <h3>Sessions</h3>
+            <h3>{t("profile.sessions")}</h3>
 
             {!isAnyDeviceRegistered ? (
               <Button
@@ -202,14 +205,14 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
                 onClick={async () => {
                   const { error } = await scuteClient.addDevice();
                   if (error) {
-                    window.alert("An error has occurred. You can try again.");
+                    window.alert(t("profile.errorTryAgain"));
                   } else {
                     setIsAnyDeviceRegistered(true);
-                    window.confirm("Success!");
+                    window.confirm(t("profile.success"));
                   }
                 }}
               >
-                Register Device
+                {t("registerDevice.registerDevice")}
               </Button>
             ) : null}
           </Flex>
@@ -225,7 +228,7 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
               ))}
             </Flex>
           ) : (
-            <Flex> no sessions</Flex>
+            <Flex>{t("profile.noSessions")}</Flex>
           )}
         </Flex>
       </ElementCard>
@@ -244,6 +247,7 @@ const SessionCard = ({
   appData: ScuteAppData;
   session: ScuteUserSession;
 }) => {
+  const { t } = useTranslation();
   return (
     <ElementCard css={{ p: "$3" }} key={session.id}>
       <Flex css={{ jc: "space-between" }}>
@@ -258,9 +262,7 @@ const SessionCard = ({
           <Button
             variant="alt"
             onClick={async () => {
-              if (
-                window.confirm("Do you really want to revoke this session ?")
-              ) {
+              if (window.confirm(t("profile.confirmRevoke"))) {
                 await scuteClient.revokeSession(
                   session.id,
                   session.credential_id
@@ -285,25 +287,25 @@ const SessionCard = ({
       >
         <Flex css={{ fd: "column", gap: "$1" }}>
           <Text size="1" css={{ opacity: 0.5 }}>
-            Last used
+            {t("profile.lastUsed")}
           </Text>
           <Text size="2">{session.last_used_at}</Text>
         </Flex>
         <Flex css={{ fd: "column", gap: "$1" }}>
           <Text size="1" css={{ opacity: 0.5 }}>
-            Last ip
+            {t("profile.lastIP")}
           </Text>
           <Text size="2">{session.last_used_at_ip}</Text>
         </Flex>
         <Flex css={{ fd: "column", gap: "$1" }}>
           <Text size="1" css={{ opacity: 0.5 }}>
-            Browser
+            {t("profile.browser")}
           </Text>
           <Text size="2">{session.browser}</Text>
         </Flex>
         <Flex css={{ fd: "column", gap: "$1" }}>
           <Text size="1" css={{ opacity: 0.5 }}>
-            Platform
+            {t("profile.platform")}
           </Text>
           <Text size="2">{session.platform}</Text>
         </Flex>

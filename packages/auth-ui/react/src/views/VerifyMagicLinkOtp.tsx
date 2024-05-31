@@ -9,6 +9,8 @@ import {
 
 import { VIEWS } from "@scute/ui-shared";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import { EmailIcon } from "../assets/icons";
 
 import {
@@ -49,6 +51,7 @@ const VerifyMagicLinkOtp = ({
   const [isVerifyCalled, setIsVerifyCalled] = useState(false);
   const [identifier, setIdentifier] = useState(_identifier);
 
+  const { t } = useTranslation();
   const isBroadcastMagicVerified = useRef<boolean>(false);
 
   const [magicLinkToken] = useState(
@@ -191,15 +194,14 @@ const VerifyMagicLinkOtp = ({
       >
         <Heading size="1" css={{ color: "$headingColor" }}>
           {isWebauthnNewDevice
-            ? "This is a new device, to remember it we need to register it first"
-            : "Check your email to login"}
+            ? t("verifyOTP.newDeviceTitle")
+            : t("verifyOTP.checkEmailTitle")}
         </Heading>
         <Text size="2" css={{ color: "$textColor", mb: "$1" }}>
-          {`We’ve sent an email to your inbox with`} <br />a one-time link.
+          {t("verifyOTP.bodyP1Part1")} <br />
+          {t("verifyOTP.bodyP1Part2")}
         </Text>
-        <Text size="2">
-          You will be automatically signed in here once you click that link.
-        </Text>
+        <Text size="2">{t("verifyOTP.bodyP2")}</Text>
         <Flex css={{ jc: "center", py: "$5" }}>
           <Badge size="1">{identifier}</Badge>
         </Flex>
@@ -208,10 +210,10 @@ const VerifyMagicLinkOtp = ({
             variant="alt"
             onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
           >
-            Change email
+            {t("general.changeEmail")}
           </Button>
           <Button variant="alt" disabled>
-            Resend email
+            {t("general.resendEmail")}
           </Button>
         </Flex>
       </Inner>
@@ -228,6 +230,8 @@ const LoadingMagic = ({
   backToLogin: () => void;
   error?: string | null;
 }) => {
+  const { t } = useTranslation();
+
   return (
     <>
       <Header css={{ mb: "$1" }}>
@@ -251,7 +255,7 @@ const LoadingMagic = ({
         {!error ? (
           <>
             <Heading size="1" css={{ color: "$headingColor" }}>
-              We are logging you in
+              {t("verifyOTP.loading.title")}
             </Heading>
             <Text size="2" css={{ color: "$textColor", mb: "$1" }}></Text>
           </>
@@ -268,7 +272,7 @@ const LoadingMagic = ({
                   backToLogin();
                 }}
               >
-                Back to login
+                {t("general.backToLogin")}
               </Button>
             </Flex>
           </>
