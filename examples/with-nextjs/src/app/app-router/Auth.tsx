@@ -19,7 +19,7 @@ const Auth = () => {
     return null;
   }
 
-  return <ScuteAuth scuteClient={scute} />;
+  return <ScuteAuth scuteClient={scute} language="en" />;
 };
 
 export default Auth;
