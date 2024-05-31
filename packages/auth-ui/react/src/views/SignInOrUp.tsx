@@ -484,7 +484,7 @@ const RegisterForm = ({
       }}
     >
       <div>
-        <span>{t("registerForm.backToLogin")}:</span>
+        <span>{t("registerForm.needInfo")}:</span>
         {isError ? (
           <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
             {t("general.correctErrors")}
