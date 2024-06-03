@@ -42,6 +42,7 @@ import { getIdentifierType } from "../helpers/identifierType";
 // import PhoneInput from "../components/PhoneInput";
 import { VIEWS } from "@scute/ui-shared";
 import { AppLogo } from "../components/AppLogo";
+import { translateError } from "../helpers/i18n/service";
 
 interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   identifier: ScuteIdentifier;
@@ -143,7 +144,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       const error = new IdentifierNotRecognizedError();
       setError("root.serverError", {
         type: String(error.code),
-        message: error.message,
+        message: translateError(error),
       });
 
       return;
@@ -151,7 +152,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       const error = new IdentifierAlreadyExistsError();
       setError("root.serverError", {
         type: String(error.code),
-        message: error.message,
+        message: translateError(error),
       });
       return;
     }
@@ -162,7 +163,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         const error = new UnknownSignInError();
         setError("root.serverError", {
           type: String(error.code),
-          message: error.message,
+          message: translateError(error),
         });
         return;
       }
@@ -175,12 +176,11 @@ const SignInOrUp = (props: SignInOrUpProps) => {
           await scuteClient.sendLoginMagicLink(identifier);
 
         if (magicLinkError) {
-          const { isFatal, message: errorMsg } =
-            getMeaningfulError(magicLinkError);
+          const { isFatal } = getMeaningfulError(magicLinkError);
           setIsFatalError?.(isFatal);
           setError("root.serverError", {
             type: String(magicLinkError.code),
-            message: errorMsg,
+            message: translateError(magicLinkError),
           });
           return;
         }
@@ -196,12 +196,11 @@ const SignInOrUp = (props: SignInOrUpProps) => {
           await scuteClient.signUp(identifier);
 
         if (signUpError) {
-          const { isFatal, message: errorMsg } =
-            getMeaningfulError(signUpError);
+          const { isFatal } = getMeaningfulError(signUpError);
           setIsFatalError?.(isFatal);
           setError("root.serverError", {
             type: String(signUpError.code),
-            message: errorMsg,
+            message: translateError(signUpError),
           });
           return;
         }
@@ -435,11 +434,11 @@ const RegisterForm = ({
     window.history.replaceState(window.history.state, "", url.toString());
 
     if (error) {
-      const { isFatal, message: errorMsg } = getMeaningfulError(error);
+      const { isFatal } = getMeaningfulError(error);
       setIsFatalError?.(isFatal);
       setError("root.serverError", {
         type: String(error.code),
-        message: errorMsg,
+        message: translateError(error),
       });
       return;
     }

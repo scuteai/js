@@ -20,6 +20,7 @@ import {
   Inner,
 } from "../../components";
 import { type CommonViewProps } from "../common";
+import { translateError } from "../../helpers/i18n/service";
 
 interface RegisterDeviceProps extends CommonViewProps {
   webauthn?: ScuteWebauthnOption;
@@ -65,10 +66,9 @@ const RegisterDevice = ({
         await scuteClient.signInWithRegisterDevice(authPayload);
 
       if (registerDeviceError) {
-        const { isFatal, message: errorMsg } =
-          getMeaningfulError(registerDeviceError);
+        const { isFatal } = getMeaningfulError(registerDeviceError);
         setIsFatalError?.(isFatal);
-        setError(errorMsg);
+        setError(translateError(registerDeviceError));
       }
     } else {
       const { error: signInError } = await scuteClient.signInWithTokenPayload(
@@ -76,9 +76,9 @@ const RegisterDevice = ({
       );
 
       if (signInError) {
-        const { isFatal, message: errorMsg } = getMeaningfulError(signInError);
+        const { isFatal } = getMeaningfulError(signInError);
         setIsFatalError?.(isFatal);
-        setError(errorMsg);
+        setError(translateError(signInError));
       }
     }
   };
@@ -91,9 +91,9 @@ const RegisterDevice = ({
     );
 
     if (signInError) {
-      const { isFatal, message: errorMsg } = getMeaningfulError(signInError);
+      const { isFatal } = getMeaningfulError(signInError);
       setIsFatalError?.(isFatal);
-      setError(errorMsg);
+      setError(translateError(signInError));
     }
   };
 

@@ -23,6 +23,7 @@ import {
 } from "../../components";
 import useEffectOnce from "../../helpers/useEffectOnce";
 import { type CommonViewProps } from "../common";
+import { translateError } from "../../helpers/i18n/service";
 
 interface VerifyDeviceProps extends CommonViewProps {
   getMagicLinkIdCallback?: (id: UniqueIdentifier) => void;
@@ -47,10 +48,9 @@ const VerifyDevice = ({
       await scuteClient.sendLoginMagicLink(identifier, undefined, !isNewDevice);
 
     if (sendMagicLinkError) {
-      const { isFatal, message: errorMsg } =
-        getMeaningfulError(sendMagicLinkError);
+      const { isFatal } = getMeaningfulError(sendMagicLinkError);
       setIsFatalError?.(isFatal);
-      setError(errorMsg);
+      setError(translateError(sendMagicLinkError));
       return;
     }
 
@@ -74,11 +74,10 @@ const VerifyDevice = ({
     }
 
     if (verifyDeviceError) {
-      const { isFatal, message: errorMsg } =
-        getMeaningfulError(verifyDeviceError);
+      const { isFatal } = getMeaningfulError(verifyDeviceError);
 
       setIsFatalError?.(isFatal);
-      setError(errorMsg);
+      setError(translateError(verifyDeviceError));
     }
   };
 

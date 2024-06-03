@@ -28,6 +28,7 @@ import useEffectOnce from "../helpers/useEffectOnce";
 import useInterval from "../helpers/useInterval";
 
 import { CommonViewProps } from "./common";
+import { translateError } from "../helpers/i18n/service";
 
 export interface VerifyMagicLinkOtpProps extends CommonViewProps {
   isWebauthnNewDevice?: boolean;
@@ -102,9 +103,10 @@ const VerifyMagicLinkOtp = ({
     );
 
     if (signInError) {
-      const { isFatal, message: errorMsg } = getMeaningfulError(signInError);
+      const { isFatal } = getMeaningfulError(signInError);
       setIsFatalError?.(isFatal);
-      setError(errorMsg);
+      const translatedErrorMessage = translateError(signInError);
+      setError(translatedErrorMessage);
     }
   };
 
@@ -120,9 +122,10 @@ const VerifyMagicLinkOtp = ({
         await scuteClient.verifyMagicLinkToken(magicLinkToken!);
 
       if (verifyError) {
-        const { isFatal, message: errorMsg } = getMeaningfulError(verifyError);
+        const { isFatal } = getMeaningfulError(verifyError);
         setIsFatalError?.(isFatal);
-        setError(errorMsg);
+        const translatedErrorMessage = translateError(verifyError);
+        setError(translatedErrorMessage);
         return;
       }
 

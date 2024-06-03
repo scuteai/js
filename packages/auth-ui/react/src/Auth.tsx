@@ -32,7 +32,7 @@ import {
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
-import { initI18n } from "./helpers/i18n/config";
+import { initI18n } from "./helpers/i18n/service";
 
 export type AuthProps = {
   scuteClient: ScuteClient;

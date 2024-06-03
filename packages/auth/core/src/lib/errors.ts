@@ -50,17 +50,20 @@ export const getMeaningfulError = (error: ScuteError | Error) => {
 export class ScuteError extends Error {
   code?: string | number;
   cause?: Error;
+  slug?: string;
 
   constructor({
     message,
     code,
     cause,
     name,
+    slug,
   }: {
     message: string;
     cause?: Error;
     code?: string | number;
     name?: string;
+    slug?: string;
   }) {
     /**
      * `cause` is supported in evergreen browsers, but not IE10, so this ts-ignore is to
@@ -71,6 +74,7 @@ export class ScuteError extends Error {
     this.name = name ?? cause?.name ?? "Error";
     this.code = code;
     this.cause = cause;
+    this.slug = slug;
   }
 }
 
@@ -89,7 +93,7 @@ export class BaseHttpError extends ScuteError {
     json?: Record<string, any>;
     cause?: ScuteError["cause"];
   }) {
-    super({ message, cause, code });
+    super({ message, cause, code, slug: json?.error?.slug });
     this.code = code;
     this.json = json;
     Object.setPrototypeOf(this, BaseHttpError.prototype);
@@ -98,7 +102,7 @@ export class BaseHttpError extends ScuteError {
 
 export class TechnicalError extends ScuteError {
   constructor(cause?: Error) {
-    super({ message: "Technical Error", cause });
+    super({ message: "Technical Error", cause, slug: "technical_error" });
     Object.setPrototypeOf(this, TechnicalError.prototype);
   }
 }
@@ -369,16 +373,21 @@ export type CustomScuteErrorCode =
 export class CustomScuteError extends ScuteError {
   constructor(
     message: ScuteError["message"],
-    code: CustomScuteErrorCode & ScuteError["code"]
+    code: CustomScuteErrorCode & ScuteError["code"],
+    slug?: ScuteError["slug"]
   ) {
-    super({ message, code });
+    super({ message, code, slug });
     Object.setPrototypeOf(this, CustomScuteError.prototype);
   }
 }
 
 export class IdentifierNotRecognizedError extends CustomScuteError {
   constructor() {
-    super("Identifier is not recognized.", "identifier-not-recognized");
+    super(
+      "Identifier is not recognized.",
+      "identifier-not-recognized",
+      "identifier_not_recognized"
+    );
     Object.setPrototypeOf(this, IdentifierNotRecognizedError.prototype);
   }
 }
@@ -387,7 +396,8 @@ export class IdentifierAlreadyExistsError extends CustomScuteError {
   constructor() {
     super(
       "User with this identifier already exists.",
-      "identifier-already-exists"
+      "identifier-already-exists",
+      "identifier_already_exists"
     );
     Object.setPrototypeOf(this, IdentifierAlreadyExistsError.prototype);
   }
@@ -395,35 +405,35 @@ export class IdentifierAlreadyExistsError extends CustomScuteError {
 
 export class NewDeviceError extends CustomScuteError {
   constructor() {
-    super("New Device.", "new-device");
+    super("New Device.", "new-device", "new_device");
     Object.setPrototypeOf(this, NewDeviceError.prototype);
   }
 }
 
 export class LoginRequiredError extends CustomScuteError {
   constructor() {
-    super("Login Required.", "login-required");
+    super("Login Required.", "login-required", "login_required");
     Object.setPrototypeOf(this, LoginRequiredError.prototype);
   }
 }
 
 export class InvalidAuthTokenError extends CustomScuteError {
   constructor() {
-    super("Invalid auth token.", "invalid-auth-token");
+    super("Invalid auth token.", "invalid-auth-token", "invalid_auth_token");
     Object.setPrototypeOf(this, InvalidAuthTokenError.prototype);
   }
 }
 
 export class UnknownSignInError extends CustomScuteError {
   constructor() {
-    super("Unknown sign in error.", "unknown-sign-in");
+    super("Unknown sign in error.", "unknown-sign-in", "unknown_sign_in");
     Object.setPrototypeOf(this, UnknownSignInError.prototype);
   }
 }
 
 export class InvalidMagicLinkError extends CustomScuteError {
   constructor() {
-    super("Invalid magic link.", "invalid-magic-link");
+    super("Invalid magic link.", "invalid-magic-link", "invalid_magic_link");
     Object.setPrototypeOf(this, InvalidMagicLinkError.prototype);
   }
 }
