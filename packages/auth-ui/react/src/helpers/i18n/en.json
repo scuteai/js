@@ -82,5 +82,26 @@
     "errorTryAgain": "An error occurred. You can try again."
   },
 
+  "scuteError": {
+    "user_meta_invalid": "User meta is invalid",
+    "session_not_found": "Session not found",
+    "app_not_found": "App not found",
+    "invalid_identifier": "Identifier invalid",
+    "magic_link_not_found_or_expired": "Magic link not found or expired",
+    "user_not_exists": "User does not exist",
+    "user_exists": "User already exists",
+    "webauthn_verification_error": "Webauthn verification error",
+    "webauthn_register_error": "Webauthn register error",
+    "technical_error": "Technical error",
+    "generic": "An error occurred",
+    "identifier_not_recognized": "Identifier is not recognized.",
+    "identifier_already_exists": "User with this identifier already exists.",
+    "new_device": "New Device.",
+    "login_required": "Login required.",
+    "invalid_auth_token": "Invalid auth token.",
+    "unknown_sign_in": "Unknown sign in error.",
+    "invalid_magic_link": "Invalid magic link."
+  },
+
   "poweredBy": "powered by"
 }
