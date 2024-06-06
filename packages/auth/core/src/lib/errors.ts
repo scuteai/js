@@ -437,3 +437,12 @@ export class InvalidMagicLinkError extends CustomScuteError {
     Object.setPrototypeOf(this, InvalidMagicLinkError.prototype);
   }
 }
+
+export type ErrorReport = {
+  location: string;
+  name?: string;
+  message?: string;
+  stack?: string;
+  code?: string | number;
+  cause?: Error;
+};

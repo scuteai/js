@@ -43,6 +43,7 @@ import {
   ScuteError,
   TechnicalError,
   UnknownSignInError,
+  BaseHttpError,
 } from "./lib/errors";
 
 import { version } from "./lib/version";
@@ -407,6 +408,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       );
 
       if (verifyError) {
+        this._reportClientError(verifyError, "webauthn");
         if (verifyError instanceof NewDeviceError) {
           this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING);
           return this._sendLoginMagicLink(identifier);
@@ -518,7 +520,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const token = this.getMagicLinkToken(url);
 
     if (!token) {
-      return { error: new InvalidMagicLinkError() };
+      const error = new InvalidMagicLinkError();
+      this._reportClientError(error, "magiclink-verify");
+      return { error };
     }
 
     return this.verifyMagicLinkToken(token);
@@ -531,9 +535,11 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   async verifyMagicLinkToken(token: string) {
     const decodedMagicLinkToken = decodeMagicLinkToken(token);
     if (!decodedMagicLinkToken) {
+      const error = new InvalidMagicLinkError();
+      this._reportClientError(error, "magiclink-verify-token");
       return {
         data: null,
-        error: new InvalidMagicLinkError(),
+        error,
       };
     }
 
@@ -572,6 +578,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const { data, error } = await this.getAuthToken();
 
     if (error) {
+      this._reportClientError(error, "invalid-token");
       return { data: null, error };
     }
 
@@ -648,8 +655,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     const isNewDevice = await this._webauthnIsNewDevice(userId, data.options);
     if (isNewDevice) {
+      const error = new NewDeviceError();
+      this._reportClientError(error, "device-verify");
       return {
-        error: new NewDeviceError(),
+        error,
       };
     }
 
@@ -676,8 +685,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (getUserError) {
       // something went wrong
       await this._signOut(session.access);
+      const error = new UnknownSignInError();
+      this._reportClientError(error, "token-payload");
       return {
-        error: new UnknownSignInError(),
+        error,
       };
     }
 
@@ -759,6 +770,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (!accessToken) {
       const { data: authData, error } = await this.getAuthToken();
       if (error) {
+        this._reportClientError(error, "get-user");
         return { data: { user: null }, error };
       }
 
@@ -877,12 +889,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     try {
       credential = await webauthn.create(options);
     } catch (error: any) {
+      const e = identifyRegistrationError({
+        error,
+        options,
+      });
+
+      this._reportClientError(e, "webauthn-register-finalize");
+
       return {
         data: null,
-        error: identifyRegistrationError({
-          error,
-          options,
-        }),
+        error: e,
       };
     }
 
@@ -1152,6 +1168,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const { data, error } = await this.getAuthToken();
 
     if (error) {
+      this._reportClientError(error, "update_user_meta");
       return { data: null, error };
     }
 
@@ -1208,6 +1225,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const { data: authData, error } = await this.getAuthToken();
 
     if (error) {
+      this._reportClientError(error, "revoke-session");
       return { data: null, error };
     }
 
@@ -1249,6 +1267,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const { data: authData, error } = await this.getAuthToken();
 
     if (error) {
+      this._reportClientError(error, "magiclink-verify");
       return { data: null, error };
     }
 
@@ -1322,6 +1341,27 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       session,
       user,
     });
+  }
+
+  /**
+   * Error reporting.
+   * @param error {Error}
+   * @param label {string} label for the error report
+   * @internal
+   * @see {@link _reportError}
+   */
+  private async _reportClientError(error: Error, label?: string) {
+    if (error instanceof BaseHttpError) {
+      return;
+    }
+
+    try {
+      const session = await this.getSession();
+      const userId = session?.data.user?.id;
+      await this._reportError(error, userId, undefined, label);
+    } catch (error) {
+      console.warn("Error reporting failed", error);
+    }
   }
 }
 
