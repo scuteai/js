@@ -1,7 +1,13 @@
 import wretch, { type Wretch, type WretchError } from "wretch";
 import { retry } from "wretch/middlewares/retry";
-import { BaseHttpError, NETWORK_ERROR_CODES } from "./errors";
-import type { BaseResponse } from "./types/general";
+import {
+  BaseHttpError,
+  ErrorReport,
+  NETWORK_ERROR_CODES,
+  ScuteError,
+} from "./errors";
+import type { BaseResponse, UniqueIdentifier } from "./types/general";
+import { isBrowser } from "./helpers";
 
 export abstract class ScuteBaseHttp {
   protected wretcher: Wretch;
@@ -33,7 +39,9 @@ export abstract class ScuteBaseHttp {
 
       return { data: response, error: null };
     } catch (e) {
-      return { data: null, error: this._getErrorObject(e as WretchError) };
+      const error = this._getErrorObject(e as WretchError);
+      this._reportError(error, undefined, url, "http");
+      return { data: null, error };
     }
   }
 
@@ -50,7 +58,9 @@ export abstract class ScuteBaseHttp {
         .json<T>();
       return { data: response, error: null };
     } catch (e) {
-      return { data: null, error: this._getErrorObject(e as WretchError) };
+      const error = this._getErrorObject(e as WretchError);
+      this._reportError(error, undefined, url, "http");
+      return { data: null, error };
     }
   }
 
@@ -67,7 +77,9 @@ export abstract class ScuteBaseHttp {
         .json<T>();
       return { data: response, error: null };
     } catch (e) {
-      return { data: null, error: this._getErrorObject(e as WretchError) };
+      const error = this._getErrorObject(e as WretchError);
+      this._reportError(error, undefined, url, "http");
+      return { data: null, error };
     }
   }
 
@@ -84,7 +96,9 @@ export abstract class ScuteBaseHttp {
         .json<T>();
       return { data: response, error: null };
     } catch (e) {
-      return { data: null, error: this._getErrorObject(e as WretchError) };
+      const error = this._getErrorObject(e as WretchError);
+      this._reportError(error, undefined, url, "http");
+      return { data: null, error };
     }
   }
 
@@ -96,7 +110,51 @@ export abstract class ScuteBaseHttp {
         .delete();
       return { data: null, error: null };
     } catch (e) {
-      return { data: null, error: this._getErrorObject(e as WretchError) };
+      const error = this._getErrorObject(e as WretchError);
+      this._reportError(error, undefined, url, "http");
+      return { data: null, error };
+    }
+  }
+
+  protected async _reportError(
+    error: Error,
+    userId?: UniqueIdentifier,
+    url?: string,
+    label?: string
+  ) {
+    const shouldNotLog =
+      (error instanceof BaseHttpError && error.code < 500) ||
+      !isBrowser() ||
+      (url && url.endsWith("errors"));
+
+    if (shouldNotLog) {
+      return;
+    }
+
+    let errorData: ErrorReport = {
+      location: window.location.toString(),
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+
+    if (error instanceof ScuteError) {
+      errorData = {
+        ...errorData,
+        code: error.code,
+        cause: error.cause,
+      };
+    }
+
+    try {
+      const payload = {
+        error: errorData,
+        user: { id: userId },
+        label: label,
+      };
+      await this.post("/errors", { payload });
+    } catch (error) {
+      console.warn("Error reporting failed", error);
     }
   }
 
