@@ -1,5 +1,13 @@
 # @scute/node
 
+## 1.0.3
+
+### Patch Changes
+
+- Added language translations and an error reporting service
+- Updated dependencies
+  - @scute/core@1.0.3
+
 ## 1.0.2
 
 ### Patch Changes
