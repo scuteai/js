@@ -11,8 +11,13 @@ import { isBrowser } from "./helpers";
 
 export abstract class ScuteBaseHttp {
   protected wretcher: Wretch;
+  protected reportErrors: boolean;
 
-  constructor(...params: Parameters<typeof wretch>) {
+  constructor(
+    reportErrors: boolean = false,
+    ...params: Parameters<typeof wretch>
+  ) {
+    this.reportErrors = reportErrors ?? false;
     this.wretcher = wretch(...params)
       .middlewares([
         retry({
@@ -122,12 +127,13 @@ export abstract class ScuteBaseHttp {
     url?: string,
     label?: string
   ) {
-    const shouldNotLog =
+    const shouldNotReport =
+      !this.reportErrors ||
       (error instanceof BaseHttpError && error.code < 500) ||
       !isBrowser() ||
       (url && url.endsWith("errors"));
 
-    if (shouldNotLog) {
+    if (shouldNotReport) {
       return;
     }
 
