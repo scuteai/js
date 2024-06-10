@@ -770,7 +770,6 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (!accessToken) {
       const { data: authData, error } = await this.getAuthToken();
       if (error) {
-        this._reportClientError(error, "get-user");
         return { data: { user: null }, error };
       }
 
