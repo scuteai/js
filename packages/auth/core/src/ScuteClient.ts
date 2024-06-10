@@ -105,6 +105,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   constructor(config: ScuteClientConfig) {
     const baseUrl = config.baseUrl || "https://api.scute.io";
     const appId = config.appId;
+    const errorReporting = config.errorReporting;
 
     if (!appId) {
       throw new ScuteError({
@@ -115,7 +116,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const browser = isBrowser();
 
     const endpointPrefix = `/v1/auth/${appId}`;
-    super(`${baseUrl}${endpointPrefix}`, {
+    super(errorReporting, `${baseUrl}${endpointPrefix}`, {
       credentials: "include",
     });
 
@@ -159,6 +160,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       appId,
       baseUrl,
       secretKey: config.secretKey,
+      errorReporting,
     });
 
     this.emitter = mitt<InternalEvent>();
@@ -770,7 +772,6 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (!accessToken) {
       const { data: authData, error } = await this.getAuthToken();
       if (error) {
-        this._reportClientError(error, "get-user");
         return { data: { user: null }, error };
       }
 

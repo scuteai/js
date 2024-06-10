@@ -8,6 +8,7 @@ export type ScuteClientConfig = {
   secretKey?: string;
   preferences?: ScuteClientPreferences;
   debug?: boolean;
+  errorReporting?: boolean;
 };
 
 export type ScuteSessionConfig = {
@@ -30,4 +31,5 @@ export type ScuteAdminApiConfig = {
   appId: UniqueIdentifier;
   baseUrl?: string;
   secretKey?: string;
+  errorReporting?: boolean;
 };

@@ -22,8 +22,9 @@ class ScuteAdminApi extends ScuteBaseHttp {
     const baseUrl = config.baseUrl || "https://api.scute.io";
     const appId = config.appId;
     const secretKey = config.secretKey;
+    const errorReporting = config.errorReporting;
 
-    super(baseUrl, {
+    super(errorReporting, baseUrl, {
       credentials: "include",
     });
 
@@ -265,7 +266,10 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param userId User ID
    * @param sessionId Session ID
    */
-  async revokeUserSession(userId: UniqueIdentifier, sessionId: UniqueIdentifier) {
+  async revokeUserSession(
+    userId: UniqueIdentifier,
+    sessionId: UniqueIdentifier
+  ) {
     return this.delete(
       `${this._v1Path}/users/${userId}/sessions/${sessionId}`,
       {
