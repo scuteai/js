@@ -1,6 +1,6 @@
 {
   "name": "@scute/node",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publishConfig": {},
   "files": [
     "dist"

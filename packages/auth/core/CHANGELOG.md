@@ -1,5 +1,11 @@
 # @scute/core
 
+## 1.0.4
+
+### Patch Changes
+
+- Fix errors and update tsup for better TS compatibility
+
 ## 1.0.3
 
 ### Patch Changes

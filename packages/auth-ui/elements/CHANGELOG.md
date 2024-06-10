@@ -1,5 +1,15 @@
 # @scute/ui-elements
 
+## 1.0.4
+
+### Patch Changes
+
+- Fix errors and update tsup for better TS compatibility
+- Updated dependencies
+  - @scute/ui-react@1.0.4
+  - @scute/ui-shared@1.0.4
+  - @scute/core@1.0.4
+
 ## 1.0.3
 
 ### Patch Changes

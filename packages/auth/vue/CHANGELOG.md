@@ -1,5 +1,13 @@
 # @scute/vue
 
+## 1.0.4
+
+### Patch Changes
+
+- Fix errors and update tsup for better TS compatibility
+- Updated dependencies
+  - @scute/core@1.0.4
+
 ## 1.0.3
 
 ### Patch Changes
