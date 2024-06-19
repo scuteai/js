@@ -11,7 +11,6 @@ import {
   decodeMagicLinkToken,
 } from "@scute/core";
 import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
-import { useTranslation } from "react-i18next";
 
 import {
   Content,
@@ -32,7 +31,7 @@ import {
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
-import { initI18n } from "./helpers/i18n/service";
+import { initI18n, translate as t } from "./helpers/i18n/service";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -305,7 +304,7 @@ const Container = ({
   children,
 }: ContainerProps) => {
   const providerTheme = useTheme();
-  const { t } = useTranslation();
+
   return (
     <Layout
       className={

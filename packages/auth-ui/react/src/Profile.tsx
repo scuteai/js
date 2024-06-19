@@ -8,7 +8,6 @@ import {
   ScuteAppData,
 } from "@scute/core";
 import type { Theme } from "@scute/ui-shared";
-import { useTranslation } from "react-i18next";
 import {
   Button,
   ElementCard,
@@ -21,15 +20,17 @@ import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import { AppLogo } from "./components/AppLogo";
 import { SessionIcon } from "./assets/sessionIcons";
+import { initI18n, translate as t } from "./helpers/i18n/service";
 
 export type ProfileProps = {
   scuteClient: ScuteClient;
+  language?: string;
   appearance?: {
     theme?: Theme;
   };
 };
 
-const Profile = ({ scuteClient, appearance }: ProfileProps) => {
+const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
   const [user, setUser] = useState<ScuteUserData | null>(null);
   const [session, setSession] = useState<Session>(sessionLoadingState());
   const [appData, setAppData] = useState<ScuteAppData | null>(null);
@@ -37,7 +38,9 @@ const Profile = ({ scuteClient, appearance }: ProfileProps) => {
     boolean | null
   >(null);
 
-  const { t } = useTranslation();
+  useEffect(() => {
+    initI18n(language);
+  }, [language]);
 
   useEffect(() => {
     (async () => {
@@ -247,7 +250,6 @@ const SessionCard = ({
   appData: ScuteAppData;
   session: ScuteUserSession;
 }) => {
-  const { t } = useTranslation();
   return (
     <ElementCard css={{ p: "$3" }} key={session.id}>
       <Flex css={{ jc: "space-between" }}>
@@ -273,7 +275,7 @@ const SessionCard = ({
               }
             }}
           >
-            Revoke
+            {t("general.revoke")}
           </Button>
         </Flex>
       </Flex>

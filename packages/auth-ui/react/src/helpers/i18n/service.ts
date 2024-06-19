@@ -1,18 +1,21 @@
-import i18next from "i18next";
+import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import en from "./en.json";
 import { ScuteError } from "@scute/core";
 
-export const initI18n = (language?: string) =>
-  i18next.use(initReactI18next).init({
+export const initI18n = async (language?: string) => {
+  return await i18n.use(initReactI18next).init({
     lng: language || "en",
     resources: {
       en: { translation: en },
     },
   });
+};
+
+export const translate = (key: string) => i18n.t(key);
 
 export const translateError = (error: ScuteError) => {
   const slug = error.slug;
   if (!slug) return error.message;
-  return i18next.t(`scuteError.${slug}`);
+  return i18n.t(`scuteError.${slug}`);
 };
