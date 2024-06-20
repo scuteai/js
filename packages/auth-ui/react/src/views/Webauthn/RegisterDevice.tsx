@@ -59,7 +59,8 @@ const RegisterDevice = ({
   }, [identifier]);
 
   const handleRegisterDevice = async () => {
-    await cookieStore.setItem(SCUTE_REMEMBER_STORAGE_KEY, "true");
+    // TODO: This is a temporary workaround to clear the refresh token cookie
+    // await cookieStore.setItem(SCUTE_REMEMBER_STORAGE_KEY, "true");
 
     if (isWebauthnSupported) {
       const { error: registerDeviceError } =
@@ -84,7 +85,8 @@ const RegisterDevice = ({
   };
 
   const handleSkipAndLogin = async () => {
-    await cookieStore.removeItem(SCUTE_REMEMBER_STORAGE_KEY);
+    // TODO: This is a temporary workaround to clear the refresh token cookie
+    // await cookieStore.removeItem(SCUTE_REMEMBER_STORAGE_KEY);
 
     const { error: signInError } = await scuteClient.signInWithTokenPayload(
       authPayload

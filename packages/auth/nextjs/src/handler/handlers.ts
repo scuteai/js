@@ -46,18 +46,20 @@ async function ScuteRouteHandler(
     headers,
   });
 
-  const rememberMe =
-    context.cookies().get(SCUTE_REMEMBER_STORAGE_KEY)?.value === "true";
+  // TODO: This is a temporary workaround to clear the refresh token cookie
 
-  if (!rememberMe) {
-    response.headers.set(
-      "set-cookie",
-      serialize(SCUTE_REFRESH_STORAGE_KEY, "", {
-        maxAge: -1,
-        path: "/",
-      })
-    );
-  }
+  // const rememberMe =
+  //   context.cookies().get(SCUTE_REMEMBER_STORAGE_KEY)?.value === "true";
+
+  // if (!rememberMe) {
+  //   response.headers.set(
+  //     "set-cookie",
+  //     serialize(SCUTE_REFRESH_STORAGE_KEY, "", {
+  //       maxAge: -1,
+  //       path: "/",
+  //     })
+  //   );
+  // }
 
   return response;
 }

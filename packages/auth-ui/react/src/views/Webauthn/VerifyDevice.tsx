@@ -61,7 +61,8 @@ const VerifyDevice = ({
   };
 
   const handleVerifyDevice = async () => {
-    await cookieStore.setItem(SCUTE_REMEMBER_STORAGE_KEY, "true");
+    // TODO: This is a temporary workaround to clear the refresh token cookie
+    // await cookieStore.setItem(SCUTE_REMEMBER_STORAGE_KEY, "true");
 
     const { error: verifyDeviceError } =
       await scuteClient.signInWithVerifyDevice(identifier);
