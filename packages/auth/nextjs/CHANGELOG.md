@@ -1,5 +1,14 @@
 # @scute/nextjs
 
+## 1.0.5
+
+### Patch Changes
+
+- Fixes translations for profile and cross login issues
+- Updated dependencies
+  - @scute/core@1.0.5
+  - @scute/react@1.0.5
+
 ## 1.0.4
 
 ### Patch Changes

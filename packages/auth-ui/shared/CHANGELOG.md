@@ -1,5 +1,11 @@
 # @scute/ui-shared
 
+## 1.0.5
+
+### Patch Changes
+
+- Fixes translations for profile and cross login issues
+
 ## 1.0.4
 
 ### Patch Changes
