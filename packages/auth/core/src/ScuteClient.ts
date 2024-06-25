@@ -59,6 +59,7 @@ import type { UniqueIdentifier } from "./lib/types/general";
 import type {
   ScuteClientConfig,
   ScuteClientPreferences,
+  ScuteOAuthProviderConfig,
 } from "./lib/types/config";
 
 import type {
@@ -85,6 +86,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     refetchOnWindowFocus: ScuteClientPreferences["refetchOnWindowFocus"];
     refetchInverval: ScuteClientPreferences["refetchInverval"];
   };
+
+  protected readonly oAuthProviders: ScuteOAuthProviderConfig[] = [];
+  protected readonly baseOAuthURL: string;
 
   readonly admin: ScuteAdminApi;
 
@@ -162,6 +166,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       secretKey: config.secretKey,
       errorReporting,
     });
+
+    this.oAuthProviders = config.oAuthProviders || [];
+
+    this.baseOAuthURL = `${baseUrl}${endpointPrefix}/oauth/authorize?provider=`;
 
     this.emitter = mitt<InternalEvent>();
 
@@ -253,6 +261,22 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
 
     return { error: null };
+  }
+
+  /**
+   * Returns an array of enabled OAuth provider configurations.
+   * @returns ScuteOAuthProviderConfig
+   */
+  getOAuthProviders() {
+    return this.oAuthProviders;
+  }
+
+  /**
+   * Sign in with an OAuth provider.
+   * @param provider - OAuth provider name
+   */
+  signInWithOAuthProvider(provider: string) {
+    window.location.href = `${this.baseOAuthURL}${provider}`;
   }
 
   /**

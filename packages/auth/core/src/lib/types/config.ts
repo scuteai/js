@@ -6,9 +6,17 @@ export type ScuteClientConfig = {
   baseUrl?: string;
   /** IMPORTANT: Do not expose to the browser */
   secretKey?: string;
+  oAuthProviders?: ScuteOAuthProviderConfig[];
   preferences?: ScuteClientPreferences;
   debug?: boolean;
   errorReporting?: boolean;
+};
+
+export type ScuteOAuthProviderConfig = {
+  provider: string;
+  name: string;
+  icon: string;
+  color?: string;
 };
 
 export type ScuteSessionConfig = {

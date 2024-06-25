@@ -31,7 +31,8 @@
     "changeUser": "Change user",
     "identifierRequired": "Identifier is required.",
     "emailLimit": "The email should have at most 50 characters",
-    "emailValid": "Email address must be a valid address"
+    "emailValid": "Email address must be a valid address",
+    "signinWith": "Sign in with {{provider}}"
   },
 
   "registerForm": {
