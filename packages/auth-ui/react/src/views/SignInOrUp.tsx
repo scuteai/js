@@ -73,6 +73,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   const { t } = useTranslation();
 
+  const providers = scuteClient.getOAuthProviders();
+
   const [_mode, _setMode] =
     useState<NonNullable<SignInOrUpProps["mode"]>>(__mode);
 
@@ -350,6 +352,53 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         ) : (
           <RegisterForm {...registerFormProps} />
         )}
+        <Flex
+          direction={providers.length < 4 ? "column" : "row"}
+          wrap="wrap"
+          justify="center"
+          style={{ paddingTop: 16 }}
+        >
+          {providers.map((provider) => (
+            <Button
+              key={provider.provider}
+              size="2"
+              variant="alt"
+              style={
+                providers.length < 4
+                  ? { marginBottom: 16 }
+                  : {
+                      marginBottom: 16,
+                      width: "auto",
+                      padding: 16,
+                      marginRight: 12,
+                    }
+              }
+              onClick={() => {
+                scuteClient.signInWithOAuthProvider(provider.provider);
+              }}
+            >
+              {providers.length < 4 && (
+                <span>
+                  {t("signInOrUp.signinWith", { provider: provider.name })}
+                </span>
+              )}
+              <IconHolder
+                style={
+                  providers.length < 4
+                    ? { position: "absolute", left: 16, top: 13 }
+                    : { position: "relative", top: 5 }
+                }
+              >
+                <img
+                  src={provider.icon}
+                  alt={provider.name}
+                  width="24"
+                  height="24"
+                />
+              </IconHolder>
+            </Button>
+          ))}
+        </Flex>
       </Inner>
     </>
   );
