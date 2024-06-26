@@ -271,6 +271,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   <Label>{identifierLabelText}</Label>
                   <TextField
                     placeholder={identifierLabelText}
+                    autoCorrect="off"
+                    autoCapitalize="none"
                     {...register("identifier", {
                       required: t("signInOrUp.identifierRequired"),
                       validate: {
