@@ -297,9 +297,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
                           if (allowedIdentifiers.includes("email")) {
                             isValidOrError =
-                              /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(
-                                v
-                              ) || t("signInOrUp.emailValid");
+                              /^\S+@\S+\.\S+$/.test(v) ||
+                              t("signInOrUp.emailValid");
                           }
 
                           if (allowedIdentifiers.includes("phone")) {
