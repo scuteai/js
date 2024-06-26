@@ -110,7 +110,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async getUserByIdentifier(identifier: ScuteIdentifier) {
     return this.get<{ user: ScuteUser | null }>(
-      `${this._authPath}/users?identifier=${identifier}`
+      `${this._authPath}/users?identifier=${encodeURIComponent(identifier)}`
     );
   }
 
