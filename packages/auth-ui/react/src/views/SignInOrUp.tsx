@@ -73,7 +73,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   const { t } = useTranslation();
 
-  const providers = scuteClient.getOAuthProviders();
+  const providers = appData.oAuthProviders || [];
 
   const [_mode, _setMode] =
     useState<NonNullable<SignInOrUpProps["mode"]>>(__mode);

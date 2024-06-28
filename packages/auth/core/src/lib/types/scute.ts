@@ -10,6 +10,13 @@ export type ScuteActivity = {
   user_agent: string;
 } & Record<string, unknown>;
 
+export type ScuteOAuthProviderConfig = {
+  provider: string;
+  name: string;
+  icon: string;
+  color?: string;
+};
+
 export type ScuteAppData = {
   id: UniqueIdentifier;
   name: string;
@@ -34,6 +41,7 @@ export type ScuteAppData = {
   required_identifiers: ScuteIdentifierType[];
   default_language: string;
   user_meta_data_schema: ScuteUserMetaDataSchema[];
+  oAuthProviders?: ScuteOAuthProviderConfig[];
 };
 
 export interface ScuteUserMetaDataSchema {
