@@ -243,7 +243,18 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                         <Text size="1" css={{ pl: "$2" }}>
                           {t("signInOrUp.signInAs")}
                         </Text>
-                        <Badge>{rememberedIdentifier}</Badge>
+                        <Badge
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            display: "inline-block",
+                            width: 180,
+                            paddingTop: 6,
+                          }}
+                        >
+                          {rememberedIdentifier}
+                        </Badge>
                       </Flex>
                     </Flex>
                     <Button
