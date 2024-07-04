@@ -17,9 +17,12 @@ import {
   ElementCard,
   Flex,
   FooterCredits,
+  FooterLinks,
+  Header,
   LargeSpinner,
   Layout,
   Logo,
+  LogoContainer,
 } from "./components";
 import {
   SignInOrUp,
@@ -32,6 +35,7 @@ import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
 import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
 import { initI18n, translate as t } from "./helpers/i18n/service";
+import { AppLogo } from "./components/AppLogo";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -313,24 +317,34 @@ const Container = ({
           : ""
       }
     >
+      <Header>
+        <LogoContainer>
+          {appData && (
+            <AppLogo url={appData.logo} alt={appData.name} size={1} />
+          )}
+          <span>{appData && appData.name}</span>
+        </LogoContainer>
+      </Header>
       <ElementCard>
         <Content>{children}</Content>
-        {appData?.scute_branding !== false ? (
-          <Flex css={{ jc: "center", pb: "$1" }}>
-            <FooterCredits>
-              <span>{t("poweredBy")}</span>
-              <span>
-                <Logo
-                  webauthnAvailable={
-                    webauthn !== "disabled" && scuteClient.isWebauthnSupported()
-                  }
-                />
-                scute
-              </span>
-            </FooterCredits>
-          </Flex>
-        ) : null}
       </ElementCard>
+      {appData?.scute_branding !== false ? (
+        <Flex css={{ pb: "$1" }}>
+          <FooterCredits>
+            <Logo
+              webauthnAvailable={
+                webauthn !== "disabled" && scuteClient.isWebauthnSupported()
+              }
+            />
+
+            <span>{t("signInOrUp.signinWith", { provider: "scute" })}</span>
+          </FooterCredits>
+          <FooterLinks>
+            <a href="#">{t("signInOrUp.privacy")}</a>
+            <a href="#">{t("signInOrUp.help")}</a>
+          </FooterLinks>
+        </Flex>
+      ) : null}
     </Layout>
   );
 };

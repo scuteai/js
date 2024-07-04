@@ -6,8 +6,9 @@ import { Text } from "./Text";
 import { Badge } from "./Badge";
 import { Label } from "./Label";
 import { LargeSpinner } from "./LargeSpinner";
-
 import { Logo } from "./Logo";
+import { FloatingLabelTextField } from "./FloatingLabelTextField";
+
 export * from "./Layout";
 export * from "./Panel";
 
@@ -21,4 +22,5 @@ export {
   Label,
   LargeSpinner,
   Logo,
+  FloatingLabelTextField,
 };

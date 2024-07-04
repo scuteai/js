@@ -3,7 +3,8 @@ import { styled } from "../stitches.config";
 const shadow1 = "0 1px 2px rgba(0, 0, 0, .1)";
 const shadow2 = "0 1px 2px rgba(0, 0, 0, .1)";
 const shadow3 = "0 1px 2px rgba(0, 0, 0, .1)";
-const hairlineBorder = "0 0 0 1px transparent, 0 0 1px var(--scute-colors-contrast8)";
+const hairlineBorder =
+  "0 0 0 1px transparent, 0 0 1px var(--scute-colors-contrast8)";
 
 const hairlineBorderInset = "inset 0 0 0 red";
 const focusGlow =
@@ -14,9 +15,12 @@ const errorGlow =
 export const TextField = styled("input", {
   // Reset
   appearance: "none",
-  borderWidth: "0",
+  borderWidth: "1",
+  borderStyle: "solid",
+  borderColor: "$borderColor",
   boxSizing: "border-box",
   fontFamily: "inherit",
+  fontSize: "$5",
   margin: "0",
   outline: "none",
   padding: "0",
@@ -32,13 +36,14 @@ export const TextField = styled("input", {
   },
 
   color: "$hiContrast",
-  backgroundColor:'$loContrast',
+  backgroundColor: "$contrast0",
   fontVariantNumeric: "tabular-nums",
 
   boxShadow: `0 0 0 1px transparent, ${hairlineBorder},  0 1px 2px $colors$contrast2`,
 
   "&:-webkit-autofill": {
-    boxShadow: "inset 0 0 0 1px $colors$focusColor, inset 0 0 0 100px $colors$focusColorLight",
+    boxShadow:
+      "inset 0 0 0 1px $colors$focusColor, inset 0 0 0 100px $colors$focusColorLight",
   },
 
   "&:-webkit-autofill::first-line": {
@@ -46,6 +51,7 @@ export const TextField = styled("input", {
   },
 
   "&:focus": {
+    backgroundColor: "$contrast0",
     boxShadow: `${focusGlow}, ${hairlineBorder}`,
     "&:-webkit-autofill": {
       boxShadow:
@@ -84,13 +90,16 @@ export const TextField = styled("input", {
         },
       },
       "2": {
-        borderRadius: "$2",
-        height: "$9",
-        fontSize: "$3",
-        px: "$2",
+        borderRadius: "$4",
+        height: "$10",
+        fontSize: "$5",
+        px: "$5",
         lineHeight: "$sizes$6",
         "&:-webkit-autofill::first-line": {
-          fontSize: "$3",
+          fontSize: "$5",
+        },
+        "&:-webkit-autofill": {
+          fontSize: "$5",
         },
       },
     },

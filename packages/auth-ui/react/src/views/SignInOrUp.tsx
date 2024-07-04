@@ -35,6 +35,7 @@ import {
   IconHolder,
   Panel,
   LargeSpinner,
+  FloatingLabelTextField,
 } from "../components";
 
 import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
@@ -73,7 +74,51 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   const { t } = useTranslation();
 
-  const providers = appData.oAuthProviders || [];
+  const providers = appData.oAuthProviders || [
+    {
+      provider: "google",
+      name: "Google",
+      icon: "https://control.scute.io/provider-icons/google-icon.svg",
+    },
+    {
+      provider: "github",
+      name: "GitHub",
+      icon: "https://control.scute.io/provider-icons/github-icon.svg",
+    },
+    {
+      provider: "microsoft",
+      name: "Microsoft",
+      icon: "https://control.scute.io/provider-icons/microsoft-icon.svg",
+    },
+    {
+      provider: "slack",
+      name: "Slack",
+      icon: "https://control.scute.io/provider-icons/slack-icon.svg",
+    },
+    {
+      provider: "discord",
+      name: "Discord",
+      icon: "https://control.scute.io/provider-icons/discord-icon.svg",
+    },
+    {
+      provider: "twitter",
+      name: "Twitter",
+      icon: "https://control.scute.io/provider-icons/twitter-icon.svg",
+    },
+    {
+      provider: "twitter",
+      name: "Twitter",
+      icon: "https://control.scute.io/provider-icons/twitter-icon.svg",
+    },
+  ];
+
+  const googleProvider = providers.find(
+    (provider) => provider.provider === "google"
+  );
+
+  const otherProviders = providers
+    .filter((provider) => provider.provider !== "google")
+    .slice(0, 5);
 
   const [_mode, _setMode] =
     useState<NonNullable<SignInOrUpProps["mode"]>>(__mode);
@@ -217,9 +262,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   return (
     <>
-      <Header>
-        <AppLogo url={appData.logo} alt={appData.name} size={2} />
-      </Header>
       <Inner>
         {!showRegisterForm ? (
           <form
@@ -230,31 +272,17 @@ const SignInOrUp = (props: SignInOrUpProps) => {
           >
             {mode !== "sign_up" && rememberedIdentifier ? (
               <>
-                <Heading size="1" css={{ color: "$headingColor" }}>
-                  {t("signInOrUp.welcomeBack")}
-                </Heading>
-                <Panel css={{ mt: "$4", mb: "$5" }}>
+                <Heading size="4">{t("signInOrUp.welcomeBack")}</Heading>
+                <Panel css={{ mt: "$4", mb: "$7" }}>
                   <Flex gap={2} css={{ ai: "center", jc: "space-between" }}>
                     <Flex>
-                      <IconHolder>
-                        <BellIcon />
-                      </IconHolder>
                       <Flex css={{ fd: "column" }}>
-                        <Text size="1" css={{ pl: "$2" }}>
+                        <Text size="5" css={{ mb: "$2", pl: "$2" }}>
                           {t("signInOrUp.signInAs")}
                         </Text>
-                        <Badge
-                          style={{
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            display: "inline-block",
-                            width: 180,
-                            paddingTop: 6,
-                          }}
-                        >
+                        <Text size="6" css={{ pl: "$2" }}>
                           {rememberedIdentifier}
-                        </Badge>
+                        </Text>
                       </Flex>
                     </Flex>
                     <Button
@@ -268,23 +296,19 @@ const SignInOrUp = (props: SignInOrUpProps) => {
               </>
             ) : (
               <>
-                <Heading
-                  css={{
-                    color: "$headingColor",
-                    fontSize: "large",
-                    textAlign: "center",
-                  }}
-                >
-                  {signInOrUpText}
-                </Heading>
-
+                <Heading size="4">{signInOrUpText}</Heading>
                 <Group>
-                  <Label>{identifierLabelText}</Label>
-                  <TextField
-                    placeholder={identifierLabelText}
+                  <FloatingLabelTextField
+                    domId="email_field__floating_label"
+                    label={identifierLabelText}
+                    fieldType="email"
                     autoCorrect="off"
                     autoCapitalize="none"
-                    {...register("identifier", {
+                    autoComplete={`webauthn ${
+                      isEmailIdentifierAllowed ? "email" : ""
+                    }${isPhoneIdentifierAllowed ? "tel" : ""}`}
+                    state={isError ? "invalid" : "valid"}
+                    registerFormAttr={register("identifier", {
                       required: t("signInOrUp.identifierRequired"),
                       validate: {
                         maxLength: (v) => {
@@ -322,11 +346,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                         },
                       },
                     })}
-                    size="2"
-                    autoComplete={`webauthn ${
-                      isEmailIdentifierAllowed ? "email" : ""
-                    }${isPhoneIdentifierAllowed ? "tel" : ""}`}
-                    state={isError ? "invalid" : "valid"}
                   />
                   {isError ? (
                     <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
@@ -348,7 +367,9 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   type="submit"
                   disabled={!rememberedIdentifier && !isDirty && !isValid}
                 >
-                  <span>{t("general.continue")}</span>
+                  <span>
+                    {t("signInOrUp.signinWith", { provider: "Passkey" })}
+                  </span>
                   {isWebauthnAvailable ? (
                     <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
                   ) : null}
@@ -365,52 +386,112 @@ const SignInOrUp = (props: SignInOrUpProps) => {
           <RegisterForm {...registerFormProps} />
         )}
         <Flex
-          direction={providers.length < 4 ? "column" : "row"}
-          wrap="wrap"
           justify="center"
-          style={{ paddingTop: 16 }}
+          css={{ py: "$3", fontSize: "$4", fontWeight: 500 }}
         >
-          {providers.map((provider) => (
+          <span>{t("signInOrUp.or")}</span>
+        </Flex>
+        <Flex>
+          {googleProvider && (
             <Button
-              key={provider.provider}
+              key={googleProvider.provider}
               size="2"
-              variant="alt"
-              style={
-                providers.length < 4
-                  ? { marginBottom: 16 }
-                  : {
-                      marginBottom: 16,
-                      width: "auto",
-                      padding: 16,
-                      marginRight: 12,
-                    }
-              }
+              style={{ marginBottom: 16 }}
               onClick={() => {
-                scuteClient.signInWithOAuthProvider(provider.provider);
+                scuteClient.signInWithOAuthProvider(googleProvider.provider);
               }}
             >
-              {providers.length < 4 && (
-                <span>
-                  {t("signInOrUp.signinWith", { provider: provider.name })}
-                </span>
-              )}
+              <span>
+                {t("signInOrUp.continueWith", {
+                  provider: googleProvider.name,
+                })}
+              </span>
               <IconHolder
-                style={
-                  providers.length < 4
-                    ? { position: "absolute", left: 16, top: 13 }
-                    : { position: "relative", top: 5 }
-                }
+                style={{
+                  position: "absolute",
+                  top: 16,
+                  left: 21,
+                  height: 34,
+                  paddingTop: 5,
+                }}
               >
                 <img
-                  src={provider.icon}
-                  alt={provider.name}
+                  src={googleProvider.icon}
+                  alt={googleProvider.name}
                   width="24"
                   height="24"
                 />
               </IconHolder>
             </Button>
+          )}
+        </Flex>
+        <Flex
+          direction={providers.length < 4 ? "column" : "row"}
+          align="center"
+        >
+          {otherProviders.map((provider, index) => (
+            <>
+              {index > 0 && providers.length > 3 && (
+                <div style={{ width: 22 }}></div>
+              )}
+              <Button
+                key={provider.provider}
+                size="2"
+                style={
+                  providers.length < 4
+                    ? { marginBottom: 16 }
+                    : {
+                        marginBottom: 16,
+                        width: "auto",
+                        flexGrow: 1,
+                        padding: 16,
+                      }
+                }
+                onClick={() => {
+                  scuteClient.signInWithOAuthProvider(provider.provider);
+                }}
+              >
+                {providers.length < 4 && (
+                  <span>
+                    {t("signInOrUp.continueWith", { provider: provider.name })}
+                  </span>
+                )}
+                <IconHolder
+                  style={
+                    providers.length < 4
+                      ? {
+                          position: "absolute",
+                          top: 16,
+                          left: 21,
+                          height: 34,
+                          paddingTop: 5,
+                        }
+                      : { position: "relative", top: 5 }
+                  }
+                >
+                  <img
+                    src={provider.icon}
+                    alt={provider.name}
+                    width="24"
+                    height="24"
+                  />
+                </IconHolder>
+              </Button>
+            </>
           ))}
         </Flex>
+        <Text
+          css={{
+            pt: "$2",
+            color: "$footerTextColor",
+            fontSize: "$2",
+          }}
+        >
+          To continue, Scute will share your name, email address, language
+          preference, and profile picture with {appData.name} Before using this
+          app, you can review {appData.name}'s <a href="#">privacy policy</a>{" "}
+          and <a href="#">terms of service</a>.
+        </Text>
       </Inner>
     </>
   );
@@ -663,19 +744,19 @@ const useSignInOrUpFormHelpers = (
   const isEmailIdentifierAllowed = allowedIdentifiers.includes("email");
   const isPhoneIdentifierAllowed = allowedIdentifiers.includes("phone");
 
-  let identifierLabelText = t("general.email");
+  let identifierLabelText = t("general.yourEmail");
   if (isEmailIdentifierAllowed && isPhoneIdentifierAllowed) {
     identifierLabelText = t("general.emailOrPhone");
   } else if (isPhoneIdentifierAllowed) {
-    identifierLabelText = t("general.phone");
+    identifierLabelText = t("general.yourPhone");
   }
 
   const maybeNeededIdentifierType: ScuteIdentifierType =
     identifierType === "email" ? "phone" : "email";
   const maybeNeededIdentifierLabel =
     maybeNeededIdentifierType === "email"
-      ? t("general.email")
-      : t("general.phone");
+      ? t("general.yourEmail")
+      : t("general.yourPhone");
 
   return {
     isPublicSignUpAllowed,

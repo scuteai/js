@@ -9,6 +9,8 @@
     "email": "Email",
     "emailOrPhone": "Email or phone number",
     "phone": "Phone number",
+    "yourEmail": "Your email",
+    "yourPhone": "Your phone number",
     "continueWithMagicLink": "Continue with magic link",
     "tryAgain": "Try again",
     "pleaseTryAgain": "Please try again",
@@ -32,7 +34,11 @@
     "identifierRequired": "Identifier is required.",
     "emailLimit": "The email should have at most 50 characters",
     "emailValid": "Email address must be a valid address",
-    "signinWith": "Sign in with {{provider}}"
+    "signinWith": "Sign in with {{provider}}",
+    "continueWith": "Continue with {{provider}}",
+    "privacy": "Privacy",
+    "help": "Help",
+    "or": "Or"
   },
 
   "registerForm": {
