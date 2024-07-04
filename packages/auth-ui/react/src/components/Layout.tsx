@@ -1,17 +1,27 @@
 import { styled, shadowCreator } from "../stitches.config";
+import { Text } from "./Text";
 
 export const Layout = styled("div", {
   maxWidth: "570px",
   width: "100%",
   fontWeight: "300",
   padding: "$4",
-  background: "$contrast1",
+  background: "$surfaceBg",
   borderRadius: "$3",
 });
 
 export const ElementCard = styled("div", {
   background: "$cardBg",
   borderRadius: "$3",
+});
+
+export const ElementCardFooter = styled(Text, {
+  pt: "$2 !important",
+  color: "$cardFooterText !important",
+  fontSize: "$2 !important",
+  "& a": {
+    color: "$cardFooterLink !important",
+  },
 });
 
 export const Content = styled("div", {
@@ -25,6 +35,10 @@ export const FooterCredits = styled("div", {
   jc: "center",
   pt: "$3",
   fontSize: "$1",
+  color: "$surfaceText",
+  "& svg path": {
+    fill: "$surfaceText",
+  },
   "& span": {
     display: "flex",
     gap: "4px",
@@ -37,7 +51,7 @@ export const FooterLinks = styled("div", {
   pt: "$3",
   fontSize: "$1",
   "& a": {
-    color: "inherit",
+    color: "$surfaceLink",
     textDecoration: "none",
     ml: "$2",
   },
@@ -58,7 +72,7 @@ export const Inner = styled("div", {
 });
 
 export const LogoContainer = styled("div", {
-  background: "$contrast0",
+  background: "$surfaceLogoBg",
   padding: "$1",
   borderRadius: "$2",
   display: "flex",

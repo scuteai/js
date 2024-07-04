@@ -36,7 +36,6 @@ export const {
       errorColor: "#fe4f0d",
       focusColor: "rgba(46, 234, 175, 0.3)",
       focusColorLight: "rgba(46, 234, 175, 0.2)",
-      cardBg: "$contrast0",
       cardShadow:
         "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
       cardBorder: "none",
@@ -44,6 +43,30 @@ export const {
       panel: "$loContrast",
       panelShadow:
         "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
+
+      /* 
+      Exposed styles
+      */
+
+      surfaceBg: "#f7f7f7",
+      surfaceLink: "#666666",
+      surfaceText: "#666666",
+      surfaceLogoBg: "#ffffff",
+
+      cardBg: "#ffffff",
+      cardHeadingText: "#121212",
+      cardBodyText: "#121212",
+      cardFooterText: "#b0b0b0",
+      cardFooterLink: "#b0b0b0",
+
+      panelBg: "#f7f7f7",
+      panelText: "#121212",
+
+      inputBg: "#ffffff",
+      inputText: "#121212",
+      inputBorder: "#e1e1e1",
+
+      buttonBorder: "#cecece",
 
       // Buttons
       buttonIconColor: "#ffffff",
@@ -86,6 +109,10 @@ export const {
       buttonAltFocusRing2: "$focusColor",
       buttonAltFocusShadow1: "$focusColor",
       buttonAltFocusShadow2: "$focusColor",
+
+      /* 
+      Exposed styles end
+      */
     },
     fonts: {
       main: '"Inter", -apple-system, system-ui, sans-serif',

@@ -51,7 +51,7 @@ export const Heading = React.forwardRef<
       size={textSize[size]}
       css={{
         mb: "$2",
-        color: "$headingColor",
+        color: "$cardHeadingText",
         fontVariantNumeric: "proportional-nums",
         ...merge(textCss[size], props.css),
       }}

@@ -17,7 +17,7 @@ export const TextField = styled("input", {
   appearance: "none",
   borderWidth: "1",
   borderStyle: "solid",
-  borderColor: "$borderColor",
+  borderColor: "$inputBorder",
   boxSizing: "border-box",
   fontFamily: "inherit",
   fontSize: "$5",
@@ -35,8 +35,8 @@ export const TextField = styled("input", {
     boxSizing: "border-box",
   },
 
-  color: "$hiContrast",
-  backgroundColor: "$contrast0",
+  color: "$inputText",
+  backgroundColor: "$inputBg",
   fontVariantNumeric: "tabular-nums",
 
   boxShadow: `0 0 0 1px transparent, ${hairlineBorder},  0 1px 2px $colors$contrast2`,

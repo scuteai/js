@@ -44,6 +44,9 @@ export const Text = styled("span", {
       contrast: {
         color: "$hiContrast",
       },
+      inherit: {
+        color: "inherit",
+      },
     },
     gradient: {
       true: {

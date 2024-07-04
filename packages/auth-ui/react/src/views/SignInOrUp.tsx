@@ -36,6 +36,7 @@ import {
   Panel,
   LargeSpinner,
   FloatingLabelTextField,
+  ElementCardFooter,
 } from "../components";
 
 import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
@@ -277,10 +278,14 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   <Flex gap={2} css={{ ai: "center", jc: "space-between" }}>
                     <Flex>
                       <Flex css={{ fd: "column" }}>
-                        <Text size="5" css={{ mb: "$2", pl: "$2" }}>
+                        <Text
+                          size="5"
+                          css={{ mb: "$2", pl: "$2" }}
+                          variant="inherit"
+                        >
                           {t("signInOrUp.signInAs")}
                         </Text>
-                        <Text size="6" css={{ pl: "$2" }}>
+                        <Text size="6" css={{ pl: "$2" }} variant="inherit">
                           {rememberedIdentifier}
                         </Text>
                       </Flex>
@@ -480,18 +485,12 @@ const SignInOrUp = (props: SignInOrUpProps) => {
             </>
           ))}
         </Flex>
-        <Text
-          css={{
-            pt: "$2",
-            color: "$footerTextColor",
-            fontSize: "$2",
-          }}
-        >
+        <ElementCardFooter>
           To continue, Scute will share your name, email address, language
           preference, and profile picture with {appData.name} Before using this
           app, you can review {appData.name}'s <a href="#">privacy policy</a>{" "}
           and <a href="#">terms of service</a>.
-        </Text>
+        </ElementCardFooter>
       </Inner>
     </>
   );

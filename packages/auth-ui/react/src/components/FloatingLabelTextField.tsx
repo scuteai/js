@@ -37,7 +37,7 @@ const Container = styled("div", {
   },
   [`& ${TextField}:focus + label, & ${TextField}:not(:placeholder-shown) + label`]:
     {
-      backgroundColor: "$contrast0",
+      backgroundColor: "$inputBg",
       transform: "translateY(-110%) scale(0.85)",
     },
 });
