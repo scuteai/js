@@ -128,7 +128,7 @@ const RegisterDevice = ({
             : t("registerDevice.trustDeviceTitle")}
         </Heading>
         {error ? (
-          <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
+          <Text size="2" css={{ color: "$errorColor" }}>
             {error}
           </Text>
         ) : (
