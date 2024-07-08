@@ -116,8 +116,8 @@ const VerifyDevice = ({
 
   return (
     <>
-      <Header>
-        <BiometricsIcon color="var(--scute-colors-contrast8)" />
+      <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
+        <BiometricsIcon color="var(--scute-colors-accent)" />
       </Header>
       <Inner
         css={{
@@ -127,9 +127,7 @@ const VerifyDevice = ({
           textAlign: "center",
         }}
       >
-        <Heading size="1" css={{ color: "$headingColor" }}>
-          {t("verifyDevice.verifyDeviceTitle")}
-        </Heading>
+        <Heading size="4">{t("verifyDevice.verifyDeviceTitle")}</Heading>
 
         {error ? (
           <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
@@ -145,9 +143,11 @@ const VerifyDevice = ({
         <Flex css={{ jc: "center", py: "$5" }}>
           <Badge size="1">{identifier}</Badge>
         </Flex>
-        <Flex css={{ jc: "space-around" }}>
+        <Flex direction="column" css={{ jc: "space-around" }}>
           <Button
+            size="2"
             variant="alt"
+            css={{ mb: "$3" }}
             onClick={() => {
               if (error) {
                 setError(null);
@@ -159,7 +159,7 @@ const VerifyDevice = ({
           >
             {!error ? t("general.changeEmail") : t("general.tryAgain")}
           </Button>
-          <Button variant="alt" onClick={() => handleSendMagicLink()}>
+          <Button size="2" variant="alt" onClick={() => handleSendMagicLink()}>
             {t("verifyDevice.signInMagicLink")}
           </Button>
         </Flex>

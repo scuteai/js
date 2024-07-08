@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { BiometricsIcon } from "../assets/icons";
+import { BiometricsIcon, DeadPCIcon } from "../assets/icons";
 import {
   Badge,
   Flex,
@@ -26,8 +26,8 @@ const FatalErrorView = ({
 
   return (
     <>
-      <Header>
-        <BiometricsIcon color="var(--scute-colors-errorColor)" />
+      <Header css={{ mb: "$4", mt: "$4", jc: "center" }}>
+        <DeadPCIcon color="var(--scute-colors-accent)" />
       </Header>
       <Inner
         css={{
@@ -37,9 +37,7 @@ const FatalErrorView = ({
           textAlign: "center",
         }}
       >
-        <Heading size="1" css={{ color: "$errorColor" }}>
-          {error ?? t("general.somethingWentWrong")}
-        </Heading>
+        <Heading size="4">{error ?? t("general.somethingWentWrong")}</Heading>
         <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
           {t("general.pleaseTryAgain")}
         </Text>
