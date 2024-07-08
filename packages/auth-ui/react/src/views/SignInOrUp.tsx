@@ -75,6 +75,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   const { t } = useTranslation();
 
+  // TODO: mock
   const providers = appData.oAuthProviders || [
     {
       provider: "google",

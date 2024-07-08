@@ -11,7 +11,7 @@ import { VIEWS } from "@scute/ui-shared";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { EmailIcon } from "../assets/icons";
+import { DeadPCIcon, EmailIcon } from "../assets/icons";
 
 import {
   Badge,
@@ -192,31 +192,29 @@ const VerifyMagicLinkOtp = ({
           display: "flex",
           jc: "center",
           fd: "column",
-          textAlign: "center",
         }}
       >
-        <Heading size="1" css={{ color: "$headingColor" }}>
+        <Heading size="4">
           {isWebauthnNewDevice
             ? t("verifyOTP.newDeviceTitle")
             : t("verifyOTP.checkEmailTitle")}
         </Heading>
-        <Text size="2" css={{ color: "$textColor", mb: "$1" }}>
-          {t("verifyOTP.bodyP1Part1")} <br />
-          {t("verifyOTP.bodyP1Part2")}
+        <Text size="2" css={{ mb: "$1" }}>
+          {t("verifyOTP.newDeviceBody")}
         </Text>
-        <Text size="2">{t("verifyOTP.bodyP2")}</Text>
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
-        <Flex css={{ jc: "space-between" }}>
+        <Text size="2" css={{ mb: "$5" }}>
+          {identifier}
+        </Text>
+        <Flex direction="column">
+          <Button size="2" variant="alt" disabled css={{ mb: "$3" }}>
+            {t("general.resendEmail")}
+          </Button>
           <Button
+            size="2"
             variant="alt"
             onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
           >
             {t("general.changeEmail")}
-          </Button>
-          <Button variant="alt" disabled>
-            {t("general.resendEmail")}
           </Button>
         </Flex>
       </Inner>
@@ -237,14 +235,16 @@ const LoadingMagic = ({
 
   return (
     <>
-      <Header css={{ mb: "$1" }}>
+      <Header css={{ mb: "$4", mt: "$4" }}>
         {!error ? (
           <LargeSpinner
-            icon={<EmailIcon color="var(--scute-colors-contrast8)" />}
+            icon={<EmailIcon color="var(--scute-colors-accent)" />}
             spinnerColor="green"
           />
         ) : (
-          <EmailIcon />
+          <Flex css={{ jc: "center", width: "100%" }}>
+            <DeadPCIcon color="var(--scute-colors-accent)" />
+          </Flex>
         )}
       </Header>
       <Inner
@@ -260,11 +260,12 @@ const LoadingMagic = ({
             <Heading size="1" css={{ color: "$headingColor" }}>
               {t("verifyOTP.loading.title")}
             </Heading>
-            <Text size="2" css={{ color: "$textColor", mb: "$1" }}></Text>
+            <Text size="2" css={{ color: "$textColor", mb: "$4" }}></Text>
           </>
         ) : (
           <>
-            <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
+            <Heading size="4">{t("general.somethingWentWrong")}</Heading>
+            <Text size="2" css={{ color: "$errorColor", mb: "$4" }}>
               {error}
             </Text>
             <Flex css={{ jc: "center", mt: "2rem" }}>

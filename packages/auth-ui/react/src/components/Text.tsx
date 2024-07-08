@@ -39,7 +39,7 @@ export const Text = styled("span", {
     },
     variant: {
       text: {
-        color: "$textColor",
+        color: "$cardBodyText",
       },
       contrast: {
         color: "$hiContrast",

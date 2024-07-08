@@ -47,13 +47,13 @@
   },
 
   "registerDevice": {
-    "registerDeviceTitle": "Let's register your device",
+    "registerDeviceTitle": "Enable passkey",
     "trustDeviceTitle": "Do you trust this device?",
     "registerDevice": "Register Device",
     "trustDevice": "Yes, trust device",
     "skipAndLogin": "Skip and log in",
     "dontTrustDevice": "No, don't trust device",
-    "logInWebAuthn": "Log into your account with the method you already use to unlock your device",
+    "logInWebAuthn": "If this is a trusted device, you can register your passkey for fast and secure login",
     "logInNoWebAuthn": "We'll keep you signed in on this device. To keep your account secure, use this option on your personal devices only.",
     "registerInProgress": "A device is being registered in another instance."
   },
@@ -66,7 +66,8 @@
   },
 
   "verifyOTP": {
-    "newDeviceTitle": "This is a new device, to remember it we need to register it first",
+    "newDeviceTitle": "Let's verify you",
+    "newDeviceBody": "To keep your account secure, we need to verify it’s you. Check your email",
     "checkEmailTitle": "Check your email to login",
     "bodyP1Part1": "We’ve sent an email to your inbox with",
     "bodyP1Part2": "a one-time link.",

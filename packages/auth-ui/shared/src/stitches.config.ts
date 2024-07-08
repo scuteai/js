@@ -47,6 +47,7 @@ export const {
       /* 
       Exposed styles
       */
+      accent: "#212121",
 
       surfaceBg: "#f7f7f7",
       surfaceLink: "#666666",
