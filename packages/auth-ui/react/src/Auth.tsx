@@ -46,6 +46,10 @@ export type AuthProps = {
   appearance?: {
     theme?: Theme;
   };
+  policyURLs?: {
+    privacyPolicy?: string;
+    termsOfService?: string;
+  };
 };
 
 function Auth(props: AuthProps) {
@@ -56,6 +60,7 @@ function Auth(props: AuthProps) {
     webauthn = "optional",
     language,
     onSignIn,
+    policyURLs,
   } = props;
 
   const [identifier, setIdentifier] = useState<ScuteIdentifier>("");
@@ -187,6 +192,7 @@ function Auth(props: AuthProps) {
             setIsFatalError={setIsFatalError}
             webauthnEnabled={webauthn !== "disabled"}
             getMagicLinkIdCallback={(id) => setMagicLinkId(id)}
+            policyURLs={policyURLs}
           />
         </Container>
       );

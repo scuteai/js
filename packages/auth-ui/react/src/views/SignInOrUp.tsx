@@ -52,6 +52,10 @@ interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   mode?: "sign_in" | "sign_up" | "sign_in_or_up" | "confirm_invite";
   appData: ScuteAppData;
   webauthnEnabled?: boolean;
+  policyURLs?: {
+    privacyPolicy?: string;
+    termsOfService?: string;
+  };
   getMagicLinkIdCallback?: (magicLinkId: UniqueIdentifier) => void;
   getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
 }
@@ -71,6 +75,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     webauthnEnabled = true,
     setIsFatalError,
     getMagicLinkIdCallback,
+    policyURLs,
   } = props;
 
   const { t } = useTranslation();
@@ -489,8 +494,9 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         <ElementCardFooter>
           To continue, Scute will share your name, email address, language
           preference, and profile picture with {appData.name} Before using this
-          app, you can review {appData.name}'s <a href="#">privacy policy</a>{" "}
-          and <a href="#">terms of service</a>.
+          app, you can review {appData.name}'s{" "}
+          <a href={policyURLs?.privacyPolicy ?? "#"}>privacy policy</a> and{" "}
+          <a href={policyURLs?.termsOfService ?? "#"}>terms of service</a>.
         </ElementCardFooter>
       </Inner>
     </>
