@@ -37,6 +37,8 @@ export interface VerifyMagicLinkOtpProps extends CommonViewProps {
   getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
 }
 
+const TIMER_START = 30;
+
 const VerifyMagicLinkOtp = ({
   scuteClient,
   identifier: _identifier,
@@ -51,6 +53,8 @@ const VerifyMagicLinkOtp = ({
   const [isPolling, setIsPolling] = useState(false);
   const [isVerifyCalled, setIsVerifyCalled] = useState(false);
   const [identifier, setIdentifier] = useState(_identifier);
+  const [time, setTime] = useState(TIMER_START);
+  const [resendDisabled, setResendDisabled] = useState(false);
 
   const { t } = useTranslation();
   const isBroadcastMagicVerified = useRef<boolean>(false);
@@ -76,6 +80,15 @@ const VerifyMagicLinkOtp = ({
 
     return () => unsubscribe();
   }, []);
+
+  useInterval(
+    () => {
+      if (time > 0) {
+        setTime(time - 1);
+      }
+    },
+    time > 0 ? 1000 : null
+  );
 
   useInterval(
     async () => {
@@ -206,7 +219,25 @@ const VerifyMagicLinkOtp = ({
           {identifier}
         </Text>
         <Flex direction="column">
-          <Button size="2" variant="alt" disabled css={{ mb: "$3" }}>
+          <Button
+            size="2"
+            variant="alt"
+            disabled={time > 0 || resendDisabled}
+            css={{ mb: "$3" }}
+            onClick={async () => {
+              setResendDisabled(true);
+              const { data, error: magicLinkError } =
+                await scuteClient.sendLoginMagicLink(identifier);
+              if (magicLinkError) {
+                const translatedErrorMessage = translateError(magicLinkError);
+                setError(translatedErrorMessage);
+                return;
+              }
+              setTime(TIMER_START);
+              setResendDisabled(false);
+            }}
+          >
+            {time > 0 && `[0:${time.toString().padStart(2, "0")}]`}{" "}
             {t("general.resendEmail")}
           </Button>
           <Button
