@@ -38,12 +38,17 @@ const VerifyDevice = ({
 }: VerifyDeviceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const { t } = useTranslation();
 
   const cookieStore = new ScuteBrowserCookieStorage();
 
   const handleSendMagicLink = async (isNewDevice = false) => {
+    if (submitting) {
+      return;
+    }
+    setSubmitting(true);
     const { data, error: sendMagicLinkError } =
       await scuteClient.sendLoginMagicLink(identifier, undefined, !isNewDevice);
 
@@ -58,6 +63,7 @@ const VerifyDevice = ({
     if (magicLinkId) {
       getMagicLinkIdCallback?.(magicLinkId);
     }
+    setSubmitting(true);
   };
 
   const handleVerifyDevice = async () => {
