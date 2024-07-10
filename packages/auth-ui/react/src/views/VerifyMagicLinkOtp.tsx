@@ -288,10 +288,8 @@ const LoadingMagic = ({
       >
         {!error ? (
           <>
-            <Heading size="1" css={{ color: "$headingColor" }}>
-              {t("verifyOTP.loading.title")}
-            </Heading>
-            <Text size="2" css={{ color: "$textColor", mb: "$4" }}></Text>
+            <Heading size="1">{t("verifyOTP.loading.title")}</Heading>
+            <Text size="2" css={{ mb: "$4" }}></Text>
           </>
         ) : (
           <>

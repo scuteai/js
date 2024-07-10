@@ -142,9 +142,7 @@ const VerifyDevice = ({
             {t("verifyDevice.tryAgain")}
           </Text>
         ) : (
-          <Text css={{ color: "$textColor" }}>
-            {t("verifyDevice.verifyDeviceBody")}
-          </Text>
+          <Text>{t("verifyDevice.verifyDeviceBody")}</Text>
         )}
         <Flex css={{ jc: "center", py: "$5" }}>
           <Badge size="1">{identifier}</Badge>
