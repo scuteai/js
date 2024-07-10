@@ -72,14 +72,14 @@ export const {
       buttonIconColor: "#ffffff",
 
       buttonIdleText: "white",
-      buttonIdleBg: "$contrast9",
-      buttonIdleBorder: "rgba(0,0,0,1)", //
+      buttonIdleBg: "#212121",
+      buttonIdleBorder: "rgb(186, 186, 186, 1)", //
       buttonIdleShadow1: "rgba(0,0,0,1)", //
       buttonIdleShadow2: "rgba(0,0,0,1)", //
 
-      buttonPassiveBg: "$contrast5", //
+      buttonPassiveBg: "#757575", //
 
-      buttonHoverBg: "$contrast10",
+      buttonHoverBg: "#121212",
       buttonHoverText: "white",
       buttonHoverBorder: "black", //
       buttonHoverShadow1: "rgba(0,0,0,1)", //
@@ -94,15 +94,15 @@ export const {
       // Alt variant
       buttonAltIconColor: "#ffffff", //
 
-      buttonAltIdleText: "$contrast8",
+      buttonAltIdleText: "#333333",
       buttonAltIdleBg: "white",
       buttonAltIdleBorder: "rgba(0,0,0,0.2)", //
       buttonAltIdleShadow1: "rgba(0,0,0,0.05)", //
       buttonAltIdleShadow2: "rgba(0,0,0,0.05)", //
 
-      buttonAltPassiveBg: "$contrast5", //
+      buttonAltPassiveBg: "#757575", //
 
-      buttonAltHoverBg: "$contrast10",
+      buttonAltHoverBg: "#121212",
       buttonAltHoverText: "white",
       buttonAltHoverBorder: "rgba(0,0,0,0.05)",
       buttonAltHoverRing1: "rgba(0,0,0,0.05)", //
@@ -125,7 +125,7 @@ export const {
       buttonSocialIdleShadow1: "rgba(0,0,0,0.05)", //
       buttonSocialIdleShadow2: "rgba(0,0,0,0.05)", //
 
-      buttonSocialPassiveBg: "$contrast5", //
+      buttonSocialPassiveBg: "#757575", //
 
       buttonSocialHoverBg: "#f7f7f7",
       buttonSocialHoverText: "#222222",
