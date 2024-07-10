@@ -152,6 +152,39 @@ export const Button = styled("button", {
           ),
         },
       },
+      social: {
+        backgroundColor: "$buttonSocialIdleBg",
+        color: "$buttonSocialIdleText",
+        border: "1px solid $buttonSocialIdleBorder",
+        "&:hover": {
+          backgroundColor: "$buttonSocialHoverBg",
+          color: "$buttonSocialHoverText",
+        },
+        "&:focus": {
+          backgroundColor: "$buttonSocialHoverBg",
+          color: "$buttonSocialHoverText",
+          boxShadow: shadowCreator(
+            "focus",
+            "$colors$buttonSocialFocusBorder",
+            "$colors$buttonSocialFocusRing1",
+            "$colors$buttonSocialFocusRing2",
+            "$colors$buttonSocialFocusShadow1",
+            "$colors$buttonSocialFocusShadow2"
+          ),
+        },
+        "&:active": {
+          backgroundColor: "$buttonSocialHoverBg",
+          color: "$buttonSocialHoverText",
+          boxShadow: shadowCreator(
+            "initial",
+            "$colors$buttonSocialFocusBorder",
+            "$colors$buttonSocialFocusRing1",
+            "$colors$buttonSocialFocusRing2",
+            "$colors$buttonSocialFocusShadow1",
+            "$colors$buttonSocialFocusShadow2"
+          ),
+        },
+      },
     },
   },
   defaultVariants: {

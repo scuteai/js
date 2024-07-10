@@ -408,6 +408,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
               key={googleProvider.provider}
               size="2"
               style={{ marginBottom: 16 }}
+              variant="social"
               onClick={() => {
                 scuteClient.signInWithOAuthProvider(googleProvider.provider);
               }}
@@ -448,6 +449,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
               <Button
                 key={provider.provider}
                 size="2"
+                variant="social"
                 style={
                   providers.length < 4
                     ? { marginBottom: 16 }
