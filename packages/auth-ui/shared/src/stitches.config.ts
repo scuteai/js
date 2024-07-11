@@ -65,7 +65,12 @@ export const {
 
       inputBg: "#ffffff",
       inputText: "#121212",
-      inputBorder: "#e1e1e1",
+      inputPlaceholder: "#333333",
+      inputBorder: "#333333",
+      inputFocusGlow: "rgba(46, 234, 175, 0.3)",
+
+      inputDisabledBg: "#DEDEDE",
+      inputDisabledText: "#333333",
 
       // Buttons
       // Default variant

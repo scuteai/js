@@ -18,7 +18,6 @@ const Container = styled("div", {
   position: "relative",
   [`& ${TextField}`]: {
     fontSize: "$5",
-    boxShadow: "none !important",
   },
   [`& ${TextField}::placeholder`]: {
     color: "transparent",

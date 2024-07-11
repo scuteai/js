@@ -4,20 +4,18 @@ const shadow1 = "0 1px 2px rgba(0, 0, 0, .1)";
 const shadow2 = "0 1px 2px rgba(0, 0, 0, .1)";
 const shadow3 = "0 1px 2px rgba(0, 0, 0, .1)";
 const hairlineBorder =
-  "0 0 0 1px transparent, 0 0 1px var(--scute-colors-contrast8)";
+  "0 0 0 1px transparent, 0 0 1px var(--scute-colors-inputBorder)";
 
 const hairlineBorderInset = "inset 0 0 0 red";
 const focusGlow =
-  "0 0 0 1px transparent, 0 0 1px #013399, 0 0 0 4px var(--scute-colors-focusColor)";
+  "0 0 0 1px transparent, 0 0 1px #013399, 0 0 0 4px var(--scute-colors-inputFocusGlow)";
 const errorGlow =
   "0 0 0 1px transparent, 0 0 1px #c84648, 0 0 0 4px var(--scute-colors-errorColor)";
 
 export const TextField = styled("input", {
   // Reset
   appearance: "none",
-  borderWidth: "1",
-  borderStyle: "solid",
-  borderColor: "$inputBorder",
+  borderWidth: "0",
   boxSizing: "border-box",
   fontFamily: "inherit",
   fontSize: "$5",
@@ -39,11 +37,11 @@ export const TextField = styled("input", {
   backgroundColor: "$inputBg",
   fontVariantNumeric: "tabular-nums",
 
-  boxShadow: `0 0 0 1px transparent, ${hairlineBorder},  0 1px 2px $colors$contrast2`,
+  boxShadow: `0 0 0 1px transparent, ${hairlineBorder}`,
 
   "&:-webkit-autofill": {
     boxShadow:
-      "inset 0 0 0 1px $colors$focusColor, inset 0 0 0 100px $colors$focusColorLight",
+      "inset 0 0 0 1px $colors$inputFocusGlow, inset 0 0 0 100px $colors$inputFocusGlow",
   },
 
   "&:-webkit-autofill::first-line": {
@@ -51,30 +49,26 @@ export const TextField = styled("input", {
   },
 
   "&:focus": {
-    backgroundColor: "$contrast0",
     boxShadow: `${focusGlow}, ${hairlineBorder}`,
     "&:-webkit-autofill": {
       boxShadow:
-        "inset 0px 0px 0px 1px $colors$focusColor, 0px 0px 0px 1px $colors$focusColor, inset 0 0 0 100px $colors$focusColorLight",
+        "inset 0px 0px 0px 1px $colors$inputFocusGlow, 0px 0px 0px 1px $colors$inputFocusGlow, inset 0 0 0 100px $colors$inputFocusGlow",
     },
   },
   "&::placeholder": {
-    color: "$contrast8",
+    color: "$inputPlaceholder",
   },
   "&:disabled": {
     pointerEvents: "none",
-    backgroundColor: "$contrast2",
-    color: "$contrast8",
+    backgroundColor: "$inputDisabledBg",
+    color: "$inputDisabledText",
     cursor: "not-allowed",
     "&::placeholder": {
       color: "$gray7",
     },
   },
   "&:read-only": {
-    backgroundColor: "$contrast2",
-    "&:focus": {
-      boxShadow: "inset 0px 0px 0px 1px $colors$contrast7",
-    },
+    backgroundColor: "$inputDisabledBg",
   },
 
   variants: {
@@ -96,10 +90,7 @@ export const TextField = styled("input", {
         px: "$5",
         lineHeight: "$sizes$6",
         "&:-webkit-autofill::first-line": {
-          fontSize: "$5",
-        },
-        "&:-webkit-autofill": {
-          fontSize: "$5",
+          fontSize: "$3",
         },
       },
     },
