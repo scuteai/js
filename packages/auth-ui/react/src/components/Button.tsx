@@ -50,6 +50,14 @@ export const Button = styled("button", {
 
   backgroundColor: "$buttonIdleBg",
   color: "$buttonIdleText",
+  boxShadow: shadowCreator(
+    "initial",
+    "$colors$buttonIdleBorder",
+    "$colors$buttonIdleShadow",
+    "$colors$buttonIdleShadow",
+    "$colors$buttonIdleShadow",
+    "$colors$buttonIdleShadow"
+  ),
 
   "& svg": {
     position: "absolute",
@@ -60,6 +68,14 @@ export const Button = styled("button", {
   "&:hover": {
     backgroundColor: "$buttonHoverBg",
     color: "$buttonHoverText",
+    boxShadow: shadowCreator(
+      "focus",
+      "$colors$buttonHoverBorder",
+      "$colors$buttonHoverShadow",
+      "$colors$buttonHoverShadow",
+      "$colors$buttonHoverShadow",
+      "$colors$buttonHoverShadow"
+    ),
   },
   "&:focus": {
     backgroundColor: "$buttonHoverBg",
@@ -67,10 +83,10 @@ export const Button = styled("button", {
     boxShadow: shadowCreator(
       "focus",
       "$colors$buttonFocusBorder",
-      "$colors$buttonFocusRing1",
-      "$colors$buttonFocusRing2",
-      "$colors$buttonFocusShadow1",
-      "$colors$buttonFocusShadow2"
+      "$colors$buttonFocusShadow",
+      "$colors$buttonFocusShadow",
+      "$colors$buttonFocusShadow",
+      "$colors$buttonFocusShadow"
     ),
   },
   "&:active": {
@@ -80,10 +96,10 @@ export const Button = styled("button", {
     boxShadow: shadowCreator(
       "initial",
       "$colors$buttonFocusBorder",
-      "$colors$buttonFocusRing1",
-      "$colors$buttonFocusRing2",
-      "$colors$buttonFocusShadow1",
-      "$colors$buttonFocusShadow2"
+      "$colors$buttonFocusShadow",
+      "$colors$buttonFocusShadow",
+      "$colors$buttonFocusShadow",
+      "$colors$buttonFocusShadow"
     ),
   },
   "&:disabled": {
@@ -122,10 +138,25 @@ export const Button = styled("button", {
       alt: {
         backgroundColor: "$buttonAltIdleBg",
         color: "$buttonAltIdleText",
-        border: "1px solid $contrast3",
+        boxShadow: shadowCreator(
+          "initial",
+          "$colors$buttonAltIdleBorder",
+          "$colors$buttonAltIdleShadow",
+          "$colors$buttonAltIdleShadow",
+          "$colors$buttonAltIdleShadow",
+          "$colors$buttonAltIdleShadow"
+        ),
         "&:hover": {
           backgroundColor: "$buttonAltHoverBg",
           color: "$buttonAltHoverText",
+          boxShadow: shadowCreator(
+            "focus",
+            "$colors$buttonAltHoverBorder",
+            "$colors$buttonAltHoverShadow",
+            "$colors$buttonAltHoverShadow",
+            "$colors$buttonAltHoverShadow",
+            "$colors$buttonAltHoverShadow"
+          ),
         },
         "&:focus": {
           backgroundColor: "$buttonAltHoverBg",
@@ -133,10 +164,10 @@ export const Button = styled("button", {
           boxShadow: shadowCreator(
             "focus",
             "$colors$buttonAltFocusBorder",
-            "$colors$buttonAltFocusRing1",
-            "$colors$buttonAltFocusRing2",
-            "$colors$buttonAltFocusShadow1",
-            "$colors$buttonAltFocusShadow2"
+            "$colors$buttonAltFocusShadow",
+            "$colors$buttonAltFocusShadow",
+            "$colors$buttonAltFocusShadow",
+            "$colors$buttonAltFocusShadow"
           ),
         },
         "&:active": {
@@ -145,20 +176,35 @@ export const Button = styled("button", {
           boxShadow: shadowCreator(
             "initial",
             "$colors$buttonAltFocusBorder",
-            "$colors$buttonAltFocusRing1",
-            "$colors$buttonAltFocusRing2",
-            "$colors$buttonAltFocusShadow1",
-            "$colors$buttonAltFocusShadow2"
+            "$colors$buttonAltFocusShadow",
+            "$colors$buttonAltFocusShadow",
+            "$colors$buttonAltFocusShadow",
+            "$colors$buttonAltFocusShadow"
           ),
         },
       },
       social: {
         backgroundColor: "$buttonSocialIdleBg",
         color: "$buttonSocialIdleText",
-        border: "1px solid $buttonSocialIdleBorder",
+        boxShadow: shadowCreator(
+          "initial",
+          "$colors$buttonSocialIdleBorder",
+          "$colors$buttonSocialIdleShadow",
+          "$colors$buttonSocialIdleShadow",
+          "$colors$buttonSocialIdleShadow",
+          "$colors$buttonSocialIdleShadow"
+        ),
         "&:hover": {
           backgroundColor: "$buttonSocialHoverBg",
           color: "$buttonSocialHoverText",
+          boxShadow: shadowCreator(
+            "focus",
+            "$colors$buttonSocialHoverBorder",
+            "$colors$buttonSocialHoverShadow",
+            "$colors$buttonSocialHoverShadow",
+            "$colors$buttonSocialHoverShadow",
+            "$colors$buttonSocialHoverShadow"
+          ),
         },
         "&:focus": {
           backgroundColor: "$buttonSocialHoverBg",
@@ -166,10 +212,10 @@ export const Button = styled("button", {
           boxShadow: shadowCreator(
             "focus",
             "$colors$buttonSocialFocusBorder",
-            "$colors$buttonSocialFocusRing1",
-            "$colors$buttonSocialFocusRing2",
-            "$colors$buttonSocialFocusShadow1",
-            "$colors$buttonSocialFocusShadow2"
+            "$colors$buttonSocialFocusShadow",
+            "$colors$buttonSocialFocusShadow",
+            "$colors$buttonSocialFocusShadow",
+            "$colors$buttonSocialFocusShadow"
           ),
         },
         "&:active": {
@@ -178,10 +224,10 @@ export const Button = styled("button", {
           boxShadow: shadowCreator(
             "initial",
             "$colors$buttonSocialFocusBorder",
-            "$colors$buttonSocialFocusRing1",
-            "$colors$buttonSocialFocusRing2",
-            "$colors$buttonSocialFocusShadow1",
-            "$colors$buttonSocialFocusShadow2"
+            "$colors$buttonSocialFocusShadow",
+            "$colors$buttonSocialFocusShadow",
+            "$colors$buttonSocialFocusShadow",
+            "$colors$buttonSocialFocusShadow"
           ),
         },
       },

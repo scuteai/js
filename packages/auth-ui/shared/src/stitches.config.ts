@@ -47,7 +47,7 @@ export const {
       /* 
       Exposed styles
       */
-      accent: "#212121",
+      accent: "#212121", //???
 
       surfaceBg: "#f7f7f7",
       surfaceLink: "#666666",
@@ -73,73 +73,54 @@ export const {
 
       buttonIdleText: "white",
       buttonIdleBg: "#212121",
-      buttonIdleBorder: "rgb(186, 186, 186, 1)", //
-      buttonIdleShadow1: "rgba(0,0,0,1)", //
-      buttonIdleShadow2: "rgba(0,0,0,1)", //
+      buttonIdleBorder: "transparent",
+      buttonIdleShadow: "transparent",
 
       buttonPassiveBg: "#757575", //
 
       buttonHoverBg: "#121212",
       buttonHoverText: "white",
-      buttonHoverBorder: "black", //
-      buttonHoverShadow1: "rgba(0,0,0,1)", //
-      buttonHoverShadow2: "rgba(0,0,0,1)", //
+      buttonHoverBorder: "black",
+      buttonHoverShadow: "transparent",
 
-      buttonFocusBorder: "$focusColor",
-      buttonFocusRing1: "$focusColor",
-      buttonFocusRing2: "$focusColor",
-      buttonFocusShadow1: "$focusColor",
-      buttonFocusShadow2: "$focusColor",
+      buttonFocusBorder: "rgba(46, 234, 175, 0.3)",
+      buttonFocusShadow: "rgba(46, 234, 175, 0.3)",
 
       // Alt variant
       buttonAltIconColor: "#ffffff", //
 
       buttonAltIdleText: "#333333",
       buttonAltIdleBg: "white",
-      buttonAltIdleBorder: "rgba(0,0,0,0.2)", //
-      buttonAltIdleShadow1: "rgba(0,0,0,0.05)", //
-      buttonAltIdleShadow2: "rgba(0,0,0,0.05)", //
+      buttonAltIdleBorder: "rgba(0,0,0,0.2)",
+      buttonAltIdleShadow: "rgba(0,0,0,0.05)",
 
       buttonAltPassiveBg: "#757575", //
 
       buttonAltHoverBg: "#121212",
       buttonAltHoverText: "white",
       buttonAltHoverBorder: "rgba(0,0,0,0.05)",
-      buttonAltHoverRing1: "rgba(0,0,0,0.05)", //
-      buttonAltHoverRing2: "rgba(0,0,0,0.05)", //
-      buttonAltHoverShadow1: "rgba(0,0,0,0.05)", //
-      buttonAltHoverShadow2: "rgba(0,0,0,0.05)", //
+      buttonAltHoverShadow: "rgba(0,0,0,0.05)",
 
-      buttonAltFocusBorder: "$focusColor",
-      buttonAltFocusRing1: "$focusColor",
-      buttonAltFocusRing2: "$focusColor",
-      buttonAltFocusShadow1: "$focusColor",
-      buttonAltFocusShadow2: "$focusColor",
+      buttonAltFocusBorder: "rgba(46, 234, 175, 0.3)",
+      buttonAltFocusShadow: "rgba(46, 234, 175, 0.3)",
 
       // Social variant
       buttonSocialIconColor: "#ffffff", //
 
       buttonSocialIdleText: "#222222",
       buttonSocialIdleBg: "#f7f7f7",
-      buttonSocialIdleBorder: "rgba(0,0,0,0)",
-      buttonSocialIdleShadow1: "rgba(0,0,0,0.05)", //
-      buttonSocialIdleShadow2: "rgba(0,0,0,0.05)", //
+      buttonSocialIdleBorder: "transparent",
+      buttonSocialIdleShadow: "transparent",
 
       buttonSocialPassiveBg: "#757575", //
 
       buttonSocialHoverBg: "#f7f7f7",
       buttonSocialHoverText: "#222222",
-      buttonSocialHoverBorder: "rgba(0,0,0,0.05)",
-      buttonSocialHoverRing1: "rgba(0,0,0,0.05)", //
-      buttonSocialHoverRing2: "rgba(0,0,0,0.05)", //
-      buttonSocialHoverShadow1: "rgba(0,0,0,0.05)", //
-      buttonSocialHoverShadow2: "rgba(0,0,0,0.05)", //
+      buttonSocialHoverBorder: "transparent",
+      buttonSocialHoverShadow: "transparent",
 
-      buttonSocialFocusBorder: "$focusColor",
-      buttonSocialFocusRing1: "$focusColor",
-      buttonSocialFocusRing2: "$focusColor",
-      buttonSocialFocusShadow1: "$focusColor",
-      buttonSocialFocusShadow2: "$focusColor",
+      buttonSocialFocusBorder: "rgba(46, 234, 175, 0.3)",
+      buttonSocialFocusShadow: "rgba(46, 234, 175, 0.3)",
 
       /* 
       Exposed styles end
