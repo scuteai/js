@@ -15,7 +15,7 @@ import {
   UnknownSignInError,
 } from "@scute/core";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import useEffectOnce from "../helpers/useEffectOnce";
@@ -145,6 +145,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     mode === "confirm_invite" ? true : false
   );
 
+  const isEmailValid = useRef(false);
+
   const backToLogin = () => {
     _setMode("sign_in_or_up");
     setShowRegisterForm(false);
@@ -272,6 +274,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       <Inner>
         {!showRegisterForm ? (
           <form
+            noValidate
             onSubmit={handleSubmit(handleValidSubmit)}
             onChange={() => {
               clearErrors("root.serverError");
@@ -353,6 +356,14 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                               isValidPhoneOrError || isValidOrError;
                           }
 
+                          if (isValidOrError === true) {
+                            isEmailValid.current = true;
+                          } else {
+                            isEmailValid.current = false;
+                          }
+
+                          console.log({ isEmailValid: isEmailValid.current });
+
                           return isValidOrError;
                         },
                       },
@@ -376,7 +387,10 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                 <Button
                   size="2"
                   type="submit"
-                  disabled={!rememberedIdentifier && !isDirty && !isValid}
+                  disabled={
+                    !rememberedIdentifier &&
+                    (!isDirty || !isValid || !isEmailValid.current)
+                  }
                 >
                   <span>
                     {t("signInOrUp.signinWith", { provider: "Passkey" })}
@@ -386,7 +400,14 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   ) : null}
                 </Button>
               ) : (
-                <Button size="2" type="submit">
+                <Button
+                  size="2"
+                  type="submit"
+                  disabled={
+                    !rememberedIdentifier &&
+                    (!isDirty || !isValid || !isEmailValid.current)
+                  }
+                >
                   <span>{t("general.continueWithMagicLink")}</span>
                   <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
                 </Button>
