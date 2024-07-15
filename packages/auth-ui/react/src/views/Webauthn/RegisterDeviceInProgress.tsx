@@ -26,6 +26,7 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
           textAlign: "center",
         }}
       >
+        <Heading size="4">Please Wait</Heading>
         <Heading size="1">{t("registerDevice.registerInProgress")}</Heading>
 
         <Flex css={{ jc: "center", py: "$5" }}>

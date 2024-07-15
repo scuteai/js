@@ -362,8 +362,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                             isEmailValid.current = false;
                           }
 
-                          console.log({ isEmailValid: isEmailValid.current });
-
                           return isValidOrError;
                         },
                       },
