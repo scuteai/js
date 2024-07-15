@@ -103,8 +103,8 @@ export const Button = styled("button", {
     ),
   },
   "&:disabled": {
-    backgroundColor: "$contrast1",
-    color: "$contrast3",
+    backgroundColor: "$buttonPassiveBg",
+    color: "$buttonPassiveText",
     pointerEvents: "none",
     "& svg": {
       opacity: "0.3",

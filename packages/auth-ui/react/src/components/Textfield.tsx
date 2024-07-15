@@ -1,8 +1,5 @@
 import { styled } from "../stitches.config";
 
-const shadow1 = "0 1px 2px rgba(0, 0, 0, .1)";
-const shadow2 = "0 1px 2px rgba(0, 0, 0, .1)";
-const shadow3 = "0 1px 2px rgba(0, 0, 0, .1)";
 const hairlineBorder =
   "0 0 0 1px transparent, 0 0 1px var(--scute-colors-inputBorder)";
 
@@ -91,28 +88,6 @@ export const TextField = styled("input", {
         lineHeight: "$sizes$6",
         "&:-webkit-autofill::first-line": {
           fontSize: "$3",
-        },
-      },
-    },
-    variant: {
-      ghost: {
-        boxShadow: "none",
-        backgroundColor: "transparent",
-        "@hover": {
-          "&:hover": {
-            boxShadow: "inset 0 0 0 1px $colors$contrast7",
-          },
-        },
-        "&:focus": {
-          backgroundColor: "$loContrast",
-          boxShadow:
-            "inset 0px 0px 0px 1px $colors$focusColor, 0px 0px 0px 1px $colors$focusColor",
-        },
-        "&:disabled": {
-          backgroundColor: "transparent",
-        },
-        "&:read-only": {
-          backgroundColor: "transparent",
         },
       },
     },

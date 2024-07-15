@@ -14,55 +14,25 @@ export const {
   prefix: "scute",
   theme: {
     colors: {
-      contrast0: "#ffffff",
-      contrast1: "#f7f7f7",
-      contrast2: "#DEDEDE",
-      contrast3: "#BABABA",
-      contrast4: "#999999",
-      contrast5: "#757575",
-      contrast6: "#545454",
-      contrast7: "#424242",
-      contrast8: "#333333",
-      contrast9: "#212121",
-      contrast10: "#121212",
-      black: "$contrast10",
-      // Semantic colors
-      hiContrast: "$contrast10",
-      loContrast: "$contrast1",
-      headingColor: "$contrast10",
-      textColor: "$contrast9",
-      footerTextColor: "#b0b0b0",
-      borderColor: "#e1e1e1",
       errorColor: "#fe4f0d",
-      focusColor: "rgba(46, 234, 175, 0.3)",
-      focusColorLight: "rgba(46, 234, 175, 0.2)",
-      cardShadow:
-        "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
-      cardBorder: "none",
-      // panel
-      panel: "$loContrast",
-      panelShadow:
-        "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
-
-      /* 
-      Exposed styles
-      */
-      accent: "#212121", //???
-
+      svgIconColor: "#121212",
+      // Loading indicator
+      loadingSpinnerColor: "rgba(46, 234, 175, 0.3)",
+      // Surface
       surfaceBg: "#f7f7f7",
       surfaceLink: "#666666",
       surfaceText: "#666666",
       surfaceLogoBg: "#ffffff",
-
+      // Card
       cardBg: "#ffffff",
       cardHeadingText: "#121212",
       cardBodyText: "#121212",
       cardFooterText: "#b0b0b0",
       cardFooterLink: "#b0b0b0",
-
+      // Panel
       panelBg: "#f7f7f7",
       panelText: "#121212",
-
+      // Input
       inputBg: "#ffffff",
       inputText: "#121212",
       inputPlaceholder: "#333333",
@@ -81,7 +51,8 @@ export const {
       buttonIdleBorder: "transparent",
       buttonIdleShadow: "transparent",
 
-      buttonPassiveBg: "#757575", //
+      buttonPassiveBg: "#f7f7f7",
+      buttonPassiveText: "#bababa",
 
       buttonHoverBg: "#121212",
       buttonHoverText: "white",
@@ -126,10 +97,6 @@ export const {
 
       buttonSocialFocusBorder: "rgba(46, 234, 175, 0.3)",
       buttonSocialFocusShadow: "rgba(46, 234, 175, 0.3)",
-
-      /* 
-      Exposed styles end
-      */
     },
     fonts: {
       main: '"Inter", -apple-system, system-ui, sans-serif',
@@ -357,24 +324,3 @@ export const shadowCreator = (
  `;
   }
 };
-
-export const darkTheme = createTheme({
-  colors: {
-    hiContrast: "hsl(206,2%,93%)",
-    loContrast: "hsl(206,8%,8%)",
-    cardBg: "red",
-    contrast0: "#ffffff",
-    contrast1: "#EDEDED",
-    contrast2: "#DEDEDE",
-    contrast3: "#BABABA",
-    contrast4: "#999999",
-    contrast5: "#757575",
-    contrast6: "#545454",
-    contrast7: "#424242",
-    contrast8: "#333333",
-    contrast9: "red",
-    contrast10: "red",
-  },
-  space: {},
-  fonts: {},
-});

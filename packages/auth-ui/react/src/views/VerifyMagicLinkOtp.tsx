@@ -196,8 +196,8 @@ const VerifyMagicLinkOtp = ({
     <>
       <Header css={{ mb: "$1" }}>
         <LargeSpinner
-          icon={<EmailIcon color="var(--scute-colors-contrast8)" />}
-          spinnerColor="var(--scute-colors-focusColor)"
+          icon={<EmailIcon color="var(--scute-colors-svgIconColor)" />}
+          spinnerColor="var(--scute-colors-loadingSpinnerColor)"
         />
       </Header>
       <Inner
@@ -269,12 +269,12 @@ const LoadingMagic = ({
       <Header css={{ mb: "$4", mt: "$4" }}>
         {!error ? (
           <LargeSpinner
-            icon={<EmailIcon color="var(--scute-colors-accent)" />}
+            icon={<EmailIcon color="var(--scute-colors-svgIconColor)" />}
             spinnerColor="green"
           />
         ) : (
           <Flex css={{ jc: "center", width: "100%" }}>
-            <DeadPCIcon color="var(--scute-colors-accent)" />
+            <DeadPCIcon color="var(--scute-colors-svgIconColor)" />
           </Flex>
         )}
       </Header>

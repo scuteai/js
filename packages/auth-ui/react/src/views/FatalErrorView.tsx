@@ -27,7 +27,7 @@ const FatalErrorView = ({
   return (
     <>
       <Header css={{ mb: "$4", mt: "$4", jc: "center" }}>
-        <DeadPCIcon color="var(--scute-colors-accent)" />
+        <DeadPCIcon color="var(--scute-colors-svgIconColor)" />
       </Header>
       <Inner
         css={{

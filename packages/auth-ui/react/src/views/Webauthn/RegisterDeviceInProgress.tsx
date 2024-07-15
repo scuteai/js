@@ -16,7 +16,7 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
   return (
     <>
       <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
-        <BiometricsIcon color="var(--scute-colors-accent)" />
+        <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
       </Header>
       <Inner
         css={{

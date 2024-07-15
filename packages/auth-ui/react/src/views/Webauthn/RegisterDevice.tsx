@@ -109,9 +109,9 @@ const RegisterDevice = ({
     <>
       <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
         {isWebauthnSupported ? (
-          <BiometricsIcon color="var(--scute-colors-accent)" />
+          <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
         ) : (
-          <CircleCheckIcon color="var(--scute-colors-accent)" />
+          <CircleCheckIcon color="var(--scute-colors-svgIconColor)" />
         )}
       </Header>
       <Inner
