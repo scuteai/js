@@ -22,7 +22,7 @@ export const {
       surfaceBg: "#f7f7f7",
       surfaceLink: "#666666",
       surfaceText: "#666666",
-      surfaceLogoBg: "#ffffff",
+      surfaceTextBg: "#ffffff",
       // Card
       cardBg: "#ffffff",
       cardHeadingText: "#121212",

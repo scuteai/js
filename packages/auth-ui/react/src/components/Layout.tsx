@@ -33,9 +33,12 @@ export const FooterCredits = styled("div", {
   display: "inline-flex",
   ai: "center",
   jc: "center",
-  pt: "$3",
+  mt: "$3",
   fontSize: "$1",
   color: "$surfaceText",
+  padding: "$1",
+  background: "$surfaceTextBg",
+  borderRadius: "$2",
   "& svg path": {
     fill: "$surfaceText",
   },
@@ -48,12 +51,21 @@ export const FooterCredits = styled("div", {
 
 export const FooterLinks = styled("div", {
   marginLeft: "auto",
-  pt: "$3",
+  mt: "$3",
   fontSize: "$1",
+  py: "$1",
+  px: "$2",
+  background: "$surfaceTextBg",
+  borderRadius: "$2",
   "& a": {
     color: "$surfaceLink",
     textDecoration: "none",
     ml: "$2",
+  },
+  "& a:first-child": {
+    color: "$surfaceLink",
+    textDecoration: "none",
+    ml: 0,
   },
 });
 
@@ -72,8 +84,9 @@ export const Inner = styled("div", {
 });
 
 export const LogoContainer = styled("div", {
-  background: "$surfaceLogoBg",
-  padding: "$1",
+  background: "$surfaceTextBg",
+  py: "$1",
+  px: "$2",
   borderRadius: "$2",
   display: "flex",
   alignItems: "center",

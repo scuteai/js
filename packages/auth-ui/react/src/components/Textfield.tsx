@@ -42,7 +42,7 @@ export const TextField = styled("input", {
   },
 
   "&:-webkit-autofill::first-line": {
-    color: "$hiContrast",
+    color: "$inputText",
   },
 
   "&:focus": {
