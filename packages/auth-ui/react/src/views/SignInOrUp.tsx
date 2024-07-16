@@ -411,114 +411,118 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                 </Button>
               )}
             </Flex>
+            <Flex
+              justify="center"
+              css={{ py: "$3", fontSize: "$4", fontWeight: 500 }}
+            >
+              <span>{t("signInOrUp.or")}</span>
+            </Flex>
+            <Flex>
+              {googleProvider && (
+                <Button
+                  key={googleProvider.provider}
+                  size="2"
+                  style={{ marginBottom: 16 }}
+                  variant="social"
+                  onClick={() => {
+                    scuteClient.signInWithOAuthProvider(
+                      googleProvider.provider
+                    );
+                  }}
+                >
+                  <span>
+                    {t("signInOrUp.continueWith", {
+                      provider: googleProvider.name,
+                    })}
+                  </span>
+                  <IconHolder
+                    style={{
+                      position: "absolute",
+                      top: 16,
+                      left: 21,
+                      height: 34,
+                      paddingTop: 5,
+                    }}
+                  >
+                    <img
+                      src={googleProvider.icon}
+                      alt={googleProvider.name}
+                      width="24"
+                      height="24"
+                    />
+                  </IconHolder>
+                </Button>
+              )}
+            </Flex>
+            <Flex
+              direction={providers.length < 4 ? "column" : "row"}
+              align="center"
+            >
+              {otherProviders.map((provider, index) => (
+                <>
+                  {index > 0 && providers.length > 3 && (
+                    <div style={{ width: 22 }}></div>
+                  )}
+                  <Button
+                    key={provider.provider}
+                    size="2"
+                    variant="social"
+                    style={
+                      providers.length < 4
+                        ? { marginBottom: 16 }
+                        : {
+                            marginBottom: 16,
+                            width: "auto",
+                            flexGrow: 1,
+                            padding: 16,
+                          }
+                    }
+                    onClick={() => {
+                      scuteClient.signInWithOAuthProvider(provider.provider);
+                    }}
+                  >
+                    {providers.length < 4 && (
+                      <span>
+                        {t("signInOrUp.continueWith", {
+                          provider: provider.name,
+                        })}
+                      </span>
+                    )}
+                    <IconHolder
+                      style={
+                        providers.length < 4
+                          ? {
+                              position: "absolute",
+                              top: 16,
+                              left: 21,
+                              height: 34,
+                              paddingTop: 5,
+                            }
+                          : { position: "relative", top: 5 }
+                      }
+                    >
+                      <img
+                        src={provider.icon}
+                        alt={provider.name}
+                        width="24"
+                        height="24"
+                      />
+                    </IconHolder>
+                  </Button>
+                </>
+              ))}
+            </Flex>
+            <ElementCardFooter>
+              To continue, Scute will share your name, email address, language
+              preference, and profile picture with {appData.name} Before using
+              this app, you can review {appData.name}'s{" "}
+              <a href={policyURLs?.privacyPolicy ?? "#"}>privacy policy</a> and{" "}
+              <a href={policyURLs?.termsOfService ?? "#"}>terms of service</a>.
+            </ElementCardFooter>
           </form>
         ) : (
           <RegisterForm {...registerFormProps} />
         )}
-        <Flex
-          justify="center"
-          css={{ py: "$3", fontSize: "$4", fontWeight: 500 }}
-        >
-          <span>{t("signInOrUp.or")}</span>
-        </Flex>
-        <Flex>
-          {googleProvider && (
-            <Button
-              key={googleProvider.provider}
-              size="2"
-              style={{ marginBottom: 16 }}
-              variant="social"
-              onClick={() => {
-                scuteClient.signInWithOAuthProvider(googleProvider.provider);
-              }}
-            >
-              <span>
-                {t("signInOrUp.continueWith", {
-                  provider: googleProvider.name,
-                })}
-              </span>
-              <IconHolder
-                style={{
-                  position: "absolute",
-                  top: 16,
-                  left: 21,
-                  height: 34,
-                  paddingTop: 5,
-                }}
-              >
-                <img
-                  src={googleProvider.icon}
-                  alt={googleProvider.name}
-                  width="24"
-                  height="24"
-                />
-              </IconHolder>
-            </Button>
-          )}
-        </Flex>
-        <Flex
-          direction={providers.length < 4 ? "column" : "row"}
-          align="center"
-        >
-          {otherProviders.map((provider, index) => (
-            <>
-              {index > 0 && providers.length > 3 && (
-                <div style={{ width: 22 }}></div>
-              )}
-              <Button
-                key={provider.provider}
-                size="2"
-                variant="social"
-                style={
-                  providers.length < 4
-                    ? { marginBottom: 16 }
-                    : {
-                        marginBottom: 16,
-                        width: "auto",
-                        flexGrow: 1,
-                        padding: 16,
-                      }
-                }
-                onClick={() => {
-                  scuteClient.signInWithOAuthProvider(provider.provider);
-                }}
-              >
-                {providers.length < 4 && (
-                  <span>
-                    {t("signInOrUp.continueWith", { provider: provider.name })}
-                  </span>
-                )}
-                <IconHolder
-                  style={
-                    providers.length < 4
-                      ? {
-                          position: "absolute",
-                          top: 16,
-                          left: 21,
-                          height: 34,
-                          paddingTop: 5,
-                        }
-                      : { position: "relative", top: 5 }
-                  }
-                >
-                  <img
-                    src={provider.icon}
-                    alt={provider.name}
-                    width="24"
-                    height="24"
-                  />
-                </IconHolder>
-              </Button>
-            </>
-          ))}
-        </Flex>
-        <ElementCardFooter>
-          To continue, Scute will share your name, email address, language
-          preference, and profile picture with {appData.name} Before using this
-          app, you can review {appData.name}'s{" "}
-          <a href={policyURLs?.privacyPolicy ?? "#"}>privacy policy</a> and{" "}
-          <a href={policyURLs?.termsOfService ?? "#"}>terms of service</a>.
-        </ElementCardFooter>
       </Inner>
     </>
   );
@@ -652,6 +656,9 @@ const RegisterForm = ({
       }}
     >
       <div>
+        <Heading size="4" css={{ mb: "$2" }}>
+          Welcome
+        </Heading>
         <span>{t("registerForm.needInfo")}:</span>
         {isError ? (
           <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
@@ -659,7 +666,6 @@ const RegisterForm = ({
           </Text>
         ) : null}
       </div>
-      <br />
       <div>
         {allowedIdentifiers.length > 1 ? (
           <>
@@ -704,9 +710,9 @@ const RegisterForm = ({
 
             return (
               <Group key={field_name}>
-                <Label>{name}</Label>
                 {field_type === "boolean" ? (
                   <>
+                    <Label>{name}</Label>
                     <br />
                     <input
                       type="checkbox"
@@ -718,17 +724,18 @@ const RegisterForm = ({
                     />
                   </>
                 ) : (
-                  <TextField
-                    placeholder={name}
-                    type={field_type}
-                    {...register(field_name, {
+                  <FloatingLabelTextField
+                    domId={`${name}__floating_label`}
+                    label={name}
+                    fieldType={field_type}
+                    state={isError ? "invalid" : "valid"}
+                    registerFormAttr={register(field_name, {
                       required: required
                         ? t("general.requiredField")
                         : undefined,
                       valueAsNumber:
                         field_type === "integer" ? true : undefined,
                     })}
-                    size="2"
                   />
                 )}
                 {errors[field_name] ? (
