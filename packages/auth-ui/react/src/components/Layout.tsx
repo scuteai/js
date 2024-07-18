@@ -2,7 +2,6 @@ import { styled, shadowCreator } from "../stitches.config";
 import { Text } from "./Text";
 
 export const Layout = styled("div", {
-  maxWidth: "570px",
   width: "100%",
   fontWeight: "300",
   padding: "$4",
@@ -94,4 +93,24 @@ export const LogoContainer = styled("div", {
     ml: "$2",
     fontSize: "$3",
   },
+});
+
+export const QueryContainer = styled("div", {
+  containerType: "inline-size",
+  containerName: "queryContainer",
+});
+export const ResponsiveContainer = styled("div", {
+  display: "flex",
+  flexDirection: "column",
+  "@container queryContainer (min-width: 960px)": {
+    flexDirection: "row",
+  },
+});
+export const ResponsiveLeft = styled("div", {
+  flex: 1,
+  pt: "$5",
+});
+export const ResponsiveRight = styled("div", {
+  flex: 1,
+  pb: "$5",
 });

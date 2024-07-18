@@ -37,6 +37,10 @@ import {
   LargeSpinner,
   FloatingLabelTextField,
   ElementCardFooter,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
 } from "../components";
 
 import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
@@ -280,238 +284,277 @@ const SignInOrUp = (props: SignInOrUpProps) => {
               clearErrors("root.serverError");
             }}
           >
-            {mode !== "sign_up" && rememberedIdentifier ? (
-              <>
-                <Heading size="4">{t("signInOrUp.welcomeBack")}</Heading>
-                <Panel css={{ mt: "$4", mb: "$7" }}>
-                  <Flex gap={2} css={{ ai: "center", jc: "space-between" }}>
-                    <Flex>
-                      <Flex css={{ fd: "column" }}>
-                        <Text
-                          size="5"
-                          css={{ mb: "$2", pl: "$2" }}
-                          variant="inherit"
-                        >
-                          {t("signInOrUp.signInAs")}
-                        </Text>
-                        <Text size="6" css={{ pl: "$2" }} variant="inherit">
-                          {rememberedIdentifier}
-                        </Text>
-                      </Flex>
-                    </Flex>
-                    <Button
-                      variant="alt"
-                      onClick={() => setRememberedIdentifier(null)}
-                    >
-                      {t("signInOrUp.changeUser")}
-                    </Button>
-                  </Flex>
-                </Panel>
-              </>
-            ) : (
-              <>
-                <Heading size="4">{signInOrUpText}</Heading>
-                <Group>
-                  <FloatingLabelTextField
-                    domId="email_field__floating_label"
-                    label={identifierLabelText}
-                    fieldType="email"
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    autoComplete={`webauthn ${
-                      isEmailIdentifierAllowed ? "email" : ""
-                    }${isPhoneIdentifierAllowed ? "tel" : ""}`}
-                    state={isError ? "invalid" : "valid"}
-                    registerFormAttr={register("identifier", {
-                      required: t("signInOrUp.identifierRequired"),
-                      validate: {
-                        maxLength: (v) => {
-                          let isValidOrError: boolean | string = true;
-
-                          if (allowedIdentifiers.includes("email")) {
-                            isValidOrError =
-                              v.length <= 50 || t("signInOrUp.emailLimit");
-                          }
-
-                          if (allowedIdentifiers.includes("phone")) {
-                            const isValidPhoneOrError: boolean | string = true;
-                            isValidOrError =
-                              isValidPhoneOrError || isValidOrError;
-                          }
-
-                          return isValidOrError;
-                        },
-                        matchPattern: (v) => {
-                          let isValidOrError: boolean | string = true;
-
-                          if (allowedIdentifiers.includes("email")) {
-                            isValidOrError =
-                              /^\S+@\S+\.\S+$/.test(v) ||
-                              t("signInOrUp.emailValid");
-                          }
-
-                          if (allowedIdentifiers.includes("phone")) {
-                            const isValidPhoneOrError: boolean | string = true;
-                            isValidOrError =
-                              isValidPhoneOrError || isValidOrError;
-                          }
-
-                          if (isValidOrError === true) {
-                            isEmailValid.current = true;
-                          } else {
-                            isEmailValid.current = false;
-                          }
-
-                          return isValidOrError;
-                        },
-                      },
-                    })}
-                  />
-                  {isError ? (
-                    <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                      <>
-                        {errors.identifier?.message ||
-                          errors.root?.serverError.message ||
-                          t("general.unknownError")}
-                      </>
-                    </Text>
-                  ) : null}
-                </Group>
-              </>
-            )}
-
-            <Flex>
-              {isWebauthnAvailable || mode === "sign_up" ? (
-                <Button
-                  size="2"
-                  type="submit"
-                  disabled={
-                    !rememberedIdentifier &&
-                    (!isDirty || !isValid || !isEmailValid.current)
-                  }
-                >
-                  <span>
-                    {t("signInOrUp.signinWith", { provider: "Passkey" })}
-                  </span>
-                  {isWebauthnAvailable ? (
-                    <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
-                  ) : null}
-                </Button>
-              ) : (
-                <Button
-                  size="2"
-                  type="submit"
-                  disabled={
-                    !rememberedIdentifier &&
-                    (!isDirty || !isValid || !isEmailValid.current)
-                  }
-                >
-                  <span>{t("general.continueWithMagicLink")}</span>
-                  <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
-                </Button>
-              )}
-            </Flex>
-            <Flex
-              justify="center"
-              css={{ py: "$3", fontSize: "$4", fontWeight: 500 }}
-            >
-              <span>{t("signInOrUp.or")}</span>
-            </Flex>
-            <Flex>
-              {googleProvider && (
-                <Button
-                  key={googleProvider.provider}
-                  size="2"
-                  style={{ marginBottom: 16 }}
-                  variant="social"
-                  onClick={() => {
-                    scuteClient.signInWithOAuthProvider(
-                      googleProvider.provider
-                    );
-                  }}
-                >
-                  <span>
-                    {t("signInOrUp.continueWith", {
-                      provider: googleProvider.name,
-                    })}
-                  </span>
-                  <IconHolder
-                    style={{
-                      position: "absolute",
-                      top: 16,
-                      left: 21,
-                      height: 34,
-                      paddingTop: 5,
-                    }}
-                  >
-                    <img
-                      src={googleProvider.icon}
-                      alt={googleProvider.name}
-                      width="24"
-                      height="24"
-                    />
-                  </IconHolder>
-                </Button>
-              )}
-            </Flex>
-            <Flex
-              direction={providers.length < 4 ? "column" : "row"}
-              align="center"
-            >
-              {otherProviders.map((provider, index) => (
-                <>
-                  {index > 0 && providers.length > 3 && (
-                    <div style={{ width: 22 }}></div>
+            <QueryContainer>
+              <ResponsiveContainer>
+                <ResponsiveLeft>
+                  {mode !== "sign_up" && rememberedIdentifier ? (
+                    <Heading size="4">{t("signInOrUp.welcomeBack")}</Heading>
+                  ) : (
+                    <Heading size="4">{signInOrUpText}</Heading>
                   )}
-                  <Button
-                    key={provider.provider}
-                    size="2"
-                    variant="social"
-                    style={
-                      providers.length < 4
-                        ? { marginBottom: 16 }
-                        : {
-                            marginBottom: 16,
-                            width: "auto",
-                            flexGrow: 1,
-                            padding: 16,
-                          }
-                    }
-                    onClick={() => {
-                      scuteClient.signInWithOAuthProvider(provider.provider);
-                    }}
-                  >
-                    {providers.length < 4 && (
-                      <span>
-                        {t("signInOrUp.continueWith", {
-                          provider: provider.name,
-                        })}
-                      </span>
+                </ResponsiveLeft>
+                <ResponsiveRight>
+                  {mode !== "sign_up" && rememberedIdentifier ? (
+                    <>
+                      <Panel css={{ mt: "$4", mb: "$7" }}>
+                        <Flex
+                          gap={2}
+                          css={{
+                            ai: "center",
+                            jc: "space-between",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <Flex css={{ fd: "column" }}>
+                            <Text
+                              size="5"
+                              css={{ mb: "$2", pl: "$2" }}
+                              variant="inherit"
+                            >
+                              {t("signInOrUp.signInAs")}
+                            </Text>
+                            <Text
+                              size="6"
+                              css={{
+                                pl: "$2",
+                                overflow: "hidden",
+                                whiteSpace: "nowrap",
+                                textOverflow: "ellipsis",
+                              }}
+                              variant="inherit"
+                            >
+                              {rememberedIdentifier}
+                            </Text>
+                          </Flex>
+                          <Button
+                            variant="alt"
+                            css={{
+                              maxWidth: "160px",
+                              ta: "center",
+                              lineHeight: "$sizes$4",
+                            }}
+                            onClick={() => setRememberedIdentifier(null)}
+                          >
+                            {t("signInOrUp.changeUser")}
+                          </Button>
+                        </Flex>
+                      </Panel>
+                    </>
+                  ) : (
+                    <>
+                      <Group>
+                        <FloatingLabelTextField
+                          domId="email_field__floating_label"
+                          label={identifierLabelText}
+                          fieldType="email"
+                          autoCorrect="off"
+                          autoCapitalize="none"
+                          autoComplete={`webauthn ${
+                            isEmailIdentifierAllowed ? "email" : ""
+                          }${isPhoneIdentifierAllowed ? "tel" : ""}`}
+                          state={isError ? "invalid" : "valid"}
+                          registerFormAttr={register("identifier", {
+                            required: t("signInOrUp.identifierRequired"),
+                            validate: {
+                              maxLength: (v) => {
+                                let isValidOrError: boolean | string = true;
+
+                                if (allowedIdentifiers.includes("email")) {
+                                  isValidOrError =
+                                    v.length <= 50 ||
+                                    t("signInOrUp.emailLimit");
+                                }
+
+                                if (allowedIdentifiers.includes("phone")) {
+                                  const isValidPhoneOrError: boolean | string =
+                                    true;
+                                  isValidOrError =
+                                    isValidPhoneOrError || isValidOrError;
+                                }
+
+                                return isValidOrError;
+                              },
+                              matchPattern: (v) => {
+                                let isValidOrError: boolean | string = true;
+
+                                if (allowedIdentifiers.includes("email")) {
+                                  isValidOrError =
+                                    /^\S+@\S+\.\S+$/.test(v) ||
+                                    t("signInOrUp.emailValid");
+                                }
+
+                                if (allowedIdentifiers.includes("phone")) {
+                                  const isValidPhoneOrError: boolean | string =
+                                    true;
+                                  isValidOrError =
+                                    isValidPhoneOrError || isValidOrError;
+                                }
+
+                                if (isValidOrError === true) {
+                                  isEmailValid.current = true;
+                                } else {
+                                  isEmailValid.current = false;
+                                }
+
+                                return isValidOrError;
+                              },
+                            },
+                          })}
+                        />
+                        {isError ? (
+                          <Text
+                            size="1"
+                            css={{ color: "$errorColor", pt: "$2" }}
+                          >
+                            <>
+                              {errors.identifier?.message ||
+                                errors.root?.serverError.message ||
+                                t("general.unknownError")}
+                            </>
+                          </Text>
+                        ) : null}
+                      </Group>
+                    </>
+                  )}
+
+                  <Flex>
+                    {isWebauthnAvailable || mode === "sign_up" ? (
+                      <Button
+                        size="2"
+                        type="submit"
+                        disabled={
+                          !rememberedIdentifier &&
+                          (!isDirty || !isValid || !isEmailValid.current)
+                        }
+                      >
+                        <span>
+                          {t("signInOrUp.signinWith", { provider: "Passkey" })}
+                        </span>
+                        {isWebauthnAvailable ? (
+                          <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
+                        ) : null}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="2"
+                        type="submit"
+                        disabled={
+                          !rememberedIdentifier &&
+                          (!isDirty || !isValid || !isEmailValid.current)
+                        }
+                      >
+                        <span>{t("general.continueWithMagicLink")}</span>
+                        <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
+                      </Button>
                     )}
-                    <IconHolder
-                      style={
-                        providers.length < 4
-                          ? {
-                              position: "absolute",
-                              top: 16,
-                              left: 21,
-                              height: 34,
-                              paddingTop: 5,
+                  </Flex>
+                  <Flex
+                    justify="center"
+                    css={{ py: "$3", fontSize: "$4", fontWeight: 500 }}
+                  >
+                    <span>{t("signInOrUp.or")}</span>
+                  </Flex>
+                  <Flex>
+                    {googleProvider && (
+                      <Button
+                        key={googleProvider.provider}
+                        size="2"
+                        style={{ marginBottom: 16 }}
+                        variant="social"
+                        onClick={() => {
+                          scuteClient.signInWithOAuthProvider(
+                            googleProvider.provider
+                          );
+                        }}
+                      >
+                        <span>
+                          {t("signInOrUp.continueWith", {
+                            provider: googleProvider.name,
+                          })}
+                        </span>
+                        <IconHolder
+                          style={{
+                            position: "absolute",
+                            top: 16,
+                            left: 21,
+                            height: 34,
+                            paddingTop: 5,
+                          }}
+                        >
+                          <img
+                            src={googleProvider.icon}
+                            alt={googleProvider.name}
+                            width="24"
+                            height="24"
+                          />
+                        </IconHolder>
+                      </Button>
+                    )}
+                  </Flex>
+                  <Flex
+                    direction={providers.length < 4 ? "column" : "row"}
+                    align="center"
+                  >
+                    {otherProviders.map((provider, index) => (
+                      <>
+                        {index > 0 && providers.length > 3 && (
+                          <div style={{ width: 22 }}></div>
+                        )}
+                        <Button
+                          key={provider.provider}
+                          size="2"
+                          variant="social"
+                          style={
+                            providers.length < 4
+                              ? { marginBottom: 16 }
+                              : {
+                                  marginBottom: 16,
+                                  width: "auto",
+                                  flexGrow: 1,
+                                  padding: 16,
+                                }
+                          }
+                          onClick={() => {
+                            scuteClient.signInWithOAuthProvider(
+                              provider.provider
+                            );
+                          }}
+                        >
+                          {providers.length < 4 && (
+                            <span>
+                              {t("signInOrUp.continueWith", {
+                                provider: provider.name,
+                              })}
+                            </span>
+                          )}
+                          <IconHolder
+                            style={
+                              providers.length < 4
+                                ? {
+                                    position: "absolute",
+                                    top: 16,
+                                    left: 21,
+                                    height: 34,
+                                    paddingTop: 5,
+                                  }
+                                : { position: "relative", top: 5 }
                             }
-                          : { position: "relative", top: 5 }
-                      }
-                    >
-                      <img
-                        src={provider.icon}
-                        alt={provider.name}
-                        width="24"
-                        height="24"
-                      />
-                    </IconHolder>
-                  </Button>
-                </>
-              ))}
-            </Flex>
+                          >
+                            <img
+                              src={provider.icon}
+                              alt={provider.name}
+                              width="24"
+                              height="24"
+                            />
+                          </IconHolder>
+                        </Button>
+                      </>
+                    ))}
+                  </Flex>
+                </ResponsiveRight>
+              </ResponsiveContainer>
+            </QueryContainer>
+
             <ElementCardFooter>
               To continue, Scute will share your name, email address, language
               preference, and profile picture with {appData.name} Before using
@@ -655,21 +698,24 @@ const RegisterForm = ({
         clearErrors("root.serverError");
       }}
     >
-      <div>
-        <Heading size="4" css={{ mb: "$2" }}>
-          Welcome
-        </Heading>
-        <span>{t("registerForm.needInfo")}:</span>
-        {isError ? (
-          <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-            {t("general.correctErrors")}
-          </Text>
-        ) : null}
-      </div>
-      <div>
-        {allowedIdentifiers.length > 1 ? (
-          <>
-            {/* // TODO
+      <QueryContainer>
+        <ResponsiveContainer>
+          <ResponsiveLeft>
+            <Heading size="4" css={{ mb: "$2" }}>
+              Welcome
+            </Heading>
+            <span>{t("registerForm.needInfo")}:</span>
+            {isError ? (
+              <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                {t("general.correctErrors")}
+              </Text>
+            ) : null}
+          </ResponsiveLeft>
+          <ResponsiveRight>
+            <div>
+              {allowedIdentifiers.length > 1 ? (
+                <>
+                  {/* // TODO
           // maybeNeededIdentifierType === "phone" ? (
           //   <PhoneInput
           //     // {...register(maybeNeededIdentifierType, {
@@ -679,79 +725,83 @@ const RegisterForm = ({
           //     // })}
           //   />
           // ) : ( */}
-            <Group>
-              <Label>{maybeNeededIdentifierLabel}</Label>
-              <TextField
-                placeholder={maybeNeededIdentifierLabel}
-                {...register(maybeNeededIdentifierType, {
-                  required: requiredIdentifiers.includes(
-                    maybeNeededIdentifierType
-                  )
-                    ? t("general.requiredField")
-                    : undefined,
-                })}
-                size="2"
-              />
-            </Group>
-            {errors[maybeNeededIdentifierType] ? (
-              <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                <>{errors[maybeNeededIdentifierType]?.message}</>
-              </Text>
-            ) : null}
-          </>
-        ) : // )
-        null}
-        {appData.user_meta_data_schema
-          .filter((metadata) => metadata.visible_registration)
-          .map(({ field_name, name, field_type, required }) => {
-            if (field_type === "phone") {
-              field_type = "tel" as any;
-            }
-
-            return (
-              <Group key={field_name}>
-                {field_type === "boolean" ? (
-                  <>
-                    <Label>{name}</Label>
-                    <br />
-                    <input
-                      type="checkbox"
-                      {...register(field_name, {
-                        required: required
+                  <Group>
+                    <Label>{maybeNeededIdentifierLabel}</Label>
+                    <TextField
+                      placeholder={maybeNeededIdentifierLabel}
+                      {...register(maybeNeededIdentifierType, {
+                        required: requiredIdentifiers.includes(
+                          maybeNeededIdentifierType
+                        )
                           ? t("general.requiredField")
                           : undefined,
                       })}
+                      size="2"
                     />
-                  </>
-                ) : (
-                  <FloatingLabelTextField
-                    domId={`${name}__floating_label`}
-                    label={name}
-                    fieldType={field_type}
-                    state={isError ? "invalid" : "valid"}
-                    registerFormAttr={register(field_name, {
-                      required: required
-                        ? t("general.requiredField")
-                        : undefined,
-                      valueAsNumber:
-                        field_type === "integer" ? true : undefined,
-                    })}
-                  />
-                )}
-                {errors[field_name] ? (
-                  <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                    <>{errors[field_name]?.message}</>
-                  </Text>
-                ) : null}
-              </Group>
-            );
-          })}
-      </div>
+                  </Group>
+                  {errors[maybeNeededIdentifierType] ? (
+                    <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                      <>{errors[maybeNeededIdentifierType]?.message}</>
+                    </Text>
+                  ) : null}
+                </>
+              ) : // )
+              null}
+              {appData.user_meta_data_schema
+                .filter((metadata) => metadata.visible_registration)
+                .map(({ field_name, name, field_type, required }) => {
+                  if (field_type === "phone") {
+                    field_type = "tel" as any;
+                  }
 
-      <br />
-      <Button size="2" type="submit" disabled={!isDirty && !isValid}>
-        <span>{t("general.continue")}</span>
-      </Button>
+                  return (
+                    <Group key={field_name}>
+                      {field_type === "boolean" ? (
+                        <>
+                          <Label>{name}</Label>
+                          <br />
+                          <input
+                            type="checkbox"
+                            {...register(field_name, {
+                              required: required
+                                ? t("general.requiredField")
+                                : undefined,
+                            })}
+                          />
+                        </>
+                      ) : (
+                        <FloatingLabelTextField
+                          domId={`${name}__floating_label`}
+                          label={name}
+                          fieldType={field_type}
+                          state={isError ? "invalid" : "valid"}
+                          registerFormAttr={register(field_name, {
+                            required: required
+                              ? t("general.requiredField")
+                              : undefined,
+                            valueAsNumber:
+                              field_type === "integer" ? true : undefined,
+                          })}
+                        />
+                      )}
+                      {errors[field_name] ? (
+                        <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                          <>{errors[field_name]?.message}</>
+                        </Text>
+                      ) : null}
+                    </Group>
+                  );
+                })}
+            </div>
+
+            <br />
+            <Button size="2" type="submit" disabled={!isDirty && !isValid}>
+              <span>{t("general.continue")}</span>
+            </Button>
+          </ResponsiveRight>
+        </ResponsiveContainer>
+      </QueryContainer>
+      <div></div>
     </form>
   );
 };

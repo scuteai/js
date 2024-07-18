@@ -28,7 +28,7 @@
   },
 
   "signInOrUp": {
-    "welcomeBack": "Welcome back!",
+    "welcomeBack": "Welcome back",
     "signInAs": "Sign in as",
     "changeUser": "Change user",
     "identifierRequired": "Identifier is required.",
