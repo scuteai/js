@@ -19,6 +19,10 @@ import {
   Heading,
   Inner,
   LargeSpinner,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
   Text,
 } from "../../components";
 import useEffectOnce from "../../helpers/useEffectOnce";
@@ -121,54 +125,76 @@ const VerifyDevice = ({
   }
 
   return (
-    <>
-      <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
-        <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        <Heading size="4">{t("verifyDevice.verifyDeviceTitle")}</Heading>
-
-        {error ? (
-          <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-            {error}
-            <br />
-            {t("verifyDevice.tryAgain")}
-          </Text>
-        ) : (
-          <Text>{t("verifyDevice.verifyDeviceBody")}</Text>
-        )}
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
-        <Flex direction="column" css={{ jc: "space-around" }}>
-          <Button
-            size="2"
-            variant="alt"
-            css={{ mb: "$3" }}
-            onClick={() => {
-              if (error) {
-                setError(null);
-                handleVerifyDevice();
-              } else {
-                setAuthView(VIEWS.SIGN_IN_OR_UP);
-              }
+    <QueryContainer>
+      <ResponsiveContainer>
+        <ResponsiveLeft>
+          <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
+            <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
+          </Header>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              textAlign: "center",
             }}
           >
-            {!error ? t("general.changeEmail") : t("general.tryAgain")}
-          </Button>
-          <Button size="2" variant="alt" onClick={() => handleSendMagicLink()}>
-            {t("verifyDevice.signInMagicLink")}
-          </Button>
-        </Flex>
-      </Inner>
-    </>
+            <Heading size="4">{t("verifyDevice.verifyDeviceTitle")}</Heading>
+
+            {error ? (
+              <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
+                {error}
+                <br />
+                {t("verifyDevice.tryAgain")}
+              </Text>
+            ) : (
+              <Text>{t("verifyDevice.verifyDeviceBody")}</Text>
+            )}
+            <Flex css={{ jc: "center", py: "$5" }}>
+              <Badge size="1">{identifier}</Badge>
+            </Flex>
+          </Inner>
+        </ResponsiveLeft>
+        <ResponsiveRight>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              textAlign: "center",
+            }}
+          >
+            <Flex
+              direction="column"
+              css={{ jc: "space-around", alignItems: "center", height: "100%" }}
+            >
+              <Button
+                size="2"
+                variant="alt"
+                css={{ mb: "$3" }}
+                onClick={() => {
+                  if (error) {
+                    setError(null);
+                    handleVerifyDevice();
+                  } else {
+                    setAuthView(VIEWS.SIGN_IN_OR_UP);
+                  }
+                }}
+              >
+                {!error ? t("general.changeEmail") : t("general.tryAgain")}
+              </Button>
+              <Button
+                size="2"
+                variant="alt"
+                onClick={() => handleSendMagicLink()}
+              >
+                {t("verifyDevice.signInMagicLink")}
+              </Button>
+            </Flex>
+          </Inner>
+        </ResponsiveRight>
+      </ResponsiveContainer>
+    </QueryContainer>
   );
 };
 

@@ -21,6 +21,10 @@ import {
   Heading,
   Inner,
   LargeSpinner,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
   Text,
 } from "../components";
 
@@ -193,63 +197,79 @@ const VerifyMagicLinkOtp = ({
   }
 
   return (
-    <>
-      <Header css={{ mb: "$1" }}>
-        <LargeSpinner
-          icon={<EmailIcon color="var(--scute-colors-svgIconColor)" />}
-          spinnerColor="var(--scute-colors-loadingSpinnerColor)"
-        />
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-        }}
-      >
-        <Heading size="4">
-          {isWebauthnNewDevice
-            ? t("verifyOTP.newDeviceTitle")
-            : t("verifyOTP.checkEmailTitle")}
-        </Heading>
-        <Text size="2" css={{ mb: "$1" }}>
-          {t("verifyOTP.newDeviceBody")}
-        </Text>
-        <Text size="2" css={{ mb: "$5" }}>
-          {identifier}
-        </Text>
-        <Flex direction="column">
-          <Button
-            size="2"
-            variant="alt"
-            disabled={time > 0 || resendDisabled}
-            css={{ mb: "$3" }}
-            onClick={async () => {
-              setResendDisabled(true);
-              const { data, error: magicLinkError } =
-                await scuteClient.sendLoginMagicLink(identifier);
-              if (magicLinkError) {
-                const translatedErrorMessage = translateError(magicLinkError);
-                setError(translatedErrorMessage);
-                return;
-              }
-              setTime(TIMER_START);
-              setResendDisabled(false);
+    <QueryContainer>
+      <ResponsiveContainer>
+        <ResponsiveLeft>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
             }}
           >
-            {time > 0 && `[0:${time.toString().padStart(2, "0")}]`}{" "}
-            {t("general.resendEmail")}
-          </Button>
-          <Button
-            size="2"
-            variant="alt"
-            onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
+            <Header css={{ mb: "$1" }}>
+              <LargeSpinner
+                icon={<EmailIcon color="var(--scute-colors-svgIconColor)" />}
+                spinnerColor="var(--scute-colors-loadingSpinnerColor)"
+              />
+            </Header>
+            <Heading size="4">
+              {isWebauthnNewDevice
+                ? t("verifyOTP.newDeviceTitle")
+                : t("verifyOTP.checkEmailTitle")}
+            </Heading>
+            <Text size="2" css={{ mb: "$4" }}>
+              {t("verifyOTP.newDeviceBody")}
+            </Text>
+            <Text size="2" css={{ mb: "$5" }}>
+              {identifier}
+            </Text>
+          </Inner>
+        </ResponsiveLeft>
+        <ResponsiveRight>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              height: "100%",
+            }}
           >
-            {t("general.changeEmail")}
-          </Button>
-        </Flex>
-      </Inner>
-    </>
+            <Flex direction="column" align="center">
+              <Button
+                size="2"
+                variant="alt"
+                disabled={time > 0 || resendDisabled}
+                css={{ mb: "$3" }}
+                onClick={async () => {
+                  setResendDisabled(true);
+                  const { data, error: magicLinkError } =
+                    await scuteClient.sendLoginMagicLink(identifier);
+                  if (magicLinkError) {
+                    const translatedErrorMessage =
+                      translateError(magicLinkError);
+                    setError(translatedErrorMessage);
+                    return;
+                  }
+                  setTime(TIMER_START);
+                  setResendDisabled(false);
+                }}
+              >
+                {time > 0 && `[0:${time.toString().padStart(2, "0")}]`}{" "}
+                {t("general.resendEmail")}
+              </Button>
+              <Button
+                size="2"
+                variant="alt"
+                onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
+              >
+                {t("general.changeEmail")}
+              </Button>
+            </Flex>
+          </Inner>
+        </ResponsiveRight>
+      </ResponsiveContainer>
+    </QueryContainer>
   );
 };
 

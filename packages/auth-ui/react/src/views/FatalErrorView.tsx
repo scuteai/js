@@ -9,6 +9,10 @@ import {
   Heading,
   Inner,
   Text,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
 } from "../components";
 import type { CommonViewProps } from "./common";
 
@@ -25,38 +29,55 @@ const FatalErrorView = ({
   const { t } = useTranslation();
 
   return (
-    <>
-      <Header css={{ mb: "$4", mt: "$4", jc: "center" }}>
-        <DeadPCIcon color="var(--scute-colors-svgIconColor)" />
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        <Heading size="4">{error ?? t("general.somethingWentWrong")}</Heading>
-        <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-          {t("general.pleaseTryAgain")}
-        </Text>
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
-        <Flex css={{ jc: "center" }}>
-          <Button
-            variant="alt"
-            size="2"
-            onClick={() => {
-              tryAgain();
+    <QueryContainer>
+      <ResponsiveContainer>
+        <ResponsiveLeft>
+          <Header css={{ mb: "$4", mt: "$4", jc: "center" }}>
+            <DeadPCIcon color="var(--scute-colors-svgIconColor)" />
+          </Header>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              textAlign: "center",
             }}
           >
-            {t("general.tryAgain")}
-          </Button>
-        </Flex>
-      </Inner>
-    </>
+            <Heading size="4">
+              {error ?? t("general.somethingWentWrong")}
+            </Heading>
+            <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
+              {t("general.pleaseTryAgain")}
+            </Text>
+            <Flex css={{ jc: "center", py: "$5" }}>
+              <Badge size="1">{identifier}</Badge>
+            </Flex>
+          </Inner>
+        </ResponsiveLeft>
+        <ResponsiveRight>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              textAlign: "center",
+            }}
+          >
+            <Flex css={{ jc: "center" }}>
+              <Button
+                variant="alt"
+                size="2"
+                onClick={() => {
+                  tryAgain();
+                }}
+              >
+                {t("general.tryAgain")}
+              </Button>
+            </Flex>
+          </Inner>
+        </ResponsiveRight>
+      </ResponsiveContainer>
+    </QueryContainer>
   );
 };
 

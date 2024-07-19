@@ -22,6 +22,10 @@ import {
   Header,
   Heading,
   Inner,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
 } from "../../components";
 import { type CommonViewProps } from "../common";
 import { translateError } from "../../helpers/i18n/service";
@@ -106,65 +110,84 @@ const RegisterDevice = ({
   const { t } = useTranslation();
 
   return (
-    <>
-      <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
-        {isWebauthnSupported ? (
-          <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
-        ) : (
-          <CircleCheckIcon color="var(--scute-colors-svgIconColor)" />
-        )}
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        <Heading size="4">
-          {isWebauthnSupported
-            ? t("registerDevice.registerDeviceTitle")
-            : t("registerDevice.trustDeviceTitle")}
-        </Heading>
-        {error ? (
-          <Text size="2" css={{ color: "$errorColor" }}>
-            {error}
-          </Text>
-        ) : (
-          <Text>
-            {isWebauthnSupported
-              ? t("registerDevice.logInWebAuthn")
-              : t("registerDevice.logInNoWebAuthn")}
-          </Text>
-        )}
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
-        <Flex direction="column" css={{ jc: "space-around" }}>
-          <Button
-            css={{ mb: "$3" }}
-            size="2"
-            variant="alt"
-            onClick={() => handleRegisterDevice()}
+    <QueryContainer>
+      <ResponsiveContainer>
+        <ResponsiveLeft>
+          <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
+            {isWebauthnSupported ? (
+              <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
+            ) : (
+              <CircleCheckIcon color="var(--scute-colors-svgIconColor)" />
+            )}
+          </Header>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+            }}
           >
-            {!error
-              ? isWebauthnSupported
-                ? t("registerDevice.registerDevice")
-                : t("registerDevice.trustDevice")
-              : t("general.tryAgain")}
-            {isWebauthnSupported && <FingerprintIcon />}
-          </Button>
-          {webauthn === "optional" || error ? (
-            <Button size="2" variant="alt" onClick={() => handleSkipAndLogin()}>
+            <Heading size="4">
               {isWebauthnSupported
-                ? t("registerDevice.skipAndLogin")
-                : t("registerDevice.dontTrustDevice")}
-            </Button>
-          ) : null}
-        </Flex>
-      </Inner>
-    </>
+                ? t("registerDevice.registerDeviceTitle")
+                : t("registerDevice.trustDeviceTitle")}
+            </Heading>
+            {error ? (
+              <Text size="2" css={{ color: "$errorColor" }}>
+                {error}
+              </Text>
+            ) : (
+              <Text>
+                {isWebauthnSupported
+                  ? t("registerDevice.logInWebAuthn")
+                  : t("registerDevice.logInNoWebAuthn")}
+              </Text>
+            )}
+            <Flex css={{ jc: "center", py: "$5" }}>
+              <Badge size="1">{identifier}</Badge>
+            </Flex>
+          </Inner>
+        </ResponsiveLeft>
+        <ResponsiveRight>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              height: "100%",
+              justifyContent: "center",
+            }}
+          >
+            <Flex direction="column" css={{ jc: "space-around" }}>
+              <Button
+                css={{ mb: "$3" }}
+                size="2"
+                variant="alt"
+                onClick={() => handleRegisterDevice()}
+              >
+                {!error
+                  ? isWebauthnSupported
+                    ? t("registerDevice.registerDevice")
+                    : t("registerDevice.trustDevice")
+                  : t("general.tryAgain")}
+                {isWebauthnSupported && <FingerprintIcon />}
+              </Button>
+              {webauthn === "optional" || error ? (
+                <Button
+                  size="2"
+                  variant="alt"
+                  onClick={() => handleSkipAndLogin()}
+                >
+                  {isWebauthnSupported
+                    ? t("registerDevice.skipAndLogin")
+                    : t("registerDevice.dontTrustDevice")}
+                </Button>
+              ) : null}
+            </Flex>
+          </Inner>
+        </ResponsiveRight>
+      </ResponsiveContainer>
+    </QueryContainer>
   );
 };
 
