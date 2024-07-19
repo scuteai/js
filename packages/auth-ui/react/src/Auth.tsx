@@ -346,8 +346,12 @@ const Container = ({
             <span>{t("signInOrUp.signinWith", { provider: "scute" })}</span>
           </FooterCredits>
           <FooterLinks>
-            <a href="#">{t("signInOrUp.privacy")}</a>
-            <a href="#">{t("signInOrUp.help")}</a>
+            <a href="https://scute.io/privacy" target="_blank">
+              {t("signInOrUp.privacy")}
+            </a>
+            <a href="https://scute.io/help" target="_blank">
+              {t("signInOrUp.help")}
+            </a>
           </FooterLinks>
         </Flex>
       ) : null}
