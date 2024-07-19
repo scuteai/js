@@ -3,7 +3,9 @@ import { Text } from "./Text";
 
 export const Layout = styled("div", {
   width: "100%",
+  maxWidth: "1100px",
   fontWeight: "300",
+  fontFamily: "$main",
   padding: "$4",
   background: "$surfaceBg",
   borderRadius: "$3",
@@ -102,7 +104,7 @@ export const QueryContainer = styled("div", {
 export const ResponsiveContainer = styled("div", {
   display: "flex",
   flexDirection: "column",
-  "@container queryContainer (min-width: 960px)": {
+  "@container queryContainer (min-width: 800px)": {
     flexDirection: "row",
   },
 });

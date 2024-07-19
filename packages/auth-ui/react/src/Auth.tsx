@@ -36,6 +36,7 @@ import { useTheme } from "./ThemeContext";
 import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
 import { initI18n, translate as t } from "./helpers/i18n/service";
 import { AppLogo } from "./components/AppLogo";
+import { LogoText } from "./components/Logo";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -337,13 +338,7 @@ const Container = ({
       {appData?.scute_branding !== false ? (
         <Flex css={{ pb: "$1" }}>
           <FooterCredits>
-            <Logo
-              webauthnAvailable={
-                webauthn !== "disabled" && scuteClient.isWebauthnSupported()
-              }
-            />
-
-            <span>{t("signInOrUp.signinWith", { provider: "scute" })}</span>
+            <LogoText />
           </FooterCredits>
           <FooterLinks>
             <a href="https://scute.io/privacy" target="_blank">
