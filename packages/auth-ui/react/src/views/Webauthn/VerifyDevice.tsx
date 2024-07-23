@@ -137,6 +137,9 @@ const VerifyDevice = ({
               jc: "center",
               fd: "column",
               textAlign: "center",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
             }}
           >
             <Heading size="4">{t("verifyDevice.verifyDeviceTitle")}</Heading>

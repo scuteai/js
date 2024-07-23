@@ -114,6 +114,7 @@ export const AppNamePlaceholder = styled("div", {
 export const QueryContainer = styled("div", {
   containerType: "inline-size",
   containerName: "queryContainer",
+  py: "$8",
 });
 export const ResponsiveContainer = styled("div", {
   display: "flex",

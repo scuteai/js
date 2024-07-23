@@ -127,6 +127,9 @@ const RegisterDevice = ({
               jc: "center",
               fd: "column",
               ta: "center",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
             }}
           >
             <Heading size="4">

@@ -206,6 +206,9 @@ const VerifyMagicLinkOtp = ({
               fd: "column",
               ta: "center",
               pb: "$5",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
             }}
           >
             <Heading size="4">
@@ -216,15 +219,17 @@ const VerifyMagicLinkOtp = ({
             <Text size="2" css={{ mb: "$4" }}>
               {t("verifyOTP.newDeviceBody")}
             </Text>
-            {identifier && (
-              <Badge size="1">
-                <EmailIcon
-                  color="var(--scute-colors-svgIconColor)"
-                  style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
-                />
-                {identifier}
-              </Badge>
-            )}
+            <Flex css={{ jc: "center" }}>
+              {identifier && (
+                <Badge size="1">
+                  <EmailIcon
+                    color="var(--scute-colors-svgIconColor)"
+                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                  />
+                  {identifier}
+                </Badge>
+              )}
+            </Flex>
           </Inner>
         </ResponsiveLeft>
         <ResponsiveRight>
@@ -296,6 +301,9 @@ const LoadingMagic = ({
                 jc: "center",
                 fd: "column",
                 textAlign: "center",
+                "@container queryContainer (min-width: 950px)": {
+                  ta: "left",
+                },
               }}
             >
               <Flex css={{ mb: "$4" }}>

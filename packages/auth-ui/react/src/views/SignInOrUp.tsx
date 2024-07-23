@@ -290,6 +290,10 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   css={{
                     display: "flex",
                     flexDirection: "column",
+                    ta: "center",
+                    "@container queryContainer (min-width: 950px)": {
+                      ta: "left",
+                    },
                   }}
                 >
                   {mode !== "sign_up" && rememberedIdentifier ? (
@@ -298,7 +302,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                     <Heading size="4">{signInOrUpText}</Heading>
                   )}
                   <Text size="2" css={{ mb: "$4" }}>
-                    {t("signInOrUp.continueTo", { appName: appData.name })}
+                    {t("signInOrUp.continueTo", { appName: appData.name })}{" "}
+                    Lorem ipsum dolor sit amet consectetur, adipisicing elit.
                   </Text>
                 </Inner>
               </ResponsiveLeft>
@@ -349,7 +354,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                     </>
                   ) : (
                     <>
-                      <Group>
+                      <Group css={{ mt: "0" }}>
                         <FloatingLabelTextField
                           domId="email_field__floating_label"
                           label={identifierLabelText}
@@ -707,7 +712,14 @@ const RegisterForm = ({
       <QueryContainer>
         <ResponsiveContainer>
           <ResponsiveLeft>
-            <Inner css={{ ta: "center" }}>
+            <Inner
+              css={{
+                ta: "center",
+                "@container queryContainer (min-width: 950px)": {
+                  ta: "left",
+                },
+              }}
+            >
               <Heading size="4" css={{ mb: "$2" }}>
                 Welcome
               </Heading>
@@ -724,16 +736,6 @@ const RegisterForm = ({
               <div>
                 {allowedIdentifiers.length > 1 ? (
                   <>
-                    {/* // TODO
-          // maybeNeededIdentifierType === "phone" ? (
-          //   <PhoneInput
-          //     // {...register(maybeNeededIdentifierType, {
-          //     //   required: requiredIdentifiers.includes(
-          //     //     maybeNeededIdentifierType
-          //     //   ),
-          //     // })}
-          //   />
-          // ) : ( */}
                     <Group>
                       <Label>{maybeNeededIdentifierLabel}</Label>
                       <TextField
@@ -758,13 +760,13 @@ const RegisterForm = ({
                 null}
                 {appData.user_meta_data_schema
                   .filter((metadata) => metadata.visible_registration)
-                  .map(({ field_name, name, field_type, required }) => {
+                  .map(({ field_name, name, field_type, required }, i) => {
                     if (field_type === "phone") {
                       field_type = "tel" as any;
                     }
 
                     return (
-                      <Group key={field_name}>
+                      <Group key={field_name} css={i === 0 ? { mt: "0" } : {}}>
                         {field_type === "boolean" ? (
                           <>
                             <Label>{name}</Label>

@@ -41,6 +41,9 @@ const FatalErrorView = ({
               jc: "center",
               fd: "column",
               textAlign: "center",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
             }}
           >
             <Heading size="4">
@@ -49,7 +52,7 @@ const FatalErrorView = ({
             <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
               {t("general.pleaseTryAgain")}
             </Text>
-            <Flex css={{ jc: "center", py: "$5" }}>
+            <Flex css={{ jc: "center", py: "$5", ta: "center" }}>
               {identifier && (
                 <Badge size="1">
                   <EmailIcon

@@ -32,7 +32,9 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
               jc: "center",
               fd: "column",
               ta: "center",
-              alignItems: "center",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
             }}
           >
             <Heading size="4">{t("general.pleaseWait")}</Heading>
