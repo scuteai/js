@@ -275,25 +275,27 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   return (
     <>
-      <Inner>
-        {!showRegisterForm ? (
-          <form
-            noValidate
-            onSubmit={handleSubmit(handleValidSubmit)}
-            onChange={() => {
-              clearErrors("root.serverError");
-            }}
-          >
-            <QueryContainer>
-              <ResponsiveContainer>
-                <ResponsiveLeft>
+      {!showRegisterForm ? (
+        <form
+          noValidate
+          onSubmit={handleSubmit(handleValidSubmit)}
+          onChange={() => {
+            clearErrors("root.serverError");
+          }}
+        >
+          <QueryContainer>
+            <ResponsiveContainer>
+              <ResponsiveLeft>
+                <Inner>
                   {mode !== "sign_up" && rememberedIdentifier ? (
                     <Heading size="4">{t("signInOrUp.welcomeBack")}</Heading>
                   ) : (
                     <Heading size="4">{signInOrUpText}</Heading>
                   )}
-                </ResponsiveLeft>
-                <ResponsiveRight>
+                </Inner>
+              </ResponsiveLeft>
+              <ResponsiveRight>
+                <Inner>
                   {mode !== "sign_up" && rememberedIdentifier ? (
                     <>
                       <Panel css={{ mt: "$4", mb: "$7" }}>
@@ -546,10 +548,11 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                       </>
                     ))}
                   </Flex>
-                </ResponsiveRight>
-              </ResponsiveContainer>
-            </QueryContainer>
-
+                </Inner>
+              </ResponsiveRight>
+            </ResponsiveContainer>
+          </QueryContainer>
+          <Inner>
             <ElementCardFooter>
               To continue, Scute will share your name, email address, language
               preference, and profile picture with {appData.name} Before using
@@ -557,11 +560,11 @@ const SignInOrUp = (props: SignInOrUpProps) => {
               <a href={policyURLs?.privacyPolicy ?? "#"}>privacy policy</a> and{" "}
               <a href={policyURLs?.termsOfService ?? "#"}>terms of service</a>.
             </ElementCardFooter>
-          </form>
-        ) : (
-          <RegisterForm {...registerFormProps} />
-        )}
-      </Inner>
+          </Inner>
+        </form>
+      ) : (
+        <RegisterForm {...registerFormProps} />
+      )}
     </>
   );
 };
@@ -696,21 +699,24 @@ const RegisterForm = ({
       <QueryContainer>
         <ResponsiveContainer>
           <ResponsiveLeft>
-            <Heading size="4" css={{ mb: "$2" }}>
-              Welcome
-            </Heading>
-            <span>{t("registerForm.needInfo")}:</span>
-            {isError ? (
-              <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                {t("general.correctErrors")}
-              </Text>
-            ) : null}
+            <Inner css={{ ta: "center" }}>
+              <Heading size="4" css={{ mb: "$2" }}>
+                Welcome
+              </Heading>
+              <span>{t("registerForm.needInfo")}:</span>
+              {isError ? (
+                <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                  {t("general.correctErrors")}
+                </Text>
+              ) : null}
+            </Inner>
           </ResponsiveLeft>
           <ResponsiveRight>
-            <div>
-              {allowedIdentifiers.length > 1 ? (
-                <>
-                  {/* // TODO
+            <Inner>
+              <div>
+                {allowedIdentifiers.length > 1 ? (
+                  <>
+                    {/* // TODO
           // maybeNeededIdentifierType === "phone" ? (
           //   <PhoneInput
           //     // {...register(maybeNeededIdentifierType, {
@@ -720,79 +726,83 @@ const RegisterForm = ({
           //     // })}
           //   />
           // ) : ( */}
-                  <Group>
-                    <Label>{maybeNeededIdentifierLabel}</Label>
-                    <TextField
-                      placeholder={maybeNeededIdentifierLabel}
-                      {...register(maybeNeededIdentifierType, {
-                        required: requiredIdentifiers.includes(
-                          maybeNeededIdentifierType
-                        )
-                          ? t("general.requiredField")
-                          : undefined,
-                      })}
-                      size="2"
-                    />
-                  </Group>
-                  {errors[maybeNeededIdentifierType] ? (
-                    <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                      <>{errors[maybeNeededIdentifierType]?.message}</>
-                    </Text>
-                  ) : null}
-                </>
-              ) : // )
-              null}
-              {appData.user_meta_data_schema
-                .filter((metadata) => metadata.visible_registration)
-                .map(({ field_name, name, field_type, required }) => {
-                  if (field_type === "phone") {
-                    field_type = "tel" as any;
-                  }
+                    <Group>
+                      <Label>{maybeNeededIdentifierLabel}</Label>
+                      <TextField
+                        placeholder={maybeNeededIdentifierLabel}
+                        {...register(maybeNeededIdentifierType, {
+                          required: requiredIdentifiers.includes(
+                            maybeNeededIdentifierType
+                          )
+                            ? t("general.requiredField")
+                            : undefined,
+                        })}
+                        size="2"
+                      />
+                    </Group>
+                    {errors[maybeNeededIdentifierType] ? (
+                      <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+                        <>{errors[maybeNeededIdentifierType]?.message}</>
+                      </Text>
+                    ) : null}
+                  </>
+                ) : // )
+                null}
+                {appData.user_meta_data_schema
+                  .filter((metadata) => metadata.visible_registration)
+                  .map(({ field_name, name, field_type, required }) => {
+                    if (field_type === "phone") {
+                      field_type = "tel" as any;
+                    }
 
-                  return (
-                    <Group key={field_name}>
-                      {field_type === "boolean" ? (
-                        <>
-                          <Label>{name}</Label>
-                          <br />
-                          <input
-                            type="checkbox"
-                            {...register(field_name, {
+                    return (
+                      <Group key={field_name}>
+                        {field_type === "boolean" ? (
+                          <>
+                            <Label>{name}</Label>
+                            <br />
+                            <input
+                              type="checkbox"
+                              {...register(field_name, {
+                                required: required
+                                  ? t("general.requiredField")
+                                  : undefined,
+                              })}
+                            />
+                          </>
+                        ) : (
+                          <FloatingLabelTextField
+                            domId={`${name}__floating_label`}
+                            label={name}
+                            fieldType={field_type}
+                            state={isError ? "invalid" : "valid"}
+                            registerFormAttr={register(field_name, {
                               required: required
                                 ? t("general.requiredField")
                                 : undefined,
+                              valueAsNumber:
+                                field_type === "integer" ? true : undefined,
                             })}
                           />
-                        </>
-                      ) : (
-                        <FloatingLabelTextField
-                          domId={`${name}__floating_label`}
-                          label={name}
-                          fieldType={field_type}
-                          state={isError ? "invalid" : "valid"}
-                          registerFormAttr={register(field_name, {
-                            required: required
-                              ? t("general.requiredField")
-                              : undefined,
-                            valueAsNumber:
-                              field_type === "integer" ? true : undefined,
-                          })}
-                        />
-                      )}
-                      {errors[field_name] ? (
-                        <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                          <>{errors[field_name]?.message}</>
-                        </Text>
-                      ) : null}
-                    </Group>
-                  );
-                })}
-            </div>
+                        )}
+                        {errors[field_name] ? (
+                          <Text
+                            size="1"
+                            css={{ color: "$errorColor", pt: "$2" }}
+                          >
+                            <>{errors[field_name]?.message}</>
+                          </Text>
+                        ) : null}
+                      </Group>
+                    );
+                  })}
+              </div>
 
-            <br />
-            <Button size="2" type="submit" disabled={!isDirty && !isValid}>
-              <span>{t("general.continue")}</span>
-            </Button>
+              <br />
+              <Button size="2" type="submit" disabled={!isDirty && !isValid}>
+                <span>{t("general.continue")}</span>
+              </Button>
+            </Inner>
           </ResponsiveRight>
         </ResponsiveContainer>
       </QueryContainer>
