@@ -427,9 +427,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                         <span>
                           {t("signInOrUp.signinWith", { provider: "Passkey" })}
                         </span>
-                        {isWebauthnAvailable ? (
-                          <FingerprintIcon color="var(--scute-colors-buttonIconColor)" />
-                        ) : null}
+                        {isWebauthnAvailable ? <FingerprintIcon /> : null}
                       </Button>
                     ) : (
                       <Button

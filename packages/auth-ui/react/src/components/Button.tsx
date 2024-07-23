@@ -44,6 +44,7 @@ export const Button = styled("button", {
   fontVariantNumeric: "tabular-nums",
   borderRadius: "$2",
   position: "relative",
+
   "@bp1": {
     fontSize: "$2",
   },
@@ -64,6 +65,16 @@ export const Button = styled("button", {
     left: "$4",
     width: "34px",
   },
+
+  "& svg path": {
+    fill: "$buttonIdleText",
+    transition: "all",
+  },
+
+  "&:hover svg path": {
+    fill: "$buttonHoverText",
+  },
+
   //border:string, ring1:string, ring2:string, bottom1:string, bottom2:string)
   "&:hover": {
     backgroundColor: "$buttonHoverBg",
@@ -181,6 +192,13 @@ export const Button = styled("button", {
             "$colors$buttonAltFocusShadow",
             "$colors$buttonAltFocusShadow"
           ),
+        },
+        "& svg path": {
+          fill: "$buttonAltIdleText",
+        },
+
+        "&:hover svg path": {
+          fill: "$buttonAltHoverText",
         },
       },
       social: {
