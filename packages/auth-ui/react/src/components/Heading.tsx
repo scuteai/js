@@ -54,6 +54,9 @@ export const Heading = React.forwardRef<
         color: "$cardHeadingText",
         fontVariantNumeric: "proportional-nums",
         ...merge(textCss[size], props.css),
+        "@container queryContainer (min-width: 950px)": {
+          mb: "$1",
+        },
       }}
     />
   );
