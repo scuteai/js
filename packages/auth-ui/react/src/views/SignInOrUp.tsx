@@ -328,11 +328,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                           </Flex>
                           <Button
                             variant="alt"
-                            css={{
-                              maxWidth: "160px",
-                              ta: "center",
-                              lineHeight: "$sizes$4",
-                            }}
                             onClick={() => setRememberedIdentifier(null)}
                           >
                             {t("signInOrUp.changeUser")}
