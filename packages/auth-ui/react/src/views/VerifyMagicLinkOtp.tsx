@@ -11,7 +11,7 @@ import { VIEWS } from "@scute/ui-shared";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { DeadPCIcon, EmailIcon } from "../assets/icons";
+import { FatalErrorIcon, EmailIcon } from "../assets/icons";
 
 import {
   Badge,
@@ -294,7 +294,7 @@ const LoadingMagic = ({
           />
         ) : (
           <Flex css={{ jc: "center", width: "100%" }}>
-            <DeadPCIcon color="var(--scute-colors-svgIconColor)" />
+            <FatalErrorIcon color="var(--scute-colors-svgIconColor)" />
           </Flex>
         )}
       </Header>

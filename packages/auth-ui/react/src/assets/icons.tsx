@@ -209,7 +209,7 @@ export const CircleCheckIcon = (props: any) => (
   </svg>
 );
 
-export const DeadPCIcon = (props: any) => (
+export const FatalErrorIcon = (props: any) => (
   <svg
     width="83"
     height="77"

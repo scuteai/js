@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { BiometricsIcon, DeadPCIcon, EmailIcon } from "../assets/icons";
+import { EmailIcon, FatalErrorIcon } from "../assets/icons";
 import {
   Badge,
   Flex,
@@ -32,8 +32,8 @@ const FatalErrorView = ({
     <QueryContainer>
       <ResponsiveContainer>
         <ResponsiveLeft>
-          <Header css={{ mb: "$4", mt: "$4", jc: "center" }}>
-            <DeadPCIcon color="var(--scute-colors-svgIconColor)" />
+          <Header css={{ jc: "center" }}>
+            <FatalErrorIcon />
           </Header>
           <Inner
             css={{
@@ -50,13 +50,15 @@ const FatalErrorView = ({
               {t("general.pleaseTryAgain")}
             </Text>
             <Flex css={{ jc: "center", py: "$5" }}>
-              <Badge size="1">
-                <EmailIcon
-                  color="var(--scute-colors-svgIconColor)"
-                  style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
-                />
-                {identifier}
-              </Badge>
+              {identifier && (
+                <Badge size="1">
+                  <EmailIcon
+                    color="var(--scute-colors-svgIconColor)"
+                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                  />
+                  {identifier}
+                </Badge>
+              )}
             </Flex>
           </Inner>
         </ResponsiveLeft>
@@ -67,6 +69,7 @@ const FatalErrorView = ({
               jc: "center",
               fd: "column",
               textAlign: "center",
+              height: "100%",
             }}
           >
             <Flex css={{ jc: "center" }}>
@@ -75,6 +78,11 @@ const FatalErrorView = ({
                 size="2"
                 onClick={() => {
                   tryAgain();
+                }}
+                css={{
+                  "@container queryContainer (min-width: 800px)": {
+                    mt: "$7",
+                  },
                 }}
               >
                 {t("general.tryAgain")}
