@@ -172,7 +172,6 @@ const RegisterDevice = ({
               <Button
                 css={{ mb: "$3" }}
                 size="2"
-                variant="alt"
                 onClick={() => handleRegisterDevice()}
               >
                 {!error
