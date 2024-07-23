@@ -150,15 +150,17 @@ const VerifyDevice = ({
             ) : (
               <Text>{t("verifyDevice.verifyDeviceBody")}</Text>
             )}
-            <Flex css={{ jc: "center", py: "$5" }}>
-              <Badge size="1">
-                <EmailIcon
-                  color="var(--scute-colors-svgIconColor)"
-                  style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
-                />
-                {identifier}
-              </Badge>
-            </Flex>
+            {identifier && (
+              <Flex css={{ jc: "center", py: "$5" }}>
+                <Badge size="1">
+                  <EmailIcon
+                    color="var(--scute-colors-svgIconColor)"
+                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                  />
+                  {identifier}
+                </Badge>
+              </Flex>
+            )}
           </Inner>
         </ResponsiveLeft>
         <ResponsiveRight>

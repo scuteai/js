@@ -33,7 +33,7 @@ const FatalErrorView = ({
       <ResponsiveContainer>
         <ResponsiveLeft>
           <Header css={{ jc: "center" }}>
-            <FatalErrorIcon />
+            <FatalErrorIcon color="var(--scute-colors-errorColor)" />
           </Header>
           <Inner
             css={{

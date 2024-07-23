@@ -202,17 +202,12 @@ const VerifyMagicLinkOtp = ({
         <ResponsiveLeft>
           <Inner
             css={{
-              display: "flex",
               jc: "center",
               fd: "column",
+              ta: "center",
+              pb: "$5",
             }}
           >
-            <Header css={{ mb: "$1" }}>
-              <LargeSpinner
-                icon={<EmailIcon color="var(--scute-colors-svgIconColor)" />}
-                spinnerColor="var(--scute-colors-loadingSpinnerColor)"
-              />
-            </Header>
             <Heading size="4">
               {isWebauthnNewDevice
                 ? t("verifyOTP.newDeviceTitle")
@@ -221,9 +216,15 @@ const VerifyMagicLinkOtp = ({
             <Text size="2" css={{ mb: "$4" }}>
               {t("verifyOTP.newDeviceBody")}
             </Text>
-            <Text size="2" css={{ mb: "$5" }}>
-              {identifier}
-            </Text>
+            {identifier && (
+              <Badge size="1">
+                <EmailIcon
+                  color="var(--scute-colors-svgIconColor)"
+                  style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                />
+                {identifier}
+              </Badge>
+            )}
           </Inner>
         </ResponsiveLeft>
         <ResponsiveRight>
@@ -294,7 +295,7 @@ const LoadingMagic = ({
           />
         ) : (
           <Flex css={{ jc: "center", width: "100%" }}>
-            <FatalErrorIcon color="var(--scute-colors-svgIconColor)" />
+            <FatalErrorIcon color="var(--scute-colors-errorColor)" />
           </Flex>
         )}
       </Header>

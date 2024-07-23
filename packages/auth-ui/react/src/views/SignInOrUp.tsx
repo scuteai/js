@@ -286,7 +286,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
           <QueryContainer>
             <ResponsiveContainer>
               <ResponsiveLeft>
-                <Inner>
+                <Inner css={{ ta: "center" }}>
                   {mode !== "sign_up" && rememberedIdentifier ? (
                     <Heading size="4">{t("signInOrUp.welcomeBack")}</Heading>
                   ) : (
@@ -703,7 +703,7 @@ const RegisterForm = ({
               <Heading size="4" css={{ mb: "$2" }}>
                 Welcome
               </Heading>
-              <span>{t("registerForm.needInfo")}:</span>
+              <span>{t("registerForm.needInfo")}</span>
               {isError ? (
                 <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
                   {t("general.correctErrors")}

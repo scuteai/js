@@ -30,6 +30,7 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
               display: "flex",
               jc: "center",
               fd: "column",
+              ta: "center",
             }}
           >
             <Heading size="4">{t("general.pleaseWait")}</Heading>
