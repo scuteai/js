@@ -13,6 +13,7 @@ import {
 import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
 
 import {
+  AppNamePlaceholder,
   Content,
   ElementCard,
   Flex,
@@ -23,6 +24,7 @@ import {
   Layout,
   Logo,
   LogoContainer,
+  LogoPlaceholder,
 } from "./components";
 import {
   SignInOrUp,
@@ -326,10 +328,12 @@ const Container = ({
     >
       <Header>
         <LogoContainer>
-          {appData && (
+          {appData ? (
             <AppLogo url={appData.logo} alt={appData.name} size={1} />
+          ) : (
+            <LogoPlaceholder />
           )}
-          <span>{appData && appData.name}</span>
+          <span>{appData ? appData.name : <AppNamePlaceholder />}</span>
         </LogoContainer>
       </Header>
       <ElementCard>

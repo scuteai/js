@@ -97,6 +97,20 @@ export const LogoContainer = styled("div", {
   },
 });
 
+export const LogoPlaceholder = styled("div", {
+  width: "$6",
+  height: "$6",
+  borderRadius: "$1",
+  background: "$surfaceBg",
+});
+
+export const AppNamePlaceholder = styled("div", {
+  width: "$10",
+  height: "$2",
+  borderRadius: "$1",
+  background: "$surfaceBg",
+});
+
 export const QueryContainer = styled("div", {
   containerType: "inline-size",
   containerName: "queryContainer",
