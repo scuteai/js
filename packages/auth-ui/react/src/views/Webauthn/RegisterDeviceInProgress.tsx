@@ -1,6 +1,10 @@
 import { useTranslation } from "react-i18next";
 
-import { BiometricsIcon, EmailIcon } from "../../assets/icons";
+import {
+  BiometricAltIcon,
+  BiometricsIcon,
+  EmailIcon,
+} from "../../assets/icons";
 import {
   Badge,
   Flex,
@@ -22,15 +26,13 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
     <QueryContainer>
       <ResponsiveContainer>
         <ResponsiveLeft>
-          <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
-            <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
-          </Header>
           <Inner
             css={{
               display: "flex",
               jc: "center",
               fd: "column",
               ta: "center",
+              alignItems: "center",
             }}
           >
             <Heading size="4">{t("general.pleaseWait")}</Heading>
@@ -38,22 +40,41 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
               {t("registerDevice.registerInProgress")}
             </Text>
 
-            <Flex css={{ jc: "center", py: "$5" }}>
-              <Badge size="1">
-                <EmailIcon
-                  color="var(--scute-colors-svgIconColor)"
-                  style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
-                />
-                {identifier}
-              </Badge>
+            <Flex
+              css={{
+                py: "$5",
+                "@container queryContainer (min-width: 800px)": {
+                  display: "none",
+                },
+              }}
+            >
+              <BiometricsIcon color="var(--scute-colors-surfaceBg)" />
             </Flex>
+            {identifier && (
+              <Flex css={{ jc: "center", py: "$5" }}>
+                <Badge size="1">
+                  <EmailIcon
+                    color="var(--scute-colors-svgIconColor)"
+                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                  />
+                  {identifier}
+                </Badge>
+              </Flex>
+            )}
           </Inner>
         </ResponsiveLeft>
         <ResponsiveRight>
           <Flex
-            css={{ jc: "space-around", alignItems: "center", height: "100%" }}
+            css={{
+              jc: "space-around",
+              alignItems: "center",
+              height: "100%",
+              "@container queryContainer (max-width: 799px)": {
+                display: "none",
+              },
+            }}
           >
-            <LargeSpinner />
+            <BiometricAltIcon color="var(--scute-colors-surfaceBg)" />
           </Flex>
         </ResponsiveRight>
       </ResponsiveContainer>

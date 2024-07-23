@@ -124,9 +124,7 @@ export const ResponsiveContainer = styled("div", {
 });
 export const ResponsiveLeft = styled("div", {
   flex: 1,
-  pt: "$5",
 });
 export const ResponsiveRight = styled("div", {
   flex: 1,
-  pb: "$5",
 });
