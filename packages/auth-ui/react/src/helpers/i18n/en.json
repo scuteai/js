@@ -37,6 +37,7 @@
     "emailValid": "Email address must be a valid address",
     "signinWith": "Sign in with {{provider}}",
     "continueWith": "Continue with {{provider}}",
+    "continueTo": "Continue to {{appName}}",
     "privacy": "Privacy",
     "help": "Help",
     "or": "Or"

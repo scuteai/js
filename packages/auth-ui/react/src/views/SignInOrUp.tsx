@@ -286,12 +286,20 @@ const SignInOrUp = (props: SignInOrUpProps) => {
           <QueryContainer>
             <ResponsiveContainer>
               <ResponsiveLeft>
-                <Inner css={{ ta: "center" }}>
+                <Inner
+                  css={{
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
                   {mode !== "sign_up" && rememberedIdentifier ? (
                     <Heading size="4">{t("signInOrUp.welcomeBack")}</Heading>
                   ) : (
                     <Heading size="4">{signInOrUpText}</Heading>
                   )}
+                  <Text size="2" css={{ mb: "$4" }}>
+                    {t("signInOrUp.continueTo", { appName: appData.name })}
+                  </Text>
                 </Inner>
               </ResponsiveLeft>
               <ResponsiveRight>
@@ -303,11 +311,12 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                           gap={2}
                           css={{
                             ai: "center",
-                            jc: "space-between",
-                            flexWrap: "wrap",
+                            // jc: "space-between",
                           }}
                         >
-                          <Flex css={{ fd: "column" }}>
+                          <Flex
+                            css={{ fd: "column", width: "calc(100% - 155px)" }}
+                          >
                             <Text
                               size="5"
                               css={{ mb: "$2", pl: "$2" }}
@@ -331,6 +340,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                           <Button
                             variant="alt"
                             onClick={() => setRememberedIdentifier(null)}
+                            css={{ width: "140px" }}
                           >
                             {t("signInOrUp.changeUser")}
                           </Button>
