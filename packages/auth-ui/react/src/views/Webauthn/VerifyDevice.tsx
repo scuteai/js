@@ -168,11 +168,12 @@ const VerifyDevice = ({
               jc: "center",
               fd: "column",
               textAlign: "center",
+              height: "100%",
             }}
           >
             <Flex
               direction="column"
-              css={{ jc: "space-around", alignItems: "center", height: "100%" }}
+              css={{ jc: "center", alignItems: "center", height: "100%" }}
             >
               <Button
                 size="2"
