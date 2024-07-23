@@ -287,38 +287,56 @@ const LoadingMagic = ({
 
   return (
     <>
-      <Header css={{ mb: "$4", mt: "$4" }}>
-        {!error ? (
-          <LargeSpinner
-            icon={<EmailIcon color="var(--scute-colors-svgIconColor)" />}
-            spinnerColor="green"
-          />
-        ) : (
-          <Flex css={{ jc: "center", width: "100%" }}>
-            <FatalErrorIcon color="var(--scute-colors-errorColor)" />
-          </Flex>
-        )}
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        {!error ? (
-          <>
-            <Heading size="1">{t("verifyOTP.loading.title")}</Heading>
-            <Text size="2" css={{ mb: "$4" }}></Text>
-          </>
-        ) : (
-          <>
-            <Heading size="4">{t("general.somethingWentWrong")}</Heading>
-            <Text size="2" css={{ color: "$errorColor", mb: "$4" }}>
-              {error}
-            </Text>
-            <Flex css={{ jc: "center", mt: "2rem" }}>
+      <QueryContainer>
+        <ResponsiveContainer>
+          <ResponsiveLeft>
+            <Inner
+              css={{
+                display: "flex",
+                jc: "center",
+                fd: "column",
+                textAlign: "center",
+              }}
+            >
+              <Flex css={{ mb: "$4" }}>
+                {!error ? (
+                  <LargeSpinner
+                    icon={
+                      <EmailIcon color="var(--scute-colors-svgIconColor)" />
+                    }
+                    spinnerColor="green"
+                  />
+                ) : (
+                  <Flex css={{ jc: "center", width: "100%" }}>
+                    <FatalErrorIcon color="var(--scute-colors-errorColor)" />
+                  </Flex>
+                )}
+              </Flex>
+              {!error ? (
+                <>
+                  <Heading size="1">{t("verifyOTP.loading.title")}</Heading>
+                  <Text size="2" css={{ mb: "$4" }}></Text>
+                </>
+              ) : (
+                <>
+                  <Heading size="4">{t("general.somethingWentWrong")}</Heading>
+                  <Text size="2" css={{ color: "$errorColor", mb: "$4" }}>
+                    {error}
+                  </Text>
+                </>
+              )}
+            </Inner>
+          </ResponsiveLeft>
+          <ResponsiveRight>
+            <Inner
+              css={{
+                display: "flex",
+                jc: "center",
+                height: "100%",
+                alignItems: "center",
+                pt: "$4",
+              }}
+            >
               <Button
                 variant="alt"
                 size="2"
@@ -328,21 +346,10 @@ const LoadingMagic = ({
               >
                 {t("general.backToLogin")}
               </Button>
-            </Flex>
-          </>
-        )}
-        {identifier ? (
-          <Flex css={{ jc: "center", py: "$5" }}>
-            <Badge size="1">
-              <EmailIcon
-                color="var(--scute-colors-svgIconColor)"
-                style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
-              />
-              {identifier}
-            </Badge>
-          </Flex>
-        ) : null}
-      </Inner>
+            </Inner>
+          </ResponsiveRight>
+        </ResponsiveContainer>
+      </QueryContainer>
     </>
   );
 };
