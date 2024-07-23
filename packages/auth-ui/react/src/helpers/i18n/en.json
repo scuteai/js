@@ -14,6 +14,7 @@
     "continueWithMagicLink": "Continue with magic link",
     "tryAgain": "Try again",
     "pleaseTryAgain": "Please try again",
+    "pleaseWait": "Please wait",
     "somethingWentWrong": "Something went wrong",
     "changeEmail": "Change email",
     "resendEmail": "Resend email",
@@ -55,7 +56,7 @@
     "dontTrustDevice": "No, don't trust device",
     "logInWebAuthn": "If this is a trusted device, you can register your passkey for fast and secure login",
     "logInNoWebAuthn": "We'll keep you signed in on this device. To keep your account secure, use this option on your personal devices only.",
-    "registerInProgress": "A device is being registered in another instance."
+    "registerInProgress": "A device is being registered in another instance. Please complete registering the device in that instance."
   },
 
   "verifyDevice": {

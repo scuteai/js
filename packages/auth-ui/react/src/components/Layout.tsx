@@ -72,7 +72,7 @@ export const FooterLinks = styled("div", {
 
 export const Header = styled("div", {
   display: "flex",
-  mb: "$1",
+  mb: "$3",
 });
 
 export const Group = styled("div", {
