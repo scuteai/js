@@ -118,7 +118,7 @@ export const QueryContainer = styled("div", {
 export const ResponsiveContainer = styled("div", {
   display: "flex",
   flexDirection: "column",
-  "@container queryContainer (min-width: 800px)": {
+  "@container queryContainer (min-width: 950px)": {
     flexDirection: "row",
   },
 });

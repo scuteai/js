@@ -80,7 +80,7 @@ const FatalErrorView = ({
                   tryAgain();
                 }}
                 css={{
-                  "@container queryContainer (min-width: 800px)": {
+                  "@container queryContainer (min-width: 950px)": {
                     mt: "$7",
                   },
                 }}

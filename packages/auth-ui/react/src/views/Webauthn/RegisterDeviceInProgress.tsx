@@ -43,7 +43,7 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
             <Flex
               css={{
                 py: "$5",
-                "@container queryContainer (min-width: 800px)": {
+                "@container queryContainer (min-width: 950px)": {
                   display: "none",
                 },
               }}
@@ -69,7 +69,7 @@ const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
               jc: "space-around",
               alignItems: "center",
               height: "100%",
-              "@container queryContainer (max-width: 799px)": {
+              "@container queryContainer (max-width: 949px)": {
                 display: "none",
               },
             }}
