@@ -155,8 +155,9 @@ const VerifyDevice = ({
             )}
             {identifier && (
               <Flex css={{ jc: "center", py: "$5" }}>
-                <Badge size="1">
+                <Badge size="1" css={{ color: "$panelText" }}>
                   <EmailIcon
+                    color="var(--scute-colors-panelText)"
                     style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
                   />
                   {identifier}
