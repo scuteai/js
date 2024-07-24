@@ -3,8 +3,8 @@ import { Text } from "./Text";
 
 export const Layout = styled("div", {
   width: "100%",
-  maxWidth: "1100px",
-  fontWeight: "300",
+  maxWidth: "1200px",
+  fontWeight: "500",
   fontFamily: "$main",
   padding: "$4",
   background: "$surfaceBg",
