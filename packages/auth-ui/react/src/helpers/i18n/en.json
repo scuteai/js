@@ -52,6 +52,7 @@
     "registerDeviceTitle": "Enable passkey",
     "trustDeviceTitle": "Do you trust this device?",
     "registerDevice": "Register Device",
+    "registeringDevice": "Registering device",
     "trustDevice": "Yes, trust device",
     "skipAndLogin": "Skip and log in",
     "dontTrustDevice": "No, don't trust device",
@@ -75,7 +76,7 @@
     "bodyP1Part2": "a one-time link.",
     "bodyP2": "You will be automatically signed in here once you click that link.",
     "loading": {
-      "title": "We are logging you in"
+      "title": "Sending email..."
     }
   },
 

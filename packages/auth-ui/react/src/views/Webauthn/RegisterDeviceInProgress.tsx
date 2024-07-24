@@ -1,17 +1,14 @@
-import { useTranslation } from "react-i18next";
-
 import {
   BiometricAltIcon,
   BiometricsIcon,
   EmailIcon,
+  FaceIdIcon,
 } from "../../assets/icons";
 import {
   Badge,
   Flex,
-  Header,
   Heading,
   Inner,
-  LargeSpinner,
   QueryContainer,
   ResponsiveContainer,
   ResponsiveLeft,
@@ -19,9 +16,25 @@ import {
   Text,
 } from "../../components";
 import { CommonViewProps } from "../common";
+import { useEffect } from "react";
+import { t } from "i18next";
 
-const RegisterDeviceInProgress = ({ identifier }: CommonViewProps) => {
-  const { t } = useTranslation();
+const RegisterDeviceInProgress = ({
+  identifier,
+  setIslandProps,
+  resetIslandProps,
+}: CommonViewProps) => {
+  useEffect(() => {
+    setIslandProps &&
+      setIslandProps({
+        label: t("registerDevice.registeringDevice"),
+        active: true,
+        Icon: <FaceIdIcon />,
+      });
+    return () => {
+      resetIslandProps && resetIslandProps();
+    };
+  }, []);
   return (
     <QueryContainer>
       <ResponsiveContainer>

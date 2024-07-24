@@ -12,6 +12,8 @@ export const Layout = styled("div", {
 });
 
 export const ElementCard = styled("div", {
+  position: "relative",
+  overflow: "hidden",
   background: "$cardBg",
   borderRadius: "$3",
 });

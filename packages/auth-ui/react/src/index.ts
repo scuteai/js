@@ -12,3 +12,5 @@ export {
 
 export { ThemeProvider, useTheme } from "./ThemeContext";
 export { type Theme } from "@scute/ui-shared";
+
+export const darkTheme = {};

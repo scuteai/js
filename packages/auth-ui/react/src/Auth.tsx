@@ -22,7 +22,6 @@ import {
   Header,
   LargeSpinner,
   Layout,
-  Logo,
   LogoContainer,
   LogoPlaceholder,
 } from "./components";
@@ -39,6 +38,7 @@ import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress"
 import { initI18n, translate as t } from "./helpers/i18n/service";
 import { AppLogo } from "./components/AppLogo";
 import { LogoText } from "./components/Logo";
+import { Island, type IslandProps } from "./components/Island";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -66,11 +66,23 @@ function Auth(props: AuthProps) {
     policyURLs,
   } = props;
 
+  const islandPropsInitial: IslandProps = {
+    active: false,
+    label: "",
+    Icon: <></>,
+  };
+
   const [identifier, setIdentifier] = useState<ScuteIdentifier>("");
   const [isFatalError, setIsFatalError] = useState(false);
 
   const [magicLinkId, setMagicLinkId] = useState<UniqueIdentifier>();
   const [authPayload, setAuthPayload] = useState<ScuteTokenPayload>();
+  const [islandProps, setIslandProps] =
+    useState<IslandProps>(islandPropsInitial);
+
+  const resetIslandProps = () => {
+    setIslandProps(islandPropsInitial);
+  };
 
   const [_authView, setAuthView] = useState<Views>(() => {
     if (
@@ -108,6 +120,7 @@ function Auth(props: AuthProps) {
     ...props,
     appearance,
     appData,
+    islandProps,
   };
 
   useEffect(() => {
@@ -268,6 +281,8 @@ function Auth(props: AuthProps) {
             setAuthView={setAuthView}
             setIsFatalError={setIsFatalError}
             identifier={identifier}
+            setIslandProps={setIslandProps}
+            resetIslandProps={resetIslandProps}
           />
         </Container>
       );
@@ -296,6 +311,8 @@ function Auth(props: AuthProps) {
             getAuthPayloadCallback={(payload) => setAuthPayload(payload)}
             magicLinkId={magicLinkId}
             isWebauthnNewDevice={authView === VIEWS.MAGIC_NEW_DEVICE_PENDING}
+            setIslandProps={setIslandProps}
+            resetIslandProps={resetIslandProps}
           />
         </Container>
       );
@@ -307,6 +324,7 @@ function Auth(props: AuthProps) {
 interface ContainerProps extends AuthProps {
   appData?: ScuteAppData;
   children: React.ReactNode;
+  islandProps: IslandProps;
 }
 
 const Container = ({
@@ -315,6 +333,7 @@ const Container = ({
   appearance,
   webauthn,
   children,
+  islandProps,
 }: ContainerProps) => {
   const providerTheme = useTheme();
 
@@ -337,6 +356,7 @@ const Container = ({
         </LogoContainer>
       </Header>
       <ElementCard>
+        <Island {...islandProps} />
         <Content>{children}</Content>
       </ElementCard>
       {appData?.scute_branding !== false ? (

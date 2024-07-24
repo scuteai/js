@@ -17,7 +17,7 @@ export const {
       errorColor: "#fe4f0d",
       svgIconColor: "#121212",
       // Loading indicator
-      loadingSpinnerColor: "rgba(46, 234, 175, 0.3)",
+      loadingSpinnerColor: "#cccccc",
       // Surface
       surfaceBg: "#f7f7f7",
       surfaceLink: "#666666",

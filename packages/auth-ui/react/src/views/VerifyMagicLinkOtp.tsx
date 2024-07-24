@@ -52,6 +52,8 @@ const VerifyMagicLinkOtp = ({
   magicLinkToken: _magicLinkToken,
   isWebauthnNewDevice,
   getAuthPayloadCallback,
+  setIslandProps,
+  resetIslandProps,
 }: VerifyMagicLinkOtpProps) => {
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -70,6 +72,18 @@ const VerifyMagicLinkOtp = ({
         ? new URL(window.location.href).searchParams.get(SCUTE_MAGIC_PARAM)
         : null)
   );
+
+  useEffect(() => {
+    setIslandProps &&
+      setIslandProps({
+        label: t("verifyOTP.loading.title"),
+        active: true,
+        Icon: <EmailIcon />,
+      });
+    return () => {
+      resetIslandProps && resetIslandProps();
+    };
+  }, []);
 
   useEffect(() => {
     setIsPolling(Boolean(magicLinkId));
@@ -214,7 +228,7 @@ const VerifyMagicLinkOtp = ({
             <Heading size="4">
               {isWebauthnNewDevice
                 ? t("verifyOTP.newDeviceTitle")
-                : t("verifyOTP.checkEmailTitle")}
+                : t("verifyOTP.newDeviceTitle")}
             </Heading>
             <Text size="2" css={{ mb: "$4" }}>
               {t("verifyOTP.newDeviceBody")}
