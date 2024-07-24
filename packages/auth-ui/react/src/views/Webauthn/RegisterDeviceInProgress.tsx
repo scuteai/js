@@ -69,7 +69,6 @@ const RegisterDeviceInProgress = ({
               <Flex css={{ jc: "center", py: "$5" }}>
                 <Badge size="1">
                   <EmailIcon
-                    color="var(--scute-colors-svgIconColor)"
                     style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
                   />
                   {identifier}

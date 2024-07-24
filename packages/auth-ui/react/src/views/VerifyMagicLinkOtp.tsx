@@ -78,7 +78,7 @@ const VerifyMagicLinkOtp = ({
       setIslandProps({
         label: t("verifyOTP.loading.title"),
         active: true,
-        Icon: <EmailIcon />,
+        Icon: <EmailIcon color="var(--scute-colors-buttonIdleBg)" />,
       });
     return () => {
       resetIslandProps && resetIslandProps();
@@ -237,7 +237,6 @@ const VerifyMagicLinkOtp = ({
               {identifier && (
                 <Badge size="1">
                   <EmailIcon
-                    color="var(--scute-colors-svgIconColor)"
                     style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
                   />
                   {identifier}
