@@ -2,79 +2,89 @@ import type { Theme } from ".";
 
 export const darkTheme: Theme = {
   colors: {
-    contrast10: "#ffffff",
-    contrast9: "#EDEDED",
-    contrast8: "#DEDEDE",
-    contrast7: "#BABABA",
-    contrast6: "#999999",
-    contrast5: "#757575",
-    contrast4: "#545454",
-    contrast3: "#424242",
-    contrast2: "#333333",
-    contrast1: "#212121",
-    contrast0: "#1f2023",
-    // Semantic colors
-    hiContrast: "$contrast10",
-    loContrast: "$contrast0",
-    headingColor: "$contrast10",
-    textColor: "$contrast9",
-    errorColor: "#e34647",
-    focusColor: "rgba(46, 234, 175, 0.3)",
-    focusColorLight: "rgba(46, 234, 175, 0.2)",
-    //
-    cardBg: "$contrast0",
-    cardShadow:
-      "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
-    cardBorder: "none",
-    // panel
+    errorColor: "#fe4f0d",
+    svgIconColor: "#121212",
+    // Loading indicator
+    loadingSpinnerColor: "#cccccc",
+    // Surface
+    surfaceBg: "#f7f7f7",
+    surfaceLink: "#666666",
+    surfaceText: "#666666",
+    surfaceTextBg: "#ffffff",
+    // Card
+    cardBg: "#ffffff",
+    cardHeadingText: "#121212",
+    cardBodyText: "#121212",
+    cardFooterText: "#b0b0b0",
+    cardFooterLink: "#b0b0b0",
+    // Panel
+    panelBg: "#f7f7f7",
+    panelText: "#121212",
+    // Input
+    inputBg: "#ffffff",
+    inputText: "#121212",
+    inputPlaceholder: "#333333",
+    inputBorder: "#333333",
+    inputFocusGlow: "rgba(46, 234, 175, 0.3)",
 
-    panel: "black",
-    panelShadow:
-      "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
+    inputDisabledBg: "#DEDEDE",
+    inputDisabledText: "#333333",
 
-    buttonIconColor: "#444444",
+    // Buttons
+    // Default variant
+    buttonIconColor: "#ffffff",
 
-    buttonIdleText: "$contrast1",
-    buttonIdleBg: "$contrast9",
-    buttonPassiveBg: "$contrast5",
-    buttonHoverBg: "$contrast10",
-    buttonHoverText: "black",
+    buttonIdleText: "white",
+    buttonIdleBg: "#212121",
+    buttonIdleBorder: "transparent",
+    buttonIdleShadow: "transparent",
 
-    buttonIdleBorder: "rgba(0,0,0,1)",
-    buttonIdleShadow1: "rgba(0,0,0,1)",
-    buttonIdleShadow2: "rgba(0,0,0,1)",
+    buttonPassiveBg: "#f7f7f7",
+    buttonPassiveText: "#bababa",
 
+    buttonHoverBg: "#121212",
+    buttonHoverText: "white",
     buttonHoverBorder: "black",
-    buttonHoverShadow1: "rgba(0,0,0,1)",
-    buttonHoverShadow2: "rgba(0,0,0,1)",
+    buttonHoverShadow: "transparent",
 
-    buttonFocusBorder: "$focusColor",
-    buttonFocusRing1: "$focusColor",
-    buttonFocusRing2: "$focusColor",
-    buttonFocusShadow1: "$focusColor",
-    buttonFocusShadow2: "$focusColor",
+    buttonFocusBorder: "rgba(46, 234, 175, 0.3)",
+    buttonFocusShadow: "rgba(46, 234, 175, 0.3)",
 
-    buttonAltIdleText: "$contrast9",
-    buttonAltIdleBg: "transparent",
-    buttonAltPassiveBg: "$contrast5",
-    buttonAltHoverBg: "$contrast10",
-    buttonAltHoverText: "black",
+    // Alt variant
+    buttonAltIconColor: "#ffffff", //
 
+    buttonAltIdleText: "#333333",
+    buttonAltIdleBg: "white",
     buttonAltIdleBorder: "rgba(0,0,0,0.2)",
-    buttonAltIdleShadow1: "rgba(0,0,0,0.05)",
-    buttonAltIdleShadow2: "rgba(0,0,0,0.05)",
+    buttonAltIdleShadow: "rgba(0,0,0,0.05)",
 
+    buttonAltPassiveBg: "#757575", //
+
+    buttonAltHoverBg: "#121212",
+    buttonAltHoverText: "white",
     buttonAltHoverBorder: "rgba(0,0,0,0.05)",
-    buttonAltHoverRing1: "rgba(0,0,0,0.05)",
-    buttonAltHoverRing2: "rgba(0,0,0,0.05)",
-    buttonAltHoverShadow1: "rgba(0,0,0,0.05)",
-    buttonAltHoverShadow2: "rgba(0,0,0,0.05)",
+    buttonAltHoverShadow: "rgba(0,0,0,0.05)",
 
-    buttonAltFocusBorder: "$focusColor",
-    buttonAltFocusRing1: "$focusColor",
-    buttonAltFocusRing2: "$focusColor",
-    buttonAltFocusShadow1: "$focusColor",
-    buttonAltFocusShadow2: "$focusColor",
+    buttonAltFocusBorder: "rgba(46, 234, 175, 0.3)",
+    buttonAltFocusShadow: "rgba(46, 234, 175, 0.3)",
+
+    // Social variant
+    buttonSocialIconColor: "#ffffff", //
+
+    buttonSocialIdleText: "#222222",
+    buttonSocialIdleBg: "#f7f7f7",
+    buttonSocialIdleBorder: "transparent",
+    buttonSocialIdleShadow: "transparent",
+
+    buttonSocialPassiveBg: "#757575", //
+
+    buttonSocialHoverBg: "#f7f7f7",
+    buttonSocialHoverText: "#222222",
+    buttonSocialHoverBorder: "transparent",
+    buttonSocialHoverShadow: "transparent",
+
+    buttonSocialFocusBorder: "rgba(46, 234, 175, 0.3)",
+    buttonSocialFocusShadow: "rgba(46, 234, 175, 0.3)",
   },
   fonts: {
     main: '"Inter", -apple-system, system-ui, sans-serif',
