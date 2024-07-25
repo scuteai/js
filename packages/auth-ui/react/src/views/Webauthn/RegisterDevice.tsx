@@ -142,7 +142,7 @@ const RegisterDevice = ({
                 {error}
               </Text>
             ) : (
-              <Text>
+              <Text size="2">
                 {isWebauthnSupported
                   ? t("registerDevice.logInWebAuthn")
                   : t("registerDevice.logInNoWebAuthn")}

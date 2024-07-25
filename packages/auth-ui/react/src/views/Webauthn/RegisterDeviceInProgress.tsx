@@ -58,6 +58,8 @@ const RegisterDeviceInProgress = ({
             <Flex
               css={{
                 py: "$5",
+                ai: "center",
+                jc: "center",
                 "@container queryContainer (min-width: 950px)": {
                   display: "none",
                 },
