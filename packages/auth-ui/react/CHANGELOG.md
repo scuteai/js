@@ -1,5 +1,14 @@
 # @scute/ui-react
 
+## 1.0.7
+
+### Patch Changes
+
+- New design themes
+- Updated dependencies
+  - @scute/ui-shared@1.0.7
+  - @scute/core@1.0.7
+
 ## 1.0.6
 
 ### Patch Changes

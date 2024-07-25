@@ -1,5 +1,11 @@
 # @scute/ui-shared
 
+## 1.0.7
+
+### Patch Changes
+
+- New design themes
+
 ## 1.0.6
 
 ### Patch Changes

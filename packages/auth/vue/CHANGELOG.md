@@ -1,5 +1,13 @@
 # @scute/vue
 
+## 1.0.7
+
+### Patch Changes
+
+- New design themes
+- Updated dependencies
+  - @scute/core@1.0.7
+
 ## 1.0.6
 
 ### Patch Changes
