@@ -14,76 +14,89 @@ export const {
   prefix: "scute",
   theme: {
     colors: {
-      contrast0: "#ffffff",
-      contrast1: "#EDEDED",
-      contrast2: "#DEDEDE",
-      contrast3: "#BABABA",
-      contrast4: "#999999",
-      contrast5: "#757575",
-      contrast6: "#545454",
-      contrast7: "#424242",
-      contrast8: "#333333",
-      contrast9: "#212121",
-      contrast10: "#121212",
-      black: "$contrast10",
-      // Semantic colors
-      hiContrast: "$contrast10",
-      loContrast: "$contrast0",
-      headingColor: "$contrast10",
-      textColor: "$contrast9",
       errorColor: "#fe4f0d",
-      focusColor: "rgba(46, 234, 175, 0.3)",
-      focusColorLight: "rgba(46, 234, 175, 0.2)",
-      cardBg: "$contrast0",
-      cardShadow:
-        "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
-      cardBorder: "none",
-      // panel
-      panel: "$loContrast",
-      panelShadow:
-        "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
+      svgIconColor: "#121212",
+      // Loading indicator
+      loadingSpinnerColor: "#cccccc",
+      // Surface
+      surfaceBg: "#f7f7f7",
+      surfaceLink: "#666666",
+      surfaceText: "#666666",
+      surfaceTextBg: "#ffffff",
+      // Card
+      cardBg: "#ffffff",
+      cardHeadingText: "#121212",
+      cardBodyText: "#121212",
+      cardFooterText: "#b0b0b0",
+      cardFooterLink: "#b0b0b0",
+      // Panel
+      panelBg: "#f7f7f7",
+      panelText: "#121212",
+      // Input
+      inputBg: "#ffffff",
+      inputText: "#121212",
+      inputPlaceholder: "#333333",
+      inputBorder: "#333333",
+      inputFocusGlow: "rgba(46, 234, 175, 0.3)",
+
+      inputDisabledBg: "#DEDEDE",
+      inputDisabledText: "#333333",
 
       // Buttons
-      buttonIconColor: "#444444",
+      // Default variant
+      buttonIconColor: "#ffffff",
+
       buttonIdleText: "white",
-      buttonIdleBg: "$contrast9",
-      buttonPassiveBg: "$contrast5",
-      buttonHoverBg: "$contrast10",
+      buttonIdleBg: "#212121",
+      buttonIdleBorder: "transparent",
+      buttonIdleShadow: "transparent",
+
+      buttonPassiveBg: "#f7f7f7",
+      buttonPassiveText: "#bababa",
+
+      buttonHoverBg: "#121212",
       buttonHoverText: "white",
-      buttonIdleBorder: "rgba(0,0,0,1)",
-      buttonIdleShadow1: "rgba(0,0,0,1)",
-      buttonIdleShadow2: "rgba(0,0,0,1)",
       buttonHoverBorder: "black",
-      buttonHoverShadow1: "rgba(0,0,0,1)",
-      buttonHoverShadow2: "rgba(0,0,0,1)",
+      buttonHoverShadow: "transparent",
 
-      buttonFocusBorder: "$focusColor",
-      buttonFocusRing1: "$focusColor",
-      buttonFocusRing2: "$focusColor",
-      buttonFocusShadow1: "$focusColor",
-      buttonFocusShadow2: "$focusColor",
+      buttonFocusBorder: "rgba(46, 234, 175, 0.3)",
+      buttonFocusShadow: "rgba(46, 234, 175, 0.3)",
 
-      buttonAltIdleText: "$contrast8",
+      // Alt variant
+      buttonAltIconColor: "#ffffff", //
+
+      buttonAltIdleText: "#333333",
       buttonAltIdleBg: "white",
-      buttonAltPassiveBg: "$contrast5",
-      buttonAltHoverBg: "$contrast10",
-      buttonAltHoverText: "white",
-
       buttonAltIdleBorder: "rgba(0,0,0,0.2)",
-      buttonAltIdleShadow1: "rgba(0,0,0,0.05)",
-      buttonAltIdleShadow2: "rgba(0,0,0,0.05)",
+      buttonAltIdleShadow: "rgba(0,0,0,0.05)",
 
+      buttonAltPassiveBg: "#757575", //
+
+      buttonAltHoverBg: "#121212",
+      buttonAltHoverText: "white",
       buttonAltHoverBorder: "rgba(0,0,0,0.05)",
-      buttonAltHoverRing1: "rgba(0,0,0,0.05)",
-      buttonAltHoverRing2: "rgba(0,0,0,0.05)",
-      buttonAltHoverShadow1: "rgba(0,0,0,0.05)",
-      buttonAltHoverShadow2: "rgba(0,0,0,0.05)",
+      buttonAltHoverShadow: "rgba(0,0,0,0.05)",
 
-      buttonAltFocusBorder: "$focusColor",
-      buttonAltFocusRing1: "$focusColor",
-      buttonAltFocusRing2: "$focusColor",
-      buttonAltFocusShadow1: "$focusColor",
-      buttonAltFocusShadow2: "$focusColor",
+      buttonAltFocusBorder: "rgba(46, 234, 175, 0.3)",
+      buttonAltFocusShadow: "rgba(46, 234, 175, 0.3)",
+
+      // Social variant
+      buttonSocialIconColor: "#ffffff", //
+
+      buttonSocialIdleText: "#222222",
+      buttonSocialIdleBg: "#f7f7f7",
+      buttonSocialIdleBorder: "transparent",
+      buttonSocialIdleShadow: "transparent",
+
+      buttonSocialPassiveBg: "#757575", //
+
+      buttonSocialHoverBg: "#f7f7f7",
+      buttonSocialHoverText: "#222222",
+      buttonSocialHoverBorder: "transparent",
+      buttonSocialHoverShadow: "transparent",
+
+      buttonSocialFocusBorder: "rgba(46, 234, 175, 0.3)",
+      buttonSocialFocusShadow: "rgba(46, 234, 175, 0.3)",
     },
     fonts: {
       main: '"Inter", -apple-system, system-ui, sans-serif',
@@ -110,19 +123,24 @@ export const {
       7: "40px",
       8: "46px",
       9: "50px",
-      10: "60px",
+      10: "65px",
     },
     fontSizes: {
       0: "0.75rem",
       1: "0.8125rem",
       2: "0.875rem",
       3: "1rem",
+      4: "1.125rem",
+      5: "1.25rem",
+      6: "1.5rem",
+      7: "1.875rem",
+      8: "2.25rem",
     },
     radii: {
-      1: "4px",
-      2: "6px",
-      3: "8px",
-      4: "12px",
+      1: "5px",
+      2: "10px",
+      3: "15px",
+      4: "20px",
       round: "50%",
       pill: "9999px",
     },
@@ -306,24 +324,3 @@ export const shadowCreator = (
  `;
   }
 };
-
-export const darkTheme = createTheme({
-  colors: {
-    hiContrast: "hsl(206,2%,93%)",
-    loContrast: "hsl(206,8%,8%)",
-    cardBg: "red",
-    contrast0: "#ffffff",
-    contrast1: "#EDEDED",
-    contrast2: "#DEDEDE",
-    contrast3: "#BABABA",
-    contrast4: "#999999",
-    contrast5: "#757575",
-    contrast6: "#545454",
-    contrast7: "#424242",
-    contrast8: "#333333",
-    contrast9: "red",
-    contrast10: "red",
-  },
-  space: {},
-  fonts: {},
-});

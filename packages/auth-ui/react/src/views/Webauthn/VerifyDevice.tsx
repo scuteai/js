@@ -9,7 +9,7 @@ import {
 import { VIEWS } from "@scute/ui-shared";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BiometricsIcon } from "../../assets/icons";
+import { BiometricsIcon, EmailIcon } from "../../assets/icons";
 
 import {
   Badge,
@@ -19,6 +19,10 @@ import {
   Heading,
   Inner,
   LargeSpinner,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
   Text,
 } from "../../components";
 import useEffectOnce from "../../helpers/useEffectOnce";
@@ -38,12 +42,17 @@ const VerifyDevice = ({
 }: VerifyDeviceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const { t } = useTranslation();
 
   const cookieStore = new ScuteBrowserCookieStorage();
 
   const handleSendMagicLink = async (isNewDevice = false) => {
+    if (submitting) {
+      return;
+    }
+    setSubmitting(true);
     const { data, error: sendMagicLinkError } =
       await scuteClient.sendLoginMagicLink(identifier, undefined, !isNewDevice);
 
@@ -58,6 +67,7 @@ const VerifyDevice = ({
     if (magicLinkId) {
       getMagicLinkIdCallback?.(magicLinkId);
     }
+    setSubmitting(true);
   };
 
   const handleVerifyDevice = async () => {
@@ -115,56 +125,88 @@ const VerifyDevice = ({
   }
 
   return (
-    <>
-      <Header>
-        <BiometricsIcon color="var(--scute-colors-contrast8)" />
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        <Heading size="1" css={{ color: "$headingColor" }}>
-          {t("verifyDevice.verifyDeviceTitle")}
-        </Heading>
-
-        {error ? (
-          <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-            {error}
-            <br />
-            {t("verifyDevice.tryAgain")}
-          </Text>
-        ) : (
-          <Text css={{ color: "$textColor" }}>
-            {t("verifyDevice.verifyDeviceBody")}
-          </Text>
-        )}
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
-        <Flex css={{ jc: "space-around" }}>
-          <Button
-            variant="alt"
-            onClick={() => {
-              if (error) {
-                setError(null);
-                handleVerifyDevice();
-              } else {
-                setAuthView(VIEWS.SIGN_IN_OR_UP);
-              }
+    <QueryContainer>
+      <ResponsiveContainer>
+        <ResponsiveLeft>
+          <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
+            <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
+          </Header>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              textAlign: "center",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
             }}
           >
-            {!error ? t("general.changeEmail") : t("general.tryAgain")}
-          </Button>
-          <Button variant="alt" onClick={() => handleSendMagicLink()}>
-            {t("verifyDevice.signInMagicLink")}
-          </Button>
-        </Flex>
-      </Inner>
-    </>
+            <Heading size="4">{t("verifyDevice.verifyDeviceTitle")}</Heading>
+
+            {error ? (
+              <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
+                {error}
+                <br />
+                {t("verifyDevice.tryAgain")}
+              </Text>
+            ) : (
+              <Text>{t("verifyDevice.verifyDeviceBody")}</Text>
+            )}
+            {identifier && (
+              <Flex css={{ jc: "center", py: "$5" }}>
+                <Badge size="1" css={{ color: "$panelText" }}>
+                  <EmailIcon
+                    color="var(--scute-colors-panelText)"
+                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                  />
+                  {identifier}
+                </Badge>
+              </Flex>
+            )}
+          </Inner>
+        </ResponsiveLeft>
+        <ResponsiveRight>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              textAlign: "center",
+              height: "100%",
+            }}
+          >
+            <Flex
+              direction="column"
+              css={{ jc: "center", alignItems: "center", height: "100%" }}
+            >
+              <Button
+                size="2"
+                variant="alt"
+                css={{ mb: "$3" }}
+                onClick={() => {
+                  if (error) {
+                    setError(null);
+                    handleVerifyDevice();
+                  } else {
+                    setAuthView(VIEWS.SIGN_IN_OR_UP);
+                  }
+                }}
+              >
+                {!error ? t("general.changeEmail") : t("general.tryAgain")}
+              </Button>
+              <Button
+                size="2"
+                variant="alt"
+                onClick={() => handleSendMagicLink()}
+              >
+                {t("verifyDevice.signInMagicLink")}
+              </Button>
+            </Flex>
+          </Inner>
+        </ResponsiveRight>
+      </ResponsiveContainer>
+    </QueryContainer>
   );
 };
 

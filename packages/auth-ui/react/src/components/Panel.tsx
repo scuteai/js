@@ -106,11 +106,11 @@ export const IconHolder = styled("div", {
 });
 
 export const panelStyles = css({
-  backgroundColor: "$panel",
-  borderRadius: "$3",
-  boxShadow: "$colors$panelShadow",
+  background: "$panelBg",
+  color: "$panelText",
+  borderRadius: "$4",
   px: "$3",
-  py: "$3",
+  py: "$5",
   mb: "$4",
   variants: {
     variant: {

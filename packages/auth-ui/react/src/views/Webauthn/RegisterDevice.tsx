@@ -9,7 +9,12 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { BiometricsIcon, CircleCheckIcon } from "../../assets/icons";
+import {
+  BiometricsIcon,
+  CircleCheckIcon,
+  EmailIcon,
+  FingerprintIcon,
+} from "../../assets/icons";
 import {
   Badge,
   Button,
@@ -18,6 +23,10 @@ import {
   Header,
   Heading,
   Inner,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
 } from "../../components";
 import { type CommonViewProps } from "../common";
 import { translateError } from "../../helpers/i18n/service";
@@ -102,59 +111,95 @@ const RegisterDevice = ({
   const { t } = useTranslation();
 
   return (
-    <>
-      <Header>
-        {isWebauthnSupported ? (
-          <BiometricsIcon color="var(--scute-colors-contrast8)" />
-        ) : (
-          <CircleCheckIcon color="var(--scute-colors-contrast8)" />
-        )}
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        <Heading size="1" css={{ color: "$headingColor" }}>
-          {isWebauthnSupported
-            ? t("registerDevice.registerDeviceTitle")
-            : t("registerDevice.trustDeviceTitle")}
-        </Heading>
-        {error ? (
-          <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-            {error}
-          </Text>
-        ) : (
-          <Text css={{ color: "$textColor" }}>
-            {isWebauthnSupported
-              ? t("registerDevice.logInWebAuthn")
-              : t("registerDevice.logInNoWebAuthn")}
-          </Text>
-        )}
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
-        <Flex css={{ jc: "space-around" }}>
-          <Button variant="alt" onClick={() => handleRegisterDevice()}>
-            {!error
-              ? isWebauthnSupported
-                ? t("registerDevice.registerDevice")
-                : t("registerDevice.trustDevice")
-              : t("general.tryAgain")}
-          </Button>
-          {webauthn === "optional" || error ? (
-            <Button variant="alt" onClick={() => handleSkipAndLogin()}>
+    <QueryContainer>
+      <ResponsiveContainer>
+        <ResponsiveLeft>
+          <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
+            {isWebauthnSupported ? (
+              <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
+            ) : (
+              <CircleCheckIcon color="var(--scute-colors-svgIconColor)" />
+            )}
+          </Header>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              ta: "center",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
+            }}
+          >
+            <Heading size="4">
               {isWebauthnSupported
-                ? t("registerDevice.skipAndLogin")
-                : t("registerDevice.dontTrustDevice")}
-            </Button>
-          ) : null}
-        </Flex>
-      </Inner>
-    </>
+                ? t("registerDevice.registerDeviceTitle")
+                : t("registerDevice.trustDeviceTitle")}
+            </Heading>
+            {error ? (
+              <Text size="2" css={{ color: "$errorColor" }}>
+                {error}
+              </Text>
+            ) : (
+              <Text>
+                {isWebauthnSupported
+                  ? t("registerDevice.logInWebAuthn")
+                  : t("registerDevice.logInNoWebAuthn")}
+              </Text>
+            )}
+            {identifier && (
+              <Flex css={{ jc: "center", py: "$5" }}>
+                <Badge size="1" css={{ color: "$panelText" }}>
+                  <EmailIcon
+                    color="var(--scute-colors-panelText)"
+                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                  />
+                  {identifier}
+                </Badge>
+              </Flex>
+            )}
+          </Inner>
+        </ResponsiveLeft>
+        <ResponsiveRight>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              height: "100%",
+              justifyContent: "center",
+            }}
+          >
+            <Flex direction="column" css={{ jc: "space-around" }}>
+              <Button
+                css={{ mb: "$3" }}
+                size="2"
+                onClick={() => handleRegisterDevice()}
+              >
+                {!error
+                  ? isWebauthnSupported
+                    ? t("registerDevice.registerDevice")
+                    : t("registerDevice.trustDevice")
+                  : t("general.tryAgain")}
+                {isWebauthnSupported && <FingerprintIcon />}
+              </Button>
+              {webauthn === "optional" || error ? (
+                <Button
+                  size="2"
+                  variant="alt"
+                  onClick={() => handleSkipAndLogin()}
+                >
+                  {isWebauthnSupported
+                    ? t("registerDevice.skipAndLogin")
+                    : t("registerDevice.dontTrustDevice")}
+                </Button>
+              ) : null}
+            </Flex>
+          </Inner>
+        </ResponsiveRight>
+      </ResponsiveContainer>
+    </QueryContainer>
   );
 };
 

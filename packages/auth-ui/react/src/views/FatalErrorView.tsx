@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { BiometricsIcon } from "../assets/icons";
+import { EmailIcon, FatalErrorIcon } from "../assets/icons";
 import {
   Badge,
   Flex,
@@ -9,6 +9,10 @@ import {
   Heading,
   Inner,
   Text,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
 } from "../components";
 import type { CommonViewProps } from "./common";
 
@@ -25,40 +29,72 @@ const FatalErrorView = ({
   const { t } = useTranslation();
 
   return (
-    <>
-      <Header>
-        <BiometricsIcon color="var(--scute-colors-errorColor)" />
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        <Heading size="1" css={{ color: "$errorColor" }}>
-          {error ?? t("general.somethingWentWrong")}
-        </Heading>
-        <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-          {t("general.pleaseTryAgain")}
-        </Text>
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
-        <Flex css={{ jc: "center" }}>
-          <Button
-            variant="alt"
-            size="2"
-            onClick={() => {
-              tryAgain();
+    <QueryContainer>
+      <ResponsiveContainer>
+        <ResponsiveLeft>
+          <Header css={{ jc: "center" }}>
+            <FatalErrorIcon color="var(--scute-colors-errorColor)" />
+          </Header>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              textAlign: "center",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
             }}
           >
-            {t("general.tryAgain")}
-          </Button>
-        </Flex>
-      </Inner>
-    </>
+            <Heading size="4">
+              {error ?? t("general.somethingWentWrong")}
+            </Heading>
+            <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
+              {t("general.pleaseTryAgain")}
+            </Text>
+            <Flex css={{ jc: "center", py: "$5", ta: "center" }}>
+              {identifier && (
+                <Badge size="1" css={{ color: "$panelText" }}>
+                  <EmailIcon
+                    color="var(--scute-colors-panelText)"
+                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                  />
+                  {identifier}
+                </Badge>
+              )}
+            </Flex>
+          </Inner>
+        </ResponsiveLeft>
+        <ResponsiveRight>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              textAlign: "center",
+              height: "100%",
+            }}
+          >
+            <Flex css={{ jc: "center" }}>
+              <Button
+                variant="alt"
+                size="2"
+                onClick={() => {
+                  tryAgain();
+                }}
+                css={{
+                  "@container queryContainer (min-width: 950px)": {
+                    mt: "$7",
+                  },
+                }}
+              >
+                {t("general.tryAgain")}
+              </Button>
+            </Flex>
+          </Inner>
+        </ResponsiveRight>
+      </ResponsiveContainer>
+    </QueryContainer>
   );
 };
 

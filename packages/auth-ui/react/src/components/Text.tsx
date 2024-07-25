@@ -7,7 +7,10 @@ export const Text = styled("span", {
   fontFamily: "$main",
   fontVariantNumeric: "tabular-nums",
   display: "block",
-  fontWeight:'normal',
+  fontWeight: "normal",
+  "& a": {
+    color: "inherit",
+  },
   variants: {
     size: {
       "1": {
@@ -26,20 +29,23 @@ export const Text = styled("span", {
         lineHeight: "20px",
       },
       "5": {
-        fontSize: "$sizes$3",
-        lineHeight: "20px",
+        fontSize: "$4",
+        lineHeight: "22px",
       },
       "6": {
         fontSize: "$sizes$4",
-        lineHeight: "20px",
+        lineHeight: "24px",
       },
     },
     variant: {
       text: {
-        color: "$textColor",
+        color: "$cardBodyText",
       },
       contrast: {
         color: "$hiContrast",
+      },
+      inherit: {
+        color: "inherit",
       },
     },
     gradient: {

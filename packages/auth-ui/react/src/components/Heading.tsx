@@ -6,7 +6,7 @@ import merge from "lodash.merge";
 const DEFAULT_TAG = "h1";
 
 type TextSizeVariants = Pick<VariantProps<typeof Text>, "size">;
-type HeadingSizeVariants = "1" | "2" | "3";
+type HeadingSizeVariants = "1" | "2" | "3" | "4";
 type HeadingVariants = { size?: HeadingSizeVariants } & Omit<
   VariantProps<typeof Text>,
   "size"
@@ -26,6 +26,7 @@ export const Heading = React.forwardRef<
     1: { "@initial": "6", "@bp2": "5" },
     2: { "@initial": "5", "@bp2": "4" },
     3: { "@initial": "4", "@bp2": "3" },
+    4: { "@initial": "3", "@bp2": "2" },
   };
 
   // This is the mapping of Heading Variants to Text css
@@ -33,6 +34,13 @@ export const Heading = React.forwardRef<
     1: { fontWeight: 500, lineHeight: "20px", "@bp2": { lineHeight: "23px" } },
     2: { fontWeight: 500, lineHeight: "25px", "@bp2": { lineHeight: "30px" } },
     3: { fontWeight: 500, lineHeight: "33px", "@bp2": { lineHeight: "41px" } },
+    4: {
+      mb: "$5",
+      fontSize: "$8",
+      fontWeight: 500,
+      lineHeight: "55px",
+      "@bp2": { lineHeight: "60px" },
+    },
   };
 
   return (
@@ -43,8 +51,12 @@ export const Heading = React.forwardRef<
       size={textSize[size]}
       css={{
         mb: "$2",
+        color: "$cardHeadingText",
         fontVariantNumeric: "proportional-nums",
         ...merge(textCss[size], props.css),
+        "@container queryContainer (min-width: 950px)": {
+          mb: "$1",
+        },
       }}
     />
   );

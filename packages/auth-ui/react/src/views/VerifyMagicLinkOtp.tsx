@@ -11,7 +11,7 @@ import { VIEWS } from "@scute/ui-shared";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { EmailIcon } from "../assets/icons";
+import { FatalErrorIcon, EmailIcon } from "../assets/icons";
 
 import {
   Badge,
@@ -21,6 +21,10 @@ import {
   Heading,
   Inner,
   LargeSpinner,
+  QueryContainer,
+  ResponsiveContainer,
+  ResponsiveLeft,
+  ResponsiveRight,
   Text,
 } from "../components";
 
@@ -37,6 +41,8 @@ export interface VerifyMagicLinkOtpProps extends CommonViewProps {
   getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
 }
 
+const TIMER_START = 30;
+
 const VerifyMagicLinkOtp = ({
   scuteClient,
   identifier: _identifier,
@@ -46,11 +52,15 @@ const VerifyMagicLinkOtp = ({
   magicLinkToken: _magicLinkToken,
   isWebauthnNewDevice,
   getAuthPayloadCallback,
+  setIslandProps,
+  resetIslandProps,
 }: VerifyMagicLinkOtpProps) => {
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [isVerifyCalled, setIsVerifyCalled] = useState(false);
   const [identifier, setIdentifier] = useState(_identifier);
+  const [time, setTime] = useState(TIMER_START);
+  const [resendDisabled, setResendDisabled] = useState(false);
 
   const { t } = useTranslation();
   const isBroadcastMagicVerified = useRef<boolean>(false);
@@ -62,6 +72,18 @@ const VerifyMagicLinkOtp = ({
         ? new URL(window.location.href).searchParams.get(SCUTE_MAGIC_PARAM)
         : null)
   );
+
+  useEffect(() => {
+    setIslandProps &&
+      setIslandProps({
+        label: t("verifyOTP.loading.title"),
+        active: true,
+        Icon: <EmailIcon color="var(--scute-colors-buttonIdleBg)" />,
+      });
+    return () => {
+      resetIslandProps && resetIslandProps();
+    };
+  }, []);
 
   useEffect(() => {
     setIsPolling(Boolean(magicLinkId));
@@ -76,6 +98,15 @@ const VerifyMagicLinkOtp = ({
 
     return () => unsubscribe();
   }, []);
+
+  useInterval(
+    () => {
+      if (time > 0) {
+        setTime(time - 1);
+      }
+    },
+    time > 0 ? 1000 : null
+  );
 
   useInterval(
     async () => {
@@ -180,47 +211,85 @@ const VerifyMagicLinkOtp = ({
   }
 
   return (
-    <>
-      <Header css={{ mb: "$1" }}>
-        <LargeSpinner
-          icon={<EmailIcon color="var(--scute-colors-contrast8)" />}
-          spinnerColor="var(--scute-colors-focusColor)"
-        />
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        <Heading size="1" css={{ color: "$headingColor" }}>
-          {isWebauthnNewDevice
-            ? t("verifyOTP.newDeviceTitle")
-            : t("verifyOTP.checkEmailTitle")}
-        </Heading>
-        <Text size="2" css={{ color: "$textColor", mb: "$1" }}>
-          {t("verifyOTP.bodyP1Part1")} <br />
-          {t("verifyOTP.bodyP1Part2")}
-        </Text>
-        <Text size="2">{t("verifyOTP.bodyP2")}</Text>
-        <Flex css={{ jc: "center", py: "$5" }}>
-          <Badge size="1">{identifier}</Badge>
-        </Flex>
-        <Flex css={{ jc: "space-between" }}>
-          <Button
-            variant="alt"
-            onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
+    <QueryContainer>
+      <ResponsiveContainer>
+        <ResponsiveLeft>
+          <Inner
+            css={{
+              jc: "center",
+              fd: "column",
+              ta: "center",
+              pb: "$5",
+              "@container queryContainer (min-width: 950px)": {
+                ta: "left",
+              },
+            }}
           >
-            {t("general.changeEmail")}
-          </Button>
-          <Button variant="alt" disabled>
-            {t("general.resendEmail")}
-          </Button>
-        </Flex>
-      </Inner>
-    </>
+            <Heading size="4">
+              {isWebauthnNewDevice
+                ? t("verifyOTP.newDeviceTitle")
+                : t("verifyOTP.newDeviceTitle")}
+            </Heading>
+            <Text size="2" css={{ mb: "$4" }}>
+              {t("verifyOTP.newDeviceBody")}
+            </Text>
+            <Flex css={{ jc: "center" }}>
+              {identifier && (
+                <Badge size="1" css={{ color: "$panelText" }}>
+                  <EmailIcon
+                    color="var(--scute-colors-panelText)"
+                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                  />
+                  {identifier}
+                </Badge>
+              )}
+            </Flex>
+          </Inner>
+        </ResponsiveLeft>
+        <ResponsiveRight>
+          <Inner
+            css={{
+              display: "flex",
+              jc: "center",
+              fd: "column",
+              height: "100%",
+            }}
+          >
+            <Flex direction="column" align="center">
+              <Button
+                size="2"
+                variant="alt"
+                disabled={time > 0 || resendDisabled}
+                css={{ mb: "$3" }}
+                onClick={async () => {
+                  setResendDisabled(true);
+                  const { data, error: magicLinkError } =
+                    await scuteClient.sendLoginMagicLink(identifier);
+                  if (magicLinkError) {
+                    const translatedErrorMessage =
+                      translateError(magicLinkError);
+                    setError(translatedErrorMessage);
+                    return;
+                  }
+                  setTime(TIMER_START);
+                  setResendDisabled(false);
+                }}
+              >
+                {time > 0 && `[0:${time.toString().padStart(2, "0")}]`}{" "}
+                {t("general.resendEmail")}
+              </Button>
+              <Button
+                size="2"
+                variant="alt"
+                onClick={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
+              >
+                {t("general.changeEmail")}
+              </Button>
+            </Flex>
+          </Inner>
+        </ResponsiveRight>
+      </ResponsiveContainer>
+    </QueryContainer>
   );
 };
 
@@ -237,37 +306,59 @@ const LoadingMagic = ({
 
   return (
     <>
-      <Header css={{ mb: "$1" }}>
-        {!error ? (
-          <LargeSpinner
-            icon={<EmailIcon color="var(--scute-colors-contrast8)" />}
-            spinnerColor="green"
-          />
-        ) : (
-          <EmailIcon />
-        )}
-      </Header>
-      <Inner
-        css={{
-          display: "flex",
-          jc: "center",
-          fd: "column",
-          textAlign: "center",
-        }}
-      >
-        {!error ? (
-          <>
-            <Heading size="1" css={{ color: "$headingColor" }}>
-              {t("verifyOTP.loading.title")}
-            </Heading>
-            <Text size="2" css={{ color: "$textColor", mb: "$1" }}></Text>
-          </>
-        ) : (
-          <>
-            <Text size="2" css={{ color: "$errorColor", mb: "$1" }}>
-              {error}
-            </Text>
-            <Flex css={{ jc: "center", mt: "2rem" }}>
+      <QueryContainer>
+        <ResponsiveContainer>
+          <ResponsiveLeft>
+            <Inner
+              css={{
+                display: "flex",
+                jc: "center",
+                fd: "column",
+                textAlign: "center",
+                "@container queryContainer (min-width: 950px)": {
+                  ta: "left",
+                },
+              }}
+            >
+              <Flex css={{ mb: "$4" }}>
+                {!error ? (
+                  <LargeSpinner
+                    icon={
+                      <EmailIcon color="var(--scute-colors-svgIconColor)" />
+                    }
+                    spinnerColor="green"
+                  />
+                ) : (
+                  <Flex css={{ jc: "center", width: "100%" }}>
+                    <FatalErrorIcon color="var(--scute-colors-errorColor)" />
+                  </Flex>
+                )}
+              </Flex>
+              {!error ? (
+                <>
+                  <Heading size="1">{t("verifyOTP.loading.title")}</Heading>
+                  <Text size="2" css={{ mb: "$4" }}></Text>
+                </>
+              ) : (
+                <>
+                  <Heading size="4">{t("general.somethingWentWrong")}</Heading>
+                  <Text size="2" css={{ color: "$errorColor", mb: "$4" }}>
+                    {error}
+                  </Text>
+                </>
+              )}
+            </Inner>
+          </ResponsiveLeft>
+          <ResponsiveRight>
+            <Inner
+              css={{
+                display: "flex",
+                jc: "center",
+                height: "100%",
+                alignItems: "center",
+                pt: "$4",
+              }}
+            >
               <Button
                 variant="alt"
                 size="2"
@@ -277,15 +368,10 @@ const LoadingMagic = ({
               >
                 {t("general.backToLogin")}
               </Button>
-            </Flex>
-          </>
-        )}
-        {identifier ? (
-          <Flex css={{ jc: "center", py: "$5" }}>
-            <Badge size="1">{identifier}</Badge>
-          </Flex>
-        ) : null}
-      </Inner>
+            </Inner>
+          </ResponsiveRight>
+        </ResponsiveContainer>
+      </QueryContainer>
     </>
   );
 };
