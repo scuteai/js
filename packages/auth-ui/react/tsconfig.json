@@ -2,7 +2,10 @@
   "extends": "@scute/tsconfig/react-library.json",
   "compilerOptions": {
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "react": ["./node_modules/@types/react"]
+    }
   },
   "include": ["src", "index.ts"],
   "exclude": ["dist", "build", "node_modules"]
