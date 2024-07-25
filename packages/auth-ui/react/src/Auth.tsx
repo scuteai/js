@@ -53,6 +53,7 @@ export type AuthProps = {
     privacyPolicy?: string;
     termsOfService?: string;
   };
+  logoUrl?: string;
 };
 
 function Auth(props: AuthProps) {
@@ -64,6 +65,7 @@ function Auth(props: AuthProps) {
     language,
     onSignIn,
     policyURLs,
+    logoUrl,
   } = props;
 
   const islandPropsInitial: IslandProps = {
@@ -121,6 +123,7 @@ function Auth(props: AuthProps) {
     appearance,
     appData,
     islandProps,
+    logoUrl,
   };
 
   useEffect(() => {
@@ -324,6 +327,7 @@ function Auth(props: AuthProps) {
 interface ContainerProps extends AuthProps {
   appData?: ScuteAppData;
   children: React.ReactNode;
+  logoUrl?: string;
   islandProps: IslandProps;
 }
 
@@ -333,6 +337,7 @@ const Container = ({
   appearance,
   webauthn,
   children,
+  logoUrl,
   islandProps,
 }: ContainerProps) => {
   const providerTheme = useTheme();
@@ -348,11 +353,17 @@ const Container = ({
       <Header>
         <LogoContainer>
           {appData ? (
-            <AppLogo url={appData.logo} alt={appData.name} size={1} />
+            <AppLogo
+              url={logoUrl ?? appData.logo}
+              alt={appData.name}
+              size={1}
+            />
           ) : (
             <LogoPlaceholder />
           )}
-          <span>{appData ? appData.name : <AppNamePlaceholder />}</span>
+          <span style={{ color: "var(--scute-colors-surfaceText)" }}>
+            {appData ? appData.name : <AppNamePlaceholder />}
+          </span>
         </LogoContainer>
       </Header>
       <ElementCard>

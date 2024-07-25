@@ -9,6 +9,7 @@ export const Layout = styled("div", {
   padding: "$4",
   background: "$surfaceBg",
   borderRadius: "$3",
+  backgroundSize: "cover",
 });
 
 export const ElementCard = styled("div", {
@@ -24,6 +25,11 @@ export const ElementCardFooter = styled(Text, {
   fontSize: "$2 !important",
   "& a": {
     color: "$cardFooterLink !important",
+    textDecoration: "underline !important",
+    transition: "color 0.2s ease-in-out",
+    "&:hover": {
+      color: "$buttonIdleBg !important",
+    },
   },
 });
 

@@ -42,7 +42,7 @@ export const Text = styled("span", {
         color: "$cardBodyText",
       },
       contrast: {
-        color: "$hiContrast",
+        color: "$cardBodyText",
       },
       inherit: {
         color: "inherit",

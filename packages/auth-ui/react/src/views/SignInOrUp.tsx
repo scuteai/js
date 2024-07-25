@@ -47,7 +47,6 @@ import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
 import { getIdentifierType } from "../helpers/identifierType";
 // import PhoneInput from "../components/PhoneInput";
 import { VIEWS } from "@scute/ui-shared";
-import { AppLogo } from "../components/AppLogo";
 import { translateError } from "../helpers/i18n/service";
 
 interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
@@ -110,11 +109,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       provider: "discord",
       name: "Discord",
       icon: "https://control.scute.io/provider-icons/discord-icon.svg",
-    },
-    {
-      provider: "twitter",
-      name: "Twitter",
-      icon: "https://control.scute.io/provider-icons/twitter-icon.svg",
     },
     {
       provider: "twitter",
@@ -460,7 +454,12 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   </Flex>
                   <Flex
                     justify="center"
-                    css={{ py: "$3", fontSize: "$4", fontWeight: 500 }}
+                    css={{
+                      py: "$3",
+                      fontSize: "$4",
+                      fontWeight: 500,
+                      color: "$cardBodyText",
+                    }}
                   >
                     <span>{t("signInOrUp.or")}</span>
                   </Flex>
@@ -721,9 +720,11 @@ const RegisterForm = ({
               }}
             >
               <Heading size="4" css={{ mb: "$2" }}>
-                Welcome
+                {t("general.signInOrUp")}
               </Heading>
-              <span>{t("registerForm.needInfo")}</span>
+              <Text size="2" css={{ mb: "$4" }}>
+                {t("registerForm.needInfo")}
+              </Text>
               {isError ? (
                 <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
                   {t("general.correctErrors")}

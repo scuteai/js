@@ -49,7 +49,7 @@ export const Button = styled("button", {
     fontSize: "$2",
   },
 
-  backgroundColor: "$buttonIdleBg",
+  background: "$buttonIdleBg",
   color: "$buttonIdleText",
   boxShadow: shadowCreator(
     "initial",
@@ -68,16 +68,16 @@ export const Button = styled("button", {
 
   "& svg path": {
     fill: "$buttonIdleText",
-    transition: "all",
+    transition: "all 0.2s ease-in-out 0s",
   },
 
-  "&:hover svg path": {
+  "&:hover svg path, &:active svg path, &:focus svg path": {
     fill: "$buttonHoverText",
   },
 
   //border:string, ring1:string, ring2:string, bottom1:string, bottom2:string)
   "&:hover": {
-    backgroundColor: "$buttonHoverBg",
+    background: "$buttonHoverBg",
     color: "$buttonHoverText",
     boxShadow: shadowCreator(
       "focus",
@@ -89,7 +89,7 @@ export const Button = styled("button", {
     ),
   },
   "&:focus": {
-    backgroundColor: "$buttonHoverBg",
+    background: "$buttonHoverBg",
     color: "$buttonHoverText",
     boxShadow: shadowCreator(
       "focus",
@@ -101,7 +101,7 @@ export const Button = styled("button", {
     ),
   },
   "&:active": {
-    backgroundColor: "$buttonHoverBg",
+    background: "$buttonHoverBg",
     color: "$buttonHoverText",
     transform: "scale(0.99)",
     boxShadow: shadowCreator(
@@ -114,7 +114,7 @@ export const Button = styled("button", {
     ),
   },
   "&:disabled": {
-    backgroundColor: "$buttonPassiveBg",
+    background: "$buttonPassiveBg",
     color: "$buttonPassiveText",
     pointerEvents: "none",
     "& svg": {
@@ -147,7 +147,7 @@ export const Button = styled("button", {
 
     variant: {
       alt: {
-        backgroundColor: "$buttonAltIdleBg",
+        background: "$buttonAltIdleBg",
         color: "$buttonAltIdleText",
         boxShadow: shadowCreator(
           "initial",
@@ -158,7 +158,7 @@ export const Button = styled("button", {
           "$colors$buttonAltIdleShadow"
         ),
         "&:hover": {
-          backgroundColor: "$buttonAltHoverBg",
+          background: "$buttonAltHoverBg",
           color: "$buttonAltHoverText",
           boxShadow: shadowCreator(
             "focus",
@@ -170,7 +170,7 @@ export const Button = styled("button", {
           ),
         },
         "&:focus": {
-          backgroundColor: "$buttonAltHoverBg",
+          background: "$buttonAltHoverBg",
           color: "$buttonAltHoverText",
           boxShadow: shadowCreator(
             "focus",
@@ -182,7 +182,7 @@ export const Button = styled("button", {
           ),
         },
         "&:active": {
-          backgroundColor: "$buttonAltHoverBg",
+          background: "$buttonAltHoverBg",
           color: "$buttonAltHoverText",
           boxShadow: shadowCreator(
             "initial",
@@ -202,7 +202,7 @@ export const Button = styled("button", {
         },
       },
       social: {
-        backgroundColor: "$buttonSocialIdleBg",
+        background: "$buttonSocialIdleBg",
         color: "$buttonSocialIdleText",
         boxShadow: shadowCreator(
           "initial",
@@ -213,7 +213,7 @@ export const Button = styled("button", {
           "$colors$buttonSocialIdleShadow"
         ),
         "&:hover": {
-          backgroundColor: "$buttonSocialHoverBg",
+          background: "$buttonSocialHoverBg",
           color: "$buttonSocialHoverText",
           boxShadow: shadowCreator(
             "focus",
@@ -225,7 +225,7 @@ export const Button = styled("button", {
           ),
         },
         "&:focus": {
-          backgroundColor: "$buttonSocialHoverBg",
+          background: "$buttonSocialHoverBg",
           color: "$buttonSocialHoverText",
           boxShadow: shadowCreator(
             "focus",
@@ -237,7 +237,7 @@ export const Button = styled("button", {
           ),
         },
         "&:active": {
-          backgroundColor: "$buttonSocialHoverBg",
+          background: "$buttonSocialHoverBg",
           color: "$buttonSocialHoverText",
           boxShadow: shadowCreator(
             "initial",

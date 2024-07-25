@@ -1,5 +1,4 @@
 import { styled } from "../stitches.config";
-import { EmailIcon } from "../assets/icons";
 import { keyframes } from "@stitches/react";
 
 const IslandHolder = styled("div", {
