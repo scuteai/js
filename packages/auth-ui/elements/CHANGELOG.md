@@ -1,5 +1,15 @@
 # @scute/ui-elements
 
+## 1.0.6
+
+### Patch Changes
+
+- New design
+- Updated dependencies
+  - @scute/ui-react@1.0.6
+  - @scute/ui-shared@1.0.6
+  - @scute/core@1.0.6
+
 ## 1.0.5
 
 ### Patch Changes
