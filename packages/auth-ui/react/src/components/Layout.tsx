@@ -137,3 +137,17 @@ export const ResponsiveLeft = styled("div", {
 export const ResponsiveRight = styled("div", {
   flex: 1,
 });
+
+export const ProfileWrapper = styled("div", {
+  maxWidth: "640px",
+  margin: "0 auto",
+  fontWeight: "500",
+  fontFamily: "$main",
+  padding: "1px $4 $4 $4",
+  background: "$surfaceBg",
+  borderRadius: "$3",
+  backgroundSize: "cover",
+  "& h1": {
+    color: "$surfaceText",
+  },
+});

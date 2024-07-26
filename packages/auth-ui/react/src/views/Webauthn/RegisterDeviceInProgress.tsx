@@ -65,7 +65,7 @@ const RegisterDeviceInProgress = ({
                 },
               }}
             >
-              <BiometricsIcon color="var(--scute-colors-surfaceBg)" />
+              <BiometricsIcon color="var(--scute-colors-svgIconMutedColor)" />
             </Flex>
             {identifier && (
               <Flex css={{ jc: "center", py: "$5" }}>
@@ -91,7 +91,7 @@ const RegisterDeviceInProgress = ({
               },
             }}
           >
-            <BiometricAltIcon color="var(--scute-colors-surfaceBg)" />
+            <BiometricAltIcon color="var(--scute-colors-svgIconMutedColor)" />
           </Flex>
         </ResponsiveRight>
       </ResponsiveContainer>

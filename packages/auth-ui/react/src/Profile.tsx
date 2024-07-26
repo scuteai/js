@@ -13,6 +13,7 @@ import {
   ElementCard,
   Flex,
   LargeSpinner,
+  ProfileWrapper,
   Text,
   TextField,
 } from "./components";
@@ -96,8 +97,7 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
   );
 
   return (
-    <div
-      style={{ maxWidth: "640px", margin: "0 auto" }}
+    <ProfileWrapper
       className={
         appearance?.theme || providerTheme
           ? createTheme((appearance?.theme || providerTheme) as any)
@@ -235,7 +235,7 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
           )}
         </Flex>
       </ElementCard>
-    </div>
+    </ProfileWrapper>
   );
 };
 
@@ -260,7 +260,10 @@ const SessionCard = ({
           </Flex>
         </Flex>
         <Flex css={{ ai: "center", gap: "$2" }}>
-          <SessionIcon type={session.type} />
+          <SessionIcon
+            color="var(--scute-colors-svgIconColor)"
+            type={session.type}
+          />
           <Button
             variant="alt"
             onClick={async () => {

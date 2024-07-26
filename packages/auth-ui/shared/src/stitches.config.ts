@@ -16,8 +16,10 @@ export const {
     colors: {
       errorColor: "#fe4f0d",
       svgIconColor: "#121212",
+      svgIconMutedColor: "#f7f7f7",
       // Loading indicator
       loadingSpinnerColor: "#cccccc",
+      loadingSpinnerBorder: "#f1f1f1",
       // Surface
       surfaceBg: "#f7f7f7",
       surfaceLink: "#666666",

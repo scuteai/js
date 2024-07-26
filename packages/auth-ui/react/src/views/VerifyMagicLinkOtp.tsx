@@ -120,6 +120,8 @@ const VerifyMagicLinkOtp = ({
           } else {
             handleLogin(payload);
           }
+        } else {
+          resetIslandProps && resetIslandProps();
         }
       }
     },
@@ -134,6 +136,7 @@ const VerifyMagicLinkOtp = ({
     );
 
     if (signInError) {
+      resetIslandProps && resetIslandProps();
       const { isFatal } = getMeaningfulError(signInError);
       setIsFatalError?.(isFatal);
       const translatedErrorMessage = translateError(signInError);
@@ -153,6 +156,7 @@ const VerifyMagicLinkOtp = ({
         await scuteClient.verifyMagicLinkToken(magicLinkToken!);
 
       if (verifyError) {
+        resetIslandProps && resetIslandProps();
         const { isFatal } = getMeaningfulError(verifyError);
         setIsFatalError?.(isFatal);
         const translatedErrorMessage = translateError(verifyError);

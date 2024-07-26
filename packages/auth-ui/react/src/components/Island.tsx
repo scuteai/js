@@ -26,7 +26,7 @@ const IslandInner = styled("div", {
   justifyContent: "space-between",
   alignItems: "center",
   padding: "0px 4px",
-  border: "1px solid #f1f1f1",
+  border: "1px solid $loadingSpinnerBorder",
   // boxShadow: "0px 0px 52px rgba(0, 0, 0, 0.1)",
   background: "$surfaceBg",
 });
