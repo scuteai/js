@@ -13,6 +13,8 @@ import {
   ElementCard,
   Flex,
   LargeSpinner,
+  ProfileHeader,
+  ProfileSubHeader,
   ProfileWrapper,
   Text,
   TextField,
@@ -104,7 +106,7 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
           : ""
       }
     >
-      <h1>{t("profile.myProfile")}</h1>
+      <ProfileHeader>{t("profile.myProfile")}</ProfileHeader>
       <ElementCard css={{ p: "$3" }}>
         <Flex css={{ fd: "column" }}>
           <Flex css={{ jc: "space-between", ai: "center" }}>
@@ -200,7 +202,7 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
         </Flex>
         <Flex css={{ fd: "column", gap: "$1", mt: "$3" }}>
           <Flex css={{ jc: "space-between", ai: "center" }}>
-            <h3>{t("profile.sessions")}</h3>
+            <ProfileSubHeader>{t("profile.sessions")}</ProfileSubHeader>
 
             {!isAnyDeviceRegistered ? (
               <Button

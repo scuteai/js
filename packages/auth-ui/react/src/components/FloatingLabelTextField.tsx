@@ -23,7 +23,8 @@ const Container = styled("div", {
     color: "transparent",
   },
   "& label": {
-    fontSize: "$5",
+    fontSize: "20px",
+    lineHeight: "30px",
     fontWeight: "500",
     px: "$2",
     position: "absolute",
@@ -37,7 +38,7 @@ const Container = styled("div", {
   [`& ${TextField}:focus + label, & ${TextField}:not(:placeholder-shown) + label`]:
     {
       background: "$inputBg",
-      transform: "translateY(-120%) scale(0.85)",
+      transform: "translateY(-110%) scale(0.85)",
     },
 });
 

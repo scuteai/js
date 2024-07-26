@@ -147,7 +147,19 @@ export const ProfileWrapper = styled("div", {
   background: "$surfaceBg",
   borderRadius: "$3",
   backgroundSize: "cover",
-  "& h1": {
-    color: "$surfaceText",
-  },
+});
+
+export const ProfileHeader = styled("div", {
+  color: "$surfaceText",
+  fontWeight: "700",
+  fontSize: "$7",
+  my: "$4",
+});
+
+export const ProfileSubHeader = styled("div", {
+  color: "$cardBodyText",
+  fontWeight: "500",
+  fontSize: "$5",
+  my: "0px",
+  py: "0px",
 });
