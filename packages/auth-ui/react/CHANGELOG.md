@@ -1,5 +1,14 @@
 # @scute/ui-react
 
+## 1.0.8
+
+### Patch Changes
+
+- Profile styling and theme fixes
+- Updated dependencies
+  - @scute/ui-shared@1.0.8
+  - @scute/core@1.0.8
+
 ## 1.0.7
 
 ### Patch Changes

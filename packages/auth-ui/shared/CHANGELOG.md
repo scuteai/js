@@ -1,5 +1,11 @@
 # @scute/ui-shared
 
+## 1.0.8
+
+### Patch Changes
+
+- Profile styling and theme fixes
+
 ## 1.0.7
 
 ### Patch Changes
