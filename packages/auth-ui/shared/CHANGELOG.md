@@ -1,5 +1,11 @@
 # @scute/ui-shared
 
+## 1.0.9
+
+### Patch Changes
+
+- Hotfxes for themeing
+
 ## 1.0.8
 
 ### Patch Changes

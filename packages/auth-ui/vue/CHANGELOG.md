@@ -1,5 +1,14 @@
 # @scute/ui-vue
 
+## 1.0.9
+
+### Patch Changes
+
+- Hotfxes for themeing
+- Updated dependencies
+  - @scute/ui-elements@1.0.9
+  - @scute/core@1.0.9
+
 ## 1.0.8
 
 ### Patch Changes

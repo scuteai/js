@@ -1,5 +1,14 @@
 # @scute/nextjs
 
+## 1.0.9
+
+### Patch Changes
+
+- Hotfxes for themeing
+- Updated dependencies
+  - @scute/core@1.0.9
+  - @scute/react@1.0.9
+
 ## 1.0.8
 
 ### Patch Changes
