@@ -58,7 +58,6 @@ export const Heading = React.forwardRef<
           mb: "$1",
         },
         "@container queryContainer (max-width: 600px)": {
-          mb: "$1",
           fontSize: "$6 !important",
           lineHeight: "35px",
           mb: "$3",

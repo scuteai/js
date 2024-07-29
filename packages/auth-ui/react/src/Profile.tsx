@@ -281,12 +281,7 @@ const SessionCard = ({
     <ElementCard css={{ p: "$3" }} key={session.id}>
       <Flex css={{ jc: "space-between" }}>
         <Flex css={{ gap: "$2", ai: "center" }}>
-          <AppLogo
-            url={appData.logo}
-            alt={appData.name}
-            size={1}
-            css={{ minWidth: 30 }}
-          />
+          <AppLogo url={appData.logo} alt={appData.name} size={1} />
           <Flex css={{ fd: "column" }}>
             <Text>{session.nickname}</Text>
           </Flex>
