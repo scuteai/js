@@ -164,6 +164,11 @@ export const ProfileWrapper = styled("div", {
   background: "$surfaceBg",
   borderRadius: "$3",
   backgroundSize: "cover",
+  containerType: "inline-size",
+  containerName: "queryContainer",
+  "@media screen and (max-width: 520px)": {
+    padding: "1px $2 $2 $2",
+  },
 });
 
 export const ProfileHeader = styled("div", {

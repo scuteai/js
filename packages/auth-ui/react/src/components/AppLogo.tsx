@@ -14,7 +14,7 @@ export const AppLogo = ({
     else return "30px";
   };
   return (
-    <Flex css={{ overflow: "hidden", borderRadius: "$1" }}>
+    <Flex css={{ overflow: "hidden", borderRadius: "$1", minWidth: getSize() }}>
       <img height={getSize()} width={getSize()} src={url} alt={alt} />
     </Flex>
   );

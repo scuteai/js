@@ -109,8 +109,26 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
       <ProfileHeader>{t("profile.myProfile")}</ProfileHeader>
       <ElementCard css={{ p: "$3" }}>
         <Flex css={{ fd: "column" }}>
-          <Flex css={{ jc: "space-between", ai: "center" }}>
-            <Flex css={{ fd: "column", pt: "$2", mb: "$6" }}>
+          <Flex
+            css={{
+              jc: "space-between",
+              ai: "center",
+              "@container queryContainer (max-width: 520px)": {
+                fd: "column",
+                ai: "unset",
+              },
+            }}
+          >
+            <Flex
+              css={{
+                fd: "column",
+                pt: "$2",
+                mb: "$6",
+                "@container queryContainer (max-width: 520px)": {
+                  mb: "$3",
+                },
+              }}
+            >
               <Text css={{ fontSize: "24px" }}>
                 {user.meta && user.meta.first_name
                   ? `${user.meta.first_name} ${user.meta.last_name ?? ""}`
@@ -119,7 +137,14 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
 
               <Text css={{ mt: "$2" }}>{user.email}</Text>
             </Flex>
-            <Flex css={{ gap: "$2" }}>
+            <Flex
+              css={{
+                gap: "$2",
+                "@container queryContainer (max-width: 600px)": {
+                  mb: "$3",
+                },
+              }}
+            >
               {isEditMode ? (
                 <Button
                   variant="alt"
@@ -256,7 +281,12 @@ const SessionCard = ({
     <ElementCard css={{ p: "$3" }} key={session.id}>
       <Flex css={{ jc: "space-between" }}>
         <Flex css={{ gap: "$2", ai: "center" }}>
-          <AppLogo url={appData.logo} alt={appData.name} size={1} />
+          <AppLogo
+            url={appData.logo}
+            alt={appData.name}
+            size={1}
+            css={{ minWidth: 30 }}
+          />
           <Flex css={{ fd: "column" }}>
             <Text>{session.nickname}</Text>
           </Flex>
