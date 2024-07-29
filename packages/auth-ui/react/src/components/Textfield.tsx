@@ -89,6 +89,13 @@ export const TextField = styled("input", {
         "&:-webkit-autofill::first-line": {
           fontSize: "$3",
         },
+        "@container queryContainer (max-width: 470px)": {
+          fontSize: "$3 !important",
+          borderRadius: "$3",
+          height: "$9",
+          px: "$4",
+          lineHeight: "$sizes$5",
+        },
       },
     },
     state: {

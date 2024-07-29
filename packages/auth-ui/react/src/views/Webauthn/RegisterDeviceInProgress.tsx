@@ -37,7 +37,14 @@ const RegisterDeviceInProgress = ({
   }, []);
   return (
     <QueryContainer>
-      <ResponsiveContainer>
+      <ResponsiveContainer
+        css={{
+          pt: "$8",
+          "@container queryContainer (max-width: 470px)": {
+            pt: "$7",
+          },
+        }}
+      >
         <ResponsiveLeft>
           <Inner
             css={{

@@ -120,8 +120,6 @@ const VerifyMagicLinkOtp = ({
           } else {
             handleLogin(payload);
           }
-        } else {
-          resetIslandProps && resetIslandProps();
         }
       }
     },
@@ -216,7 +214,14 @@ const VerifyMagicLinkOtp = ({
 
   return (
     <QueryContainer>
-      <ResponsiveContainer>
+      <ResponsiveContainer
+        css={{
+          pt: "$8",
+          "@container queryContainer (max-width: 470px)": {
+            pt: "$7",
+          },
+        }}
+      >
         <ResponsiveLeft>
           <Inner
             css={{

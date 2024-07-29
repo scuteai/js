@@ -130,6 +130,11 @@ export const Button = styled("button", {
         px: "$4",
         fontSize: "$3",
         lineHeight: "$sizes$5",
+        "@container queryContainer (max-width: 470px)": {
+          height: "$7",
+          fontSize: "$2",
+          borderRadius: "$2",
+        },
       },
       "2": {
         borderRadius: "$4",
@@ -138,6 +143,17 @@ export const Button = styled("button", {
         fontSize: "$4",
         lineHeight: "$sizes$6",
         width: "100%",
+        "@container queryContainer (max-width: 470px)": {
+          fontSize: "$3",
+          lineHeight: "$sizes$5",
+          height: "$9",
+          px: "$2",
+          borderRadius: "$3",
+          "& svg": {
+            left: "$3",
+            width: "24px",
+          },
+        },
       },
     },
 

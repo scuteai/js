@@ -128,7 +128,9 @@ const VerifyDevice = ({
     <QueryContainer>
       <ResponsiveContainer>
         <ResponsiveLeft>
-          <Header css={{ textAlign: "center", mb: "$5", jc: "center" }}>
+          <Header
+            css={{ textAlign: "center", mb: "$5", jc: "center", px: "$4" }}
+          >
             <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
           </Header>
           <Inner

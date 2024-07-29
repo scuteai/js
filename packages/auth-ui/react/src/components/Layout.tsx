@@ -1,5 +1,9 @@
 import { styled, shadowCreator } from "../stitches.config";
-import { Text } from "./Text";
+
+export const Header = styled("div", {
+  display: "flex",
+  mb: "$3",
+});
 
 export const Layout = styled("div", {
   width: "100%",
@@ -10,6 +14,14 @@ export const Layout = styled("div", {
   background: "$surfaceBg",
   borderRadius: "$3",
   backgroundSize: "cover",
+  containerType: "inline-size",
+  containerName: "queryContainer",
+  "@media screen and (max-width: 600px)": {
+    padding: "$3",
+    [`& > ${Header}`]: {
+      mb: "$2",
+    },
+  },
 });
 
 export const ElementCard = styled("div", {
@@ -19,10 +31,16 @@ export const ElementCard = styled("div", {
   borderRadius: "$3",
 });
 
-export const ElementCardFooter = styled(Text, {
-  pt: "$2 !important",
-  color: "$cardFooterText !important",
-  fontSize: "$2 !important",
+export const ElementCardFooter = styled("div", {
+  pt: "$4",
+  color: "$cardFooterText",
+  fontSize: "$2",
+  pl: "$6",
+  pr: "$6",
+  "@container queryContainer (max-width: 600px)": {
+    pl: "$3",
+    pr: "$3",
+  },
   "& a": {
     color: "$cardFooterLink !important",
     textDecoration: "underline !important",
@@ -78,18 +96,20 @@ export const FooterLinks = styled("div", {
   },
 });
 
-export const Header = styled("div", {
-  display: "flex",
-  mb: "$3",
-});
-
 export const Group = styled("div", {
   mb: "$4",
   mt: "$6",
+  "@container queryContainer (max-width: 470px)": {
+    mb: "$2",
+    mt: "$4",
+  },
 });
 
 export const Inner = styled("div", {
   px: "$6",
+  "@container queryContainer (max-width: 600px)": {
+    px: "$3 !important",
+  },
 });
 
 export const LogoContainer = styled("div", {
@@ -119,11 +139,8 @@ export const AppNamePlaceholder = styled("div", {
   background: "$surfaceBg",
 });
 
-export const QueryContainer = styled("div", {
-  containerType: "inline-size",
-  containerName: "queryContainer",
-  py: "$8",
-});
+export const QueryContainer = styled("div", {});
+
 export const ResponsiveContainer = styled("div", {
   display: "flex",
   flexDirection: "column",

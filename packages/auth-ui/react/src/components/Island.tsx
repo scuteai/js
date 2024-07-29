@@ -25,10 +25,15 @@ const IslandInner = styled("div", {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  padding: "0px 4px",
+  padding: "0px 2px",
   border: "1px solid $loadingSpinnerBorder",
   // boxShadow: "0px 0px 52px rgba(0, 0, 0, 0.1)",
   background: "$surfaceBg",
+  "@container queryContainer (max-width: 470px)": {
+    maxWidth: 260,
+    height: "42px",
+    borderRadius: 21,
+  },
 });
 
 const IslandIcon = styled("div", {
@@ -39,6 +44,10 @@ const IslandIcon = styled("div", {
   width: 44,
   borderRadius: 100,
   background: "$cardBg",
+  "@container queryContainer (max-width: 470px)": {
+    height: 38,
+    width: 38,
+  },
 });
 
 const IslandIconPrimary = styled(IslandIcon, {
@@ -49,6 +58,9 @@ const IslandLabel = styled("div", {
   fontSize: 15,
   color: "$surfaceText",
   fontWeight: 500,
+  "@container queryContainer (max-width: 470px)": {
+    fontSize: 14,
+  },
 });
 
 const rotate = keyframes({
@@ -57,14 +69,18 @@ const rotate = keyframes({
 });
 
 const Loader = styled("span", {
-  width: 24,
-  height: 24,
+  width: 26,
+  height: 26,
   border: "5px dotted $loadingSpinnerColor",
   borderRadius: "50%",
   display: "inline-block",
   position: "relative",
   boxXizing: "border-box",
   animation: `${rotate} 5s linear infinite`,
+  "@container queryContainer (max-width: 470px)": {
+    height: 20,
+    width: 20,
+  },
 });
 
 export type IslandProps = {

@@ -50,12 +50,18 @@ export const Heading = React.forwardRef<
       ref={forwardedRef}
       size={textSize[size]}
       css={{
-        mb: "$2",
+        mb: "$1 !important",
         color: "$cardHeadingText",
         fontVariantNumeric: "proportional-nums",
         ...merge(textCss[size], props.css),
         "@container queryContainer (min-width: 950px)": {
           mb: "$1",
+        },
+        "@container queryContainer (max-width: 600px)": {
+          mb: "$1",
+          fontSize: "$6 !important",
+          lineHeight: "35px",
+          mb: "$3",
         },
       }}
     />

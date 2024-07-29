@@ -123,7 +123,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   const otherProviders = providers
     .filter((provider) => provider.provider !== "google")
-    .slice(0, 5);
+    .slice(0, 4);
 
   const [_mode, _setMode] =
     useState<NonNullable<SignInOrUpProps["mode"]>>(__mode);
@@ -277,7 +277,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
             clearErrors("root.serverError");
           }}
         >
-          <QueryContainer>
+          <QueryContainer css={{ pt: "0px", pb: "$2" }}>
             <ResponsiveContainer>
               <ResponsiveLeft>
                 <Inner
@@ -305,26 +305,47 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                 <Inner>
                   {mode !== "sign_up" && rememberedIdentifier ? (
                     <>
-                      <Panel css={{ mt: "$4", mb: "$7" }}>
+                      <Panel
+                        css={{
+                          px: "$3",
+                          py: "$5",
+                          mt: "$4",
+                          mb: "$7",
+                          "@container queryContainer (max-width: 600px)": {
+                            mt: "$1",
+                            mb: "$4",
+                            px: "$2",
+                            py: "$3",
+                          },
+                        }}
+                      >
                         <Flex
                           gap={2}
                           css={{
                             ai: "center",
-                            // jc: "space-between",
+                            "@container queryContainer (max-width: 470px)": {
+                              display: "block",
+                            },
                           }}
                         >
                           <Flex
-                            css={{ fd: "column", width: "calc(100% - 155px)" }}
+                            css={{
+                              fd: "column",
+                              width: "calc(100% - 155px)",
+                              "@container queryContainer (max-width: 470px)": {
+                                width: "100%",
+                              },
+                            }}
                           >
                             <Text
-                              size="5"
-                              css={{ mb: "$2", pl: "$2" }}
+                              size="4"
+                              css={{ mb: "$1", pl: "$2" }}
                               variant="inherit"
                             >
                               {t("signInOrUp.signInAs")}
                             </Text>
                             <Text
-                              size="6"
+                              size="5"
                               css={{
                                 pl: "$2",
                                 overflow: "hidden",
@@ -339,7 +360,13 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                           <Button
                             variant="alt"
                             onClick={() => setRememberedIdentifier(null)}
-                            css={{ width: "140px" }}
+                            css={{
+                              width: "140px",
+                              "@container queryContainer (max-width: 470px)": {
+                                width: "100%",
+                                mt: "$4",
+                              },
+                            }}
                           >
                             {t("signInOrUp.changeUser")}
                           </Button>
@@ -482,12 +509,15 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                           })}
                         </span>
                         <IconHolder
-                          style={{
+                          css={{
                             position: "absolute",
                             top: 16,
                             left: 21,
                             height: 34,
                             paddingTop: 5,
+                            "@container queryContainer (max-width: 470px)": {
+                              top: 8,
+                            },
                           }}
                         >
                           <img
@@ -563,8 +593,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                 </Inner>
               </ResponsiveRight>
             </ResponsiveContainer>
-          </QueryContainer>
-          <Inner>
             <ElementCardFooter>
               To continue, Scute will share your name, email address, language
               preference, and profile picture with {appData.name} Before using
@@ -572,7 +600,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
               <a href={policyURLs?.privacyPolicy ?? "#"}>privacy policy</a> and{" "}
               <a href={policyURLs?.termsOfService ?? "#"}>terms of service</a>.
             </ElementCardFooter>
-          </Inner>
+          </QueryContainer>
         </form>
       ) : (
         <RegisterForm {...registerFormProps} />
@@ -708,7 +736,7 @@ const RegisterForm = ({
         clearErrors("root.serverError");
       }}
     >
-      <QueryContainer>
+      <QueryContainer css={{ pt: "0px", pb: "$2" }}>
         <ResponsiveContainer>
           <ResponsiveLeft>
             <Inner

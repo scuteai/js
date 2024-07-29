@@ -34,11 +34,20 @@ const Container = styled("div", {
     transformOrigin: "left center",
     transition: "all 150ms",
     borderRadius: "$4",
+    "@container queryContainer (max-width: 470px)": {
+      px: "$1",
+      top: "13px",
+      fontSize: "$3 !important",
+      lineHeight: "$sizes$5",
+    },
   },
   [`& ${TextField}:focus + label, & ${TextField}:not(:placeholder-shown) + label`]:
     {
       background: "$inputBg",
       transform: "translateY(-110%) scale(0.85)",
+      "@container queryContainer (max-width: 470px)": {
+        transform: "translateY(-105%) scale(0.85)",
+      },
     },
 });
 
