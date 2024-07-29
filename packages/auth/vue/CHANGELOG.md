@@ -1,5 +1,13 @@
 # @scute/vue
 
+## 1.0.10
+
+### Patch Changes
+
+- Mobile UI for new designs
+- Updated dependencies
+  - @scute/core@1.0.10
+
 ## 1.0.9
 
 ### Patch Changes

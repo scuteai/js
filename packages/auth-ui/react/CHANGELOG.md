@@ -1,5 +1,14 @@
 # @scute/ui-react
 
+## 1.0.10
+
+### Patch Changes
+
+- Mobile UI for new designs
+- Updated dependencies
+  - @scute/ui-shared@1.0.10
+  - @scute/core@1.0.10
+
 ## 1.0.9
 
 ### Patch Changes
