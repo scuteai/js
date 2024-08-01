@@ -34,6 +34,7 @@ const Container = styled("div", {
     transformOrigin: "left center",
     transition: "all 150ms",
     borderRadius: "$4",
+    color: "$inputText",
     "@container queryContainer (max-width: 470px)": {
       px: "$1",
       top: "13px",
