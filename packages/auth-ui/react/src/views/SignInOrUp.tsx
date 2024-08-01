@@ -143,8 +143,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     mode === "confirm_invite" ? true : false
   );
 
-  const isEmailValid = useRef(false);
-
   const backToLogin = () => {
     _setMode("sign_in_or_up");
     setShowRegisterForm(false);
@@ -423,12 +421,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                                     isValidPhoneOrError || isValidOrError;
                                 }
 
-                                if (isValidOrError === true) {
-                                  isEmailValid.current = true;
-                                } else {
-                                  isEmailValid.current = false;
-                                }
-
                                 return isValidOrError;
                               },
                             },
@@ -452,28 +444,14 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
                   <Flex>
                     {isWebauthnAvailable || mode === "sign_up" ? (
-                      <Button
-                        size="2"
-                        type="submit"
-                        disabled={
-                          !rememberedIdentifier &&
-                          (!isDirty || !isValid || !isEmailValid.current)
-                        }
-                      >
+                      <Button size="2" type="submit">
                         <span>
                           {t("signInOrUp.signinWith", { provider: "Passkey" })}
                         </span>
                         {isWebauthnAvailable ? <FingerprintIcon /> : null}
                       </Button>
                     ) : (
-                      <Button
-                        size="2"
-                        type="submit"
-                        disabled={
-                          !rememberedIdentifier &&
-                          (!isDirty || !isValid || !isEmailValid.current)
-                        }
-                      >
+                      <Button size="2" type="submit">
                         <span>{t("general.continueWithMagicLink")}</span>
                         <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
                       </Button>
