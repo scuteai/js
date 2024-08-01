@@ -373,7 +373,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                     </>
                   ) : (
                     <>
-                      <Group css={{ mt: "0" }}>
+                      <Group css={{ mt: "$2" }}>
                         <FloatingLabelTextField
                           domId="email_field__floating_label"
                           label={identifierLabelText}
