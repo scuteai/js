@@ -115,7 +115,12 @@ const RegisterDevice = ({
       <ResponsiveContainer>
         <ResponsiveLeft>
           <Header
-            css={{ textAlign: "center", mb: "$5", jc: "center", px: "$2" }}
+            css={{
+              textAlign: "center",
+              mb: isWebauthnSupported ? "$5" : "0",
+              jc: "center",
+              px: "$2",
+            }}
           >
             {isWebauthnSupported ? (
               <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
