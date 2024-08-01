@@ -34,7 +34,8 @@ export const ElementCard = styled("div", {
 export const ElementCardFooter = styled("div", {
   pt: "$4",
   color: "$cardFooterText",
-  fontSize: "$2",
+  fontSize: "$1",
+  lineHeight: "$sizes$4",
   pl: "$6",
   pr: "$6",
   "@container queryContainer (max-width: 600px)": {
