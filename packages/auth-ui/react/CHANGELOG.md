@@ -1,5 +1,14 @@
 # @scute/ui-react
 
+## 1.0.11
+
+### Patch Changes
+
+- Fine tuning the design, fonts and spacings
+- Updated dependencies
+  - @scute/ui-shared@1.0.11
+  - @scute/core@1.0.11
+
 ## 1.0.10
 
 ### Patch Changes

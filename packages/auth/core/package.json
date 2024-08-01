@@ -1,6 +1,6 @@
 {
   "name": "@scute/core",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "publishConfig": {},
   "files": [
     "dist"

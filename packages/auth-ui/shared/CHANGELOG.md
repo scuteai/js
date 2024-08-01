@@ -1,5 +1,11 @@
 # @scute/ui-shared
 
+## 1.0.11
+
+### Patch Changes
+
+- Fine tuning the design, fonts and spacings
+
 ## 1.0.10
 
 ### Patch Changes
