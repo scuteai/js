@@ -497,6 +497,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                         size="2"
                         style={{ marginBottom: 16 }}
                         variant="social"
+                        type="button"
                         onClick={() => {
                           scuteClient.signInWithOAuthProvider(
                             googleProvider.provider
@@ -553,6 +554,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                                   padding: 16,
                                 }
                           }
+                          type="button"
                           onClick={() => {
                             scuteClient.signInWithOAuthProvider(
                               provider.provider
@@ -845,7 +847,6 @@ const RegisterForm = ({
           </ResponsiveRight>
         </ResponsiveContainer>
       </QueryContainer>
-      <div></div>
     </form>
   );
 };
