@@ -18,7 +18,7 @@ export const Text = styled("span", {
       },
       "2": {
         fontSize: "$2",
-        lineHeight: "18px",
+        lineHeight: "22px",
       },
       "3": {
         fontSize: "$3",

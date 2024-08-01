@@ -153,7 +153,7 @@ const VerifyDevice = ({
                 {t("verifyDevice.tryAgain")}
               </Text>
             ) : (
-              <Text>{t("verifyDevice.verifyDeviceBody")}</Text>
+              <Text size="2">{t("verifyDevice.verifyDeviceBody")}</Text>
             )}
             {identifier && (
               <Flex css={{ jc: "center", py: "$5" }}>
