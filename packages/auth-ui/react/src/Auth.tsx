@@ -184,6 +184,7 @@ function Auth(props: AuthProps) {
             setIsFatalError(false);
             setAuthView(VIEWS.SIGN_IN_OR_UP);
           }}
+          resetIslandProps={resetIslandProps}
         />
       </Container>
     );

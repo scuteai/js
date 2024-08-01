@@ -15,6 +15,7 @@ import {
   ResponsiveRight,
 } from "../components";
 import type { CommonViewProps } from "./common";
+import { useEffect } from "react";
 
 interface FatalErrorViewProps extends CommonViewProps {
   error?: string | null;
@@ -25,8 +26,13 @@ const FatalErrorView = ({
   identifier,
   error,
   tryAgain,
+  resetIslandProps,
 }: FatalErrorViewProps) => {
   const { t } = useTranslation();
+
+  useEffect(() => {
+    resetIslandProps?.();
+  });
 
   return (
     <QueryContainer>
