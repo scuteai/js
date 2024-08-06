@@ -78,6 +78,8 @@ export const FooterCredits = styled("div", {
 });
 
 export const FooterLinks = styled("div", {
+  display: "flex",
+  alignItems: "center",
   marginLeft: "auto",
   mt: "$3",
   fontSize: "$1",
