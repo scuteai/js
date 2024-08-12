@@ -309,6 +309,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                           py: "$5",
                           mt: "$4",
                           mb: "$7",
+                          ta: "left",
                           "@container queryContainer (max-width: 600px)": {
                             mt: "$1",
                             mb: "$4",

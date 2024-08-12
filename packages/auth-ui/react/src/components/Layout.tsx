@@ -8,6 +8,7 @@ export const Header = styled("div", {
 export const Layout = styled("div", {
   width: "100%",
   maxWidth: "1200px",
+  boxSizing: "border-box",
   fontWeight: "500",
   fontFamily: "$main",
   padding: "$4",
@@ -29,6 +30,7 @@ export const ElementCard = styled("div", {
   overflow: "hidden",
   background: "$cardBg",
   borderRadius: "$3",
+  boxSizing: "border-box",
 });
 
 export const ElementCardFooter = styled("div", {
