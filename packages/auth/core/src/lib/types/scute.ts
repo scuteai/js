@@ -41,7 +41,7 @@ export type ScuteAppData = {
   required_identifiers: ScuteIdentifierType[];
   default_language: string;
   user_meta_data_schema: ScuteUserMetaDataSchema[];
-  oAuthProviders?: ScuteOAuthProviderConfig[];
+  oauth_providers?: ScuteOAuthProviderConfig[];
 };
 
 export interface ScuteUserMetaDataSchema {

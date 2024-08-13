@@ -84,38 +84,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   const { t } = useTranslation();
 
   // TODO: mock
-  const providers = appData.oAuthProviders || [
-    {
-      provider: "google",
-      name: "Google",
-      icon: "https://control.scute.io/provider-icons/google-icon.svg",
-    },
-    {
-      provider: "github",
-      name: "GitHub",
-      icon: "https://control.scute.io/provider-icons/github-icon.svg",
-    },
-    {
-      provider: "microsoft",
-      name: "Microsoft",
-      icon: "https://control.scute.io/provider-icons/microsoft-icon.svg",
-    },
-    {
-      provider: "slack",
-      name: "Slack",
-      icon: "https://control.scute.io/provider-icons/slack-icon.svg",
-    },
-    {
-      provider: "discord",
-      name: "Discord",
-      icon: "https://control.scute.io/provider-icons/discord-icon.svg",
-    },
-    {
-      provider: "twitter",
-      name: "Twitter",
-      icon: "https://control.scute.io/provider-icons/twitter-icon.svg",
-    },
-  ];
+  const providers = appData.oauth_providers || [];
 
   const googleProvider = providers.find(
     (provider) => provider.provider === "google"
@@ -443,7 +412,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                     </>
                   )}
 
-                  <Flex>
+                  <Flex css={{ mb: "$3" }}>
                     {isWebauthnAvailable || mode === "sign_up" ? (
                       <Button size="2" type="submit">
                         <span>
@@ -458,17 +427,19 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                       </Button>
                     )}
                   </Flex>
-                  <Flex
-                    justify="center"
-                    css={{
-                      py: "$3",
-                      fontSize: "$4",
-                      fontWeight: 500,
-                      color: "$cardBodyText",
-                    }}
-                  >
-                    <span>{t("signInOrUp.or")}</span>
-                  </Flex>
+                  {providers.length > 0 && (
+                    <Flex
+                      justify="center"
+                      css={{
+                        pb: "$3",
+                        fontSize: "$4",
+                        fontWeight: 500,
+                        color: "$cardBodyText",
+                      }}
+                    >
+                      <span>{t("signInOrUp.or")}</span>
+                    </Flex>
+                  )}
                   <Flex>
                     {googleProvider && (
                       <Button
