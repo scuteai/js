@@ -42,6 +42,7 @@ export type ScuteAppData = {
   default_language: string;
   user_meta_data_schema: ScuteUserMetaDataSchema[];
   oauth_providers?: ScuteOAuthProviderConfig[];
+  base_url: string;
 };
 
 export interface ScuteUserMetaDataSchema {

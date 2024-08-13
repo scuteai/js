@@ -472,7 +472,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                           }}
                         >
                           <img
-                            src={googleProvider.icon}
+                            src={`${scuteClient.baseUrl}/${googleProvider.icon}`}
                             alt={googleProvider.name}
                             width="24"
                             height="24"
@@ -532,7 +532,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                             }
                           >
                             <img
-                              src={provider.icon}
+                              src={`${scuteClient.baseUrl}/${provider.icon}`}
                               alt={provider.name}
                               width="24"
                               height="24"

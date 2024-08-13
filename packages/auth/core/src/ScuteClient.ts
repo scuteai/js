@@ -87,6 +87,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   };
 
   protected readonly baseOAuthURL: string;
+  readonly baseUrl: string;
 
   readonly admin: ScuteAdminApi;
 
@@ -121,6 +122,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     super(errorReporting, `${baseUrl}${endpointPrefix}`, {
       credentials: "include",
     });
+
+    this.baseUrl = baseUrl;
 
     if (browser) {
       this.instanceID = ScuteClient.nextInstanceID;
