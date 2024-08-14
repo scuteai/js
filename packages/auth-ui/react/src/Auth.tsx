@@ -68,6 +68,18 @@ function Auth(props: AuthProps) {
     logoUrl,
   } = props;
 
+  if (!policyURLs) {
+    console.warn(
+      "The 'policyURLs' property of the Scute Auth component is not provided."
+    );
+  }
+
+  if (!policyURLs) {
+    console.warn(
+      "The 'logo' property of the Scute Auth component is not provided."
+    );
+  }
+
   const islandPropsInitial: IslandProps = {
     active: false,
     label: "",
@@ -353,12 +365,8 @@ const Container = ({
     >
       <Header>
         <LogoContainer>
-          {appData ? (
-            <AppLogo
-              url={logoUrl ?? appData.logo}
-              alt={appData.name}
-              size={1}
-            />
+          {appData && logoUrl ? (
+            <AppLogo url={logoUrl} alt={appData.name} size={1} />
           ) : (
             <LogoPlaceholder />
           )}
