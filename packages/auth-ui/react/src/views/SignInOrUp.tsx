@@ -15,23 +15,21 @@ import {
   UnknownSignInError,
 } from "@scute/core";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import useEffectOnce from "../helpers/useEffectOnce";
-import { FingerprintIcon, MagicMailIcon, BellIcon } from "../assets/icons";
+import { FingerprintIcon, MagicMailIcon } from "../assets/icons";
 import type { CommonViewProps } from "./common";
 import {
   Button,
   Flex,
   Group,
-  Header,
   Heading,
   Inner,
   Label,
   Text,
   TextField,
-  Badge,
   IconHolder,
   Panel,
   LargeSpinner,
@@ -83,7 +81,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   const { t } = useTranslation();
 
-  // TODO: mock
   const providers = appData.oauth_providers || [];
 
   const googleProvider = providers.find(
