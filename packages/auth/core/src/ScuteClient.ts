@@ -16,6 +16,7 @@ import {
   INTERNAL_EVENTS,
   SCUTE_BROADCAST_CHANNEL,
   SCUTE_MAGIC_PARAM,
+  SCUTE_SKIP_PARAM,
 } from "./lib/constants";
 
 import {
@@ -530,6 +531,17 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /**
+   * Skip device registration if the url has the skip param.
+   * @param url - (Optional) magic link url with sct_magic and sct_sk params. Default `window.location.href`.
+   */
+  private shouldSkipDeviceRegister(url?: string | URL) {
+    const skip = new URL(url ?? window.location.href).searchParams.get(
+      SCUTE_SKIP_PARAM
+    );
+    return skip === "true";
+  }
+
+  /**
    * Verify the magic link url.
    * @param url - (Optional) magic link url with sct_magic param. Default `window.location.href`.
    */
@@ -550,6 +562,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param token - Magic link token (sct_magic)
    */
   async verifyMagicLinkToken(token: string) {
+    const shouldSkipDeviceRegister = this.shouldSkipDeviceRegister();
     const decodedMagicLinkToken = decodeMagicLinkToken(token);
     if (!decodedMagicLinkToken) {
       const error = new InvalidMagicLinkError();
@@ -567,7 +580,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: verifyError };
     }
 
-    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_VERIFIED);
+    if (shouldSkipDeviceRegister) {
+      await this.signInWithTokenPayload(authPayload);
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN);
+    } else {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_VERIFIED);
+    }
 
     return {
       data: { authPayload, magicPayload: decodedMagicLinkToken },

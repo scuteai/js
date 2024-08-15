@@ -8,6 +8,7 @@ import {
   type ScuteTokenPayload,
   decodeMagicLinkToken,
   SCUTE_MAGIC_PARAM,
+  SCUTE_SKIP_PARAM,
   type ScuteError,
   getMeaningfulError,
   IdentifierAlreadyExistsError,
@@ -634,6 +635,7 @@ const RegisterForm = ({
 
     const url = new URL(window.location.href);
     url.searchParams.delete(SCUTE_MAGIC_PARAM);
+    url.searchParams.delete(SCUTE_SKIP_PARAM);
     window.history.replaceState(window.history.state, "", url.toString());
 
     if (error) {

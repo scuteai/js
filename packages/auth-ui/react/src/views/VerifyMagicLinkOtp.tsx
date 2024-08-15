@@ -2,6 +2,7 @@ import {
   AUTH_CHANGE_EVENTS,
   getMeaningfulError,
   SCUTE_MAGIC_PARAM,
+  SCUTE_SKIP_PARAM,
   type ScuteIdentifier,
   type ScuteTokenPayload,
   type UniqueIdentifier,
@@ -195,6 +196,7 @@ const VerifyMagicLinkOtp = ({
 
     return () => {
       url.searchParams.delete(SCUTE_MAGIC_PARAM);
+      url.searchParams.delete(SCUTE_SKIP_PARAM);
       window.history.replaceState(window.history.state, "", url.toString());
     };
   });
