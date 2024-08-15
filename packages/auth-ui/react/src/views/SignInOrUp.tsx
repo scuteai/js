@@ -261,8 +261,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                     <Heading size="4">{signInOrUpText}</Heading>
                   )}
                   <Text size="2" css={{ mb: "$4" }}>
-                    {t("signInOrUp.continueTo", { appName: appData.name })}{" "}
-                    Lorem ipsum dolor sit amet consectetur, adipisicing elit.
+                    {t("signInOrUp.continueTo", { appName: appData.name })}
                   </Text>
                 </Inner>
               </ResponsiveLeft>
