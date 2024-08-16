@@ -1,5 +1,11 @@
 # @scute/core
 
+## 1.1.0
+
+### Minor Changes
+
+- oAuth provider login
+
 ## 1.0.11
 
 ### Patch Changes
