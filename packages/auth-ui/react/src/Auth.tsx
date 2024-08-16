@@ -292,14 +292,7 @@ function Auth(props: AuthProps) {
         </Container>
       ) : (
         <Container {...containerProps}>
-          <RegisterDeviceInProgress
-            scuteClient={scuteClient}
-            setAuthView={setAuthView}
-            setIsFatalError={setIsFatalError}
-            identifier={identifier}
-            setIslandProps={setIslandProps}
-            resetIslandProps={resetIslandProps}
-          />
+          <LargeSpinner />
         </Container>
       );
     case VIEWS.WEBAUTHN_VERIFY:
@@ -324,7 +317,9 @@ function Auth(props: AuthProps) {
             identifier={identifier}
             setAuthView={setAuthView}
             setIsFatalError={setIsFatalError}
-            getAuthPayloadCallback={(payload) => setAuthPayload(payload)}
+            getAuthPayloadCallback={(payload) => {
+              setAuthPayload(payload);
+            }}
             magicLinkId={magicLinkId}
             isWebauthnNewDevice={authView === VIEWS.MAGIC_NEW_DEVICE_PENDING}
             setIslandProps={setIslandProps}

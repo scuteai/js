@@ -62,6 +62,9 @@ const VerifyMagicLinkOtp = ({
   const [identifier, setIdentifier] = useState(_identifier);
   const [time, setTime] = useState(TIMER_START);
   const [resendDisabled, setResendDisabled] = useState(false);
+  const [shouldSkip] = useState(() =>
+    new URL(window.location.href).searchParams.get(SCUTE_SKIP_PARAM)
+  );
 
   const { t } = useTranslation();
   const isBroadcastMagicVerified = useRef<boolean>(false);
@@ -74,17 +77,17 @@ const VerifyMagicLinkOtp = ({
         : null)
   );
 
-  useEffect(() => {
-    setIslandProps &&
-      setIslandProps({
-        label: t("verifyOTP.loading.title"),
-        active: true,
-        Icon: <EmailIcon color="var(--scute-colors-buttonIdleBg)" />,
-      });
-    return () => {
-      resetIslandProps && resetIslandProps();
-    };
-  }, []);
+  // useEffect(() => {
+  //     setIslandProps &&
+  //     setIslandProps({
+  //       label: t("verifyOTP.loading.title"),
+  //       active: true,
+  //       Icon: <EmailIcon color="var(--scute-colors-buttonIdleBg)" />,
+  //     });
+  //   return () => {
+  //     resetIslandProps && resetIslandProps();
+  //   };
+  // }, [isVerifyCalled]);
 
   useEffect(() => {
     setIsPolling(Boolean(magicLinkId));
@@ -145,6 +148,11 @@ const VerifyMagicLinkOtp = ({
 
   useEffectOnce(() => {
     if (!magicLinkToken) {
+      setIslandProps!({
+        label: t("verifyOTP.loading.title"),
+        active: true,
+        Icon: <EmailIcon color="var(--scute-colors-buttonIdleBg)" />,
+      });
       return;
     }
 
@@ -167,10 +175,12 @@ const VerifyMagicLinkOtp = ({
         scuteClient.isWebauthnSupported() &&
         data.magicPayload.webauthnEnabled !== false;
 
-      if (isWebauthnAvailable) {
-        setAuthView(VIEWS.WEBAUTHN_REGISTER);
-      } else {
-        handleLogin(data.authPayload);
+      if (!shouldSkip) {
+        if (isWebauthnAvailable) {
+          setAuthView(VIEWS.WEBAUTHN_REGISTER);
+        } else {
+          handleLogin(data.authPayload);
+        }
       }
 
       if (!identifier) {
@@ -203,7 +213,7 @@ const VerifyMagicLinkOtp = ({
 
   if (magicLinkToken) {
     if (!isVerifyCalled) {
-      return null;
+      return <LargeSpinner />;
     }
     return (
       <LoadingMagic
@@ -333,12 +343,7 @@ const LoadingMagic = ({
             >
               <Flex css={{ mb: "$4" }}>
                 {!error ? (
-                  <LargeSpinner
-                    icon={
-                      <EmailIcon color="var(--scute-colors-svgIconColor)" />
-                    }
-                    spinnerColor="green"
-                  />
+                  <LargeSpinner spinnerColor="green" />
                 ) : (
                   <Flex css={{ jc: "center", width: "100%" }}>
                     <FatalErrorIcon color="var(--scute-colors-errorColor)" />
@@ -346,10 +351,7 @@ const LoadingMagic = ({
                 )}
               </Flex>
               {!error ? (
-                <>
-                  <Heading size="1">{t("verifyOTP.loading.title")}</Heading>
-                  <Text size="2" css={{ mb: "$4" }}></Text>
-                </>
+                <></>
               ) : (
                 <>
                   <Heading size="4">{t("general.somethingWentWrong")}</Heading>
