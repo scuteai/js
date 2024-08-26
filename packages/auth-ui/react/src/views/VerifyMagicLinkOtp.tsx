@@ -62,8 +62,8 @@ const VerifyMagicLinkOtp = ({
   const [identifier, setIdentifier] = useState(_identifier);
   const [time, setTime] = useState(TIMER_START);
   const [resendDisabled, setResendDisabled] = useState(false);
-  const [shouldSkip] = useState(() =>
-    new URL(window.location.href).searchParams.get(SCUTE_SKIP_PARAM)
+  const [shouldSkip] = useState(
+    () => !!new URL(window.location.href).searchParams.get(SCUTE_SKIP_PARAM)
   );
 
   const { t } = useTranslation();
@@ -220,6 +220,7 @@ const VerifyMagicLinkOtp = ({
         identifier={identifier}
         backToLogin={() => setAuthView(VIEWS.SIGN_IN_OR_UP)}
         error={error}
+        shouldSkip={shouldSkip}
       />
     );
   }
@@ -318,10 +319,12 @@ const LoadingMagic = ({
   identifier,
   backToLogin,
   error,
+  shouldSkip,
 }: {
   identifier: ScuteIdentifier;
   backToLogin: () => void;
   error?: string | null;
+  shouldSkip?: boolean;
 }) => {
   const { t } = useTranslation();
 
@@ -372,15 +375,17 @@ const LoadingMagic = ({
                 pt: "$4",
               }}
             >
-              <Button
-                variant="alt"
-                size="2"
-                onClick={() => {
-                  backToLogin();
-                }}
-              >
-                {t("general.backToLogin")}
-              </Button>
+              {!shouldSkip && (
+                <Button
+                  variant="alt"
+                  size="2"
+                  onClick={() => {
+                    backToLogin();
+                  }}
+                >
+                  {t("general.backToLogin")}
+                </Button>
+              )}
             </Inner>
           </ResponsiveRight>
         </ResponsiveContainer>
