@@ -1,5 +1,11 @@
 # @scute/ui-shared
 
+## 1.1.1
+
+### Patch Changes
+
+- Fixes a minor issue where back to login pops up during oauth flow
+
 ## 1.1.0
 
 ### Minor Changes

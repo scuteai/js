@@ -1,5 +1,13 @@
 # @scute/react
 
+## 1.1.1
+
+### Patch Changes
+
+- Fixes a minor issue where back to login pops up during oauth flow
+- Updated dependencies
+  - @scute/core@1.1.1
+
 ## 1.1.0
 
 ### Minor Changes
