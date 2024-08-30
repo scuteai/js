@@ -27,10 +27,7 @@ jobs:
 
       - name: Install dependencies (if the cached directory was not found)
         if: steps.node-cache.outputs.cache-hit != 'true'
-        run: pnpm i
-
-      - name: Install genversion
-        run: pnpm i -g genversion tsup typescript
+        run: pnpm i --frozen-lockfile --prod=false
 
       - name: Test to see if the project compiles
         run: pnpm build
