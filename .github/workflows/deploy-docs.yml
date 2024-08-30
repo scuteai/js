@@ -1,7 +1,7 @@
 # ci.yml file for GitHub Actions
 name: Deploy docs
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_and_lint:
