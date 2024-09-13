@@ -10,6 +10,7 @@ export const VIEWS = {
   MAGIC_LOADING: "magic-loading",
   MAGIC_PENDING: "magic-pending",
   MAGIC_NEW_DEVICE_PENDING: "magic-new-device-pending",
+  PKCE_OAUTH: "pkce-oauth",
 } as const;
 
 export type Views = ValueOf<typeof VIEWS>;

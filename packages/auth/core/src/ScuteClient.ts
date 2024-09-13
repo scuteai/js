@@ -246,6 +246,18 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /**
+   * Check if the user has mandatory metafields to fill.
+   *
+   * @param user_id - UniqueIdentifier of the user
+   */
+
+  async getUserMetafieldState(user_id: UniqueIdentifier) {
+    return await this.get<{ meta: boolean }>(
+      `/users/metafields?user_id=${user_id}`
+    );
+  }
+
+  /**
    * @param fresh - fetch new data from the server
    * @internal
    * @see {@link getAppData}
@@ -582,7 +594,6 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     if (shouldSkipDeviceRegister) {
       await this.signInWithTokenPayload(authPayload);
-      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN);
     } else {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_VERIFIED);
     }
@@ -734,8 +745,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (user.email) {
       this.setRememberedIdentifier(user.email);
     }
-
-    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user);
+    setTimeout(() => {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user);
+    }, 1000);
 
     return { error: null };
   }

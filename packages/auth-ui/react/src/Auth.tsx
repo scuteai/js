@@ -9,6 +9,7 @@ import {
   AUTH_CHANGE_EVENTS,
   SCUTE_MAGIC_PARAM,
   decodeMagicLinkToken,
+  SCUTE_SKIP_PARAM,
 } from "@scute/core";
 import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
 
@@ -39,6 +40,7 @@ import { initI18n, translate as t } from "./helpers/i18n/service";
 import { AppLogo } from "./components/AppLogo";
 import { LogoText } from "./components/Logo";
 import { Island, type IslandProps } from "./components/Island";
+import { PkceOtp } from "./views/PkceOtp";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -110,6 +112,10 @@ function Auth(props: AuthProps) {
       if (magicPayload) {
         if (magicPayload.user_status === "pending") {
           return VIEWS.CONFIRM_INVITE;
+        } else if (
+          !!new URL(window.location.href).searchParams.has(SCUTE_SKIP_PARAM)
+        ) {
+          return VIEWS.PKCE_OAUTH;
         } else {
           return VIEWS.MAGIC_LOADING;
         }
@@ -324,6 +330,23 @@ function Auth(props: AuthProps) {
             isWebauthnNewDevice={authView === VIEWS.MAGIC_NEW_DEVICE_PENDING}
             setIslandProps={setIslandProps}
             resetIslandProps={resetIslandProps}
+          />
+        </Container>
+      );
+    case VIEWS.PKCE_OAUTH:
+      return (
+        <Container {...containerProps}>
+          <PkceOtp
+            scuteClient={scuteClient}
+            mode="confirm_invite"
+            setAuthView={setAuthView}
+            identifier={identifier}
+            setIdentifier={setIdentifier}
+            appData={appData}
+            setIsFatalError={setIsFatalError}
+            webauthnEnabled={webauthn !== "disabled"}
+            getMagicLinkIdCallback={(id) => setMagicLinkId(id)}
+            getAuthPayloadCallback={(payload) => setAuthPayload(payload)}
           />
         </Container>
       );

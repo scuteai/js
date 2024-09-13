@@ -45,7 +45,9 @@
 
   "registerForm": {
     "backToLogin": "Back to login",
-    "needInfo": "Let's get you set up. We'll need following information"
+    "needInfo": "Let's get you set up. We'll need following information",
+    "title": "Let's get you set up",
+    "needInfoShort": "We'll need following information"
   },
 
   "registerDevice": {

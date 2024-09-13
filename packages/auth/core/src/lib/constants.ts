@@ -13,6 +13,7 @@ export const AUTH_CHANGE_EVENTS = {
   MAGIC_PENDING: "magic_pending",
   MAGIC_NEW_DEVICE_PENDING: "magic_new_device_pending",
   MAGIC_VERIFIED: "magic_verified",
+  MAGIC_VERIFIED_OAUTH: "magic_verified_oauth",
   WEBAUTHN_REGISTER_START: "webauthn_register_start",
   WEBAUTHN_REGISTER_SUCCESS: "webauthn_register_success",
   WEBAUTHN_VERIFY_START: "webauthn_verify_start",
