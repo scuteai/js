@@ -12,6 +12,7 @@ import {
   Button,
   ElementCard,
   Flex,
+  FloatingLabelTextField,
   LargeSpinner,
   ProfileHeader,
   ProfileSubHeader,
@@ -195,18 +196,34 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
                     const userValue = user.meta?.[field_name];
 
                     return (
-                      <Flex key={id} css={{ gap: "$7" }}>
-                        <Text css={{ fontSize: "$1", opacity: 0.5 }}>
-                          {name}
-                        </Text>
+                      <Flex
+                        key={id}
+                        css={{
+                          gap: "$7",
+                          width: "100%",
+                          display: "block",
+                          mb: "$2",
+                        }}
+                      >
+                        {(!isEditMode ||
+                          (isEditMode && field_type === "boolean")) && (
+                          <Text css={{ fontSize: "$1", opacity: 0.5 }}>
+                            {name}
+                          </Text>
+                        )}
                         {isEditMode ? (
                           field_type === "boolean" ? (
                             <input type="checkbox" />
                           ) : (
-                            <TextField
-                              defaultValue={userValue as string | undefined}
-                              name={field_name}
+                            <FloatingLabelTextField
+                              domId={`metafform-${name}`}
+                              label={name}
+                              fieldType={field_type}
                             />
+                            // <TextField
+                            //   defaultValue={userValue as string | undefined}
+                            //   name={field_name}
+                            // />
                           )
                         ) : field_type === "boolean" ? (
                           <input

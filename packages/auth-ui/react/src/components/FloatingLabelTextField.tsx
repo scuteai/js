@@ -11,7 +11,7 @@ type FloatingLabelTextFieldProps = {
   autoCorrect?: string;
   autoComplete?: string;
   state?: "invalid" | "valid";
-  registerFormAttr: UseFormRegisterReturn<string>;
+  registerFormAttr?: UseFormRegisterReturn<string>;
 };
 
 const Container = styled("div", {

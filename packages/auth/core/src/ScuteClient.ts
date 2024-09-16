@@ -747,7 +747,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
     setTimeout(() => {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user);
-    }, 1000);
+    }, 100);
 
     return { error: null };
   }
