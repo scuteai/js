@@ -1,5 +1,14 @@
 # @scute/ui-vue
 
+## 1.1.2
+
+### Patch Changes
+
+- Adds UserButton component
+- Updated dependencies
+  - @scute/ui-elements@1.1.2
+  - @scute/core@1.1.2
+
 ## 1.1.1
 
 ### Patch Changes

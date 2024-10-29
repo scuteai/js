@@ -1,5 +1,11 @@
 # @scute/ui-shared
 
+## 1.1.2
+
+### Patch Changes
+
+- Adds UserButton component
+
 ## 1.1.1
 
 ### Patch Changes

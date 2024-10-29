@@ -1,5 +1,14 @@
 # @scute/nextjs
 
+## 1.1.2
+
+### Patch Changes
+
+- Adds UserButton component
+- Updated dependencies
+  - @scute/core@1.1.2
+  - @scute/react@1.1.2
+
 ## 1.1.1
 
 ### Patch Changes
