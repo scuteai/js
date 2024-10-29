@@ -95,6 +95,11 @@
     "errorTryAgain": "An error occurred. You can try again."
   },
 
+  "userButton": {
+    "profile": "Profile",
+    "signOut": "Sign out"
+  },
+
   "scuteError": {
     "user_meta_invalid": "User meta is invalid",
     "session_not_found": "Session not found",

@@ -15,6 +15,11 @@ export {
   type ProfileProps,
 } from "./Profile";
 export {
+  default as UserButton,
+  USER_BUTTON_ELEMENT_NAME,
+  type UserButtonProps,
+} from "./UserButton";
+export {
   default as Webauthn,
   WEBAUTHN_ELEMENT_NAME,
   type WebauthnProps,

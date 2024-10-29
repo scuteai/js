@@ -18,7 +18,6 @@ import {
   ProfileSubHeader,
   ProfileWrapper,
   Text,
-  TextField,
 } from "./components";
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
