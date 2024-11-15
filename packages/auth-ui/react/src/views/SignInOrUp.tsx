@@ -25,7 +25,6 @@ import {
   Text,
   IconHolder,
   Panel,
-  FloatingLabelTextField,
   ElementCardFooter,
   QueryContainer,
   ResponsiveContainer,
@@ -39,6 +38,8 @@ import { getIdentifierType } from "../helpers/identifierType";
 import { VIEWS } from "@scute/ui-shared";
 import { translateError } from "../helpers/i18n/service";
 import { RegisterForm } from "./RegisterForm";
+import { FloatingLabelIdField } from "../components/FloatingLabelTextField";
+import { isMaybePhoneNumber, isValidPhoneNumber } from "../helpers/phone";
 
 export interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   identifier: ScuteIdentifier;
@@ -333,16 +334,18 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   ) : (
                     <>
                       <Group css={{ mt: "$2" }}>
-                        <FloatingLabelTextField
+                        <FloatingLabelIdField
                           domId="email_field__floating_label"
                           label={identifierLabelText}
-                          fieldType="email"
                           autoCorrect="off"
                           autoCapitalize="none"
                           autoComplete={`webauthn ${
                             isEmailIdentifierAllowed ? "email" : ""
                           }${isPhoneIdentifierAllowed ? "tel" : ""}`}
                           state={isError ? "invalid" : "valid"}
+                          fieldType="text"
+                          allowedIdentifiers={allowedIdentifiers}
+                          onChange={console.log}
                           registerFormAttr={register("identifier", {
                             required: t("signInOrUp.identifierRequired"),
                             validate: {
@@ -355,7 +358,10 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                                     t("signInOrUp.emailLimit");
                                 }
 
-                                if (allowedIdentifiers.includes("phone")) {
+                                if (
+                                  allowedIdentifiers.includes("phone") &&
+                                  isMaybePhoneNumber(v)
+                                ) {
                                   const isValidPhoneOrError: boolean | string =
                                     true;
                                   isValidOrError =
@@ -373,18 +379,22 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                                     t("signInOrUp.emailValid");
                                 }
 
-                                if (allowedIdentifiers.includes("phone")) {
+                                if (
+                                  allowedIdentifiers.includes("phone") &&
+                                  isMaybePhoneNumber(v)
+                                ) {
                                   const isValidPhoneOrError: boolean | string =
-                                    true;
+                                    isValidPhoneNumber(v, t);
                                   isValidOrError =
                                     isValidPhoneOrError || isValidOrError;
                                 }
-
+                                console.log({ isValidOrError, v });
                                 return isValidOrError;
                               },
                             },
                           })}
                         />
+
                         {isError ? (
                           <Text
                             size="1"
@@ -561,7 +571,7 @@ export const useSignInOrUpFormHelpers = (
   mode: SignInOrUpProps["mode"]
 ) => {
   const { t } = useTranslation();
-
+  // TODO: make use of this shit
   const allowedIdentifiers = appData.allowed_identifiers;
   const requiredIdentifiers = appData.required_identifiers;
   const isPublicSignUpAllowed = appData.public_signup !== false;

@@ -35,6 +35,7 @@
     "identifierRequired": "Identifier is required.",
     "emailLimit": "The email should have at most 50 characters",
     "emailValid": "Email address must be a valid address",
+    "phoneValid": "Phone number must be a valid number",
     "signinWith": "Sign in with {{provider}}",
     "continueWith": "Continue with {{provider}}",
     "continueTo": "Continue to {{appName}}",

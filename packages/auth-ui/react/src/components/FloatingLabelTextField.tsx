@@ -1,6 +1,12 @@
 import { UseFormRegisterReturn } from "react-hook-form";
 import { styled } from "../stitches.config";
 import { TextField } from "./Textfield";
+import "react-international-phone/style.css";
+
+import { CountrySelector, usePhoneInput } from "react-international-phone";
+import { useState } from "react";
+import { isMaybePhoneNumber, cleanPhoneFormat } from "../helpers/phone";
+import { ScuteIdentifierType } from "@scute/core";
 
 type FloatingLabelTextFieldProps = {
   domId: string;
@@ -12,6 +18,11 @@ type FloatingLabelTextFieldProps = {
   autoComplete?: string;
   state?: "invalid" | "valid";
   registerFormAttr?: UseFormRegisterReturn<string>;
+};
+
+type FloatingLabelIdFieldProps = FloatingLabelTextFieldProps & {
+  allowedIdentifiers: ScuteIdentifierType[];
+  onChange: (identifier: string) => void;
 };
 
 const Container = styled("div", {
@@ -75,6 +86,95 @@ export const FloatingLabelTextField = ({
         state={state}
         {...registerFormAttr}
         size={size}
+      />
+      <label htmlFor={domId}>{label}</label>
+    </Container>
+  );
+};
+
+export const FloatingLabelIdField = ({
+  domId = "phoneId",
+  label = "Email or Phone",
+  fieldType = "tel",
+  size = 2,
+  autoCapitalize = "none",
+  autoCorrect = "off",
+  autoComplete = "off",
+  state,
+  allowedIdentifiers,
+  onChange,
+}: FloatingLabelIdFieldProps) => {
+  const [idState, setIdState] = useState(
+    allowedIdentifiers.includes("email") ? "email" : "phone"
+  );
+  const [identifier, setIdentifier] = useState("");
+
+  const {
+    inputValue,
+    phone,
+    country,
+    setCountry,
+    handlePhoneValueChange,
+    inputRef,
+  } = usePhoneInput({});
+
+  return (
+    <Container>
+      {idState === "phone" && (
+        <CountrySelector
+          selectedCountry={country.iso2}
+          onSelect={(data) => setCountry(data.iso2)}
+          style={{
+            position: "absolute",
+            top: "14px",
+            left: "10px",
+            border: "none",
+          }}
+          buttonStyle={{
+            border: "none",
+            backgroundColor: "transparent",
+          }}
+        />
+      )}
+      <TextField
+        id={domId}
+        type={fieldType}
+        placeholder="&nbsp;"
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
+        autoComplete={autoComplete}
+        state={state}
+        size={size}
+        value={idState === "phone" ? inputValue : identifier}
+        ref={inputRef}
+        onChange={(e) => {
+          if (
+            allowedIdentifiers.includes("phone") &&
+            isMaybePhoneNumber(e.target.value)
+          ) {
+            setIdState("phone");
+            handlePhoneValueChange(e);
+            setIdentifier(phone);
+            onChange(phone);
+          } else {
+            if (idState === "phone") {
+              const id = cleanPhoneFormat(e.target.value);
+              setIdentifier(id);
+              onChange(id);
+            } else {
+              setIdentifier(e.target.value);
+              onChange(e.target.value);
+            }
+            setIdState("email");
+          }
+        }}
+        css={
+          idState === "phone"
+            ? {
+                paddingLeft: "60px",
+              }
+            : {}
+        }
       />
       <label htmlFor={domId}>{label}</label>
     </Container>

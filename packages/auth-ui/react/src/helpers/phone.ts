@@ -1,0 +1,28 @@
+import { PhoneNumberUtil } from "google-libphonenumber";
+import { TFunction } from "i18next";
+const phoneUtil = PhoneNumberUtil.getInstance();
+
+export const cleanPhoneFormat = (input: string) => {
+  return input.replace(/[\s()+-]/g, "");
+};
+
+export const isMaybePhoneNumber = (phone: string) => {
+  const phoneRegex = /^\+?[\d\s()-]*$/;
+  return phone && phoneRegex.test(phone.replace(/\s+/g, ""));
+};
+
+export const isValidPhoneNumber = (phone: string, t: TFunction) => {
+  if (!phone || phone === "") {
+    return t("signInOrUp.phoneValid");
+  }
+
+  try {
+    if (phoneUtil.isValidNumber(phoneUtil.parseAndKeepRawInput(phone))) {
+      return true;
+    } else {
+      return t("signInOrUp.phoneValid");
+    }
+  } catch (error) {
+    return t("signInOrUp.phoneValid");
+  }
+};
