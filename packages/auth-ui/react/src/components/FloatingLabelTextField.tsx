@@ -129,8 +129,6 @@ export const FloatingLabelIdField = ({
   const phoneOnly =
     allowedIdentifiers.length === 1 && allowedIdentifiers[0] === "phone";
 
-  console.log({ allowedIdentifiers });
-
   const { inputValue, country, setCountry, handlePhoneValueChange, inputRef } =
     usePhoneInput({
       value: !phoneOnly ? "+000" : "",

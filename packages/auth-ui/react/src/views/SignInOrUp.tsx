@@ -139,7 +139,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log({ identifier, e });
     setIsDirty(true);
     if (error) {
       return;
@@ -206,13 +205,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   return (
     <>
       {!showRegisterForm ? (
-        <form
-          noValidate
-          onSubmit={onSubmit}
-          // onChange={() => {
-          //   clearErrors("root.serverError");
-          // }}
-        >
+        <form noValidate onSubmit={onSubmit}>
           <QueryContainer css={{ pt: "0px", pb: "$2" }}>
             <ResponsiveContainer>
               <ResponsiveLeft>
