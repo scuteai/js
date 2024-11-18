@@ -55,10 +55,6 @@ export interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
 }
 
-type IdentifierInput = {
-  identifier: ScuteIdentifier;
-};
-
 const SignInOrUp = (props: SignInOrUpProps) => {
   const {
     scuteClient,
@@ -129,43 +125,34 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   const isWebauthnAvailable =
     webauthnEnabled && scuteClient.isWebauthnSupported();
 
-  const {
-    register,
-    handleSubmit,
-    setError,
-    clearErrors,
-    formState: { errors, isDirty, isValid },
-  } = useForm<IdentifierInput>({
-    criteriaMode: "all",
-    defaultValues: {
-      identifier: "",
-    },
-  });
-  const isError = Object.keys(errors).length !== 0;
+  const [isDirty, setIsDirty] = useState(false);
+  const [error, setError] = useState<boolean | string>(
+    t("signInOrUp.identifierRequired")
+  );
 
-  const handleValidSubmit: SubmitHandler<IdentifierInput> = async (values) => {
-    const identifier =
-      values.identifier.length !== 0
-        ? values.identifier
-        : rememberedIdentifier ?? values.identifier;
+  useEffect(() => {
+    if (rememberedIdentifier) {
+      setError(false);
+      setIdentifier(rememberedIdentifier);
+    }
+  }, [rememberedIdentifier]);
 
-    setIdentifier(identifier);
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    console.log({ identifier, e });
+    setIsDirty(true);
+    if (error) {
+      return;
+    }
     const user = await scuteClient.identifierExists(identifier);
 
     if (!user && mode === "sign_in") {
       const error = new IdentifierNotRecognizedError();
-      setError("root.serverError", {
-        type: String(error.code),
-        message: translateError(error),
-      });
-
+      setError(translateError(error));
       return;
     } else if (user && mode === "sign_up") {
       const error = new IdentifierAlreadyExistsError();
-      setError("root.serverError", {
-        type: String(error.code),
-        message: translateError(error),
-      });
+      setError(translateError(error));
       return;
     }
 
@@ -173,10 +160,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       if (user.status === "inactive") {
         // TODO
         const error = new UnknownSignInError();
-        setError("root.serverError", {
-          type: String(error.code),
-          message: translateError(error),
-        });
+        setError(translateError(error));
         return;
       }
 
@@ -190,10 +174,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         if (magicLinkError) {
           const { isFatal } = getMeaningfulError(magicLinkError);
           setIsFatalError?.(isFatal);
-          setError("root.serverError", {
-            type: String(magicLinkError.code),
-            message: translateError(magicLinkError),
-          });
+          setError(translateError(magicLinkError));
           return;
         }
 
@@ -210,10 +191,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         if (signUpError) {
           const { isFatal } = getMeaningfulError(signUpError);
           setIsFatalError?.(isFatal);
-          setError("root.serverError", {
-            type: String(signUpError.code),
-            message: translateError(signUpError),
-          });
+          setError(translateError(signUpError));
           return;
         }
 
@@ -230,10 +208,10 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       {!showRegisterForm ? (
         <form
           noValidate
-          onSubmit={handleSubmit(handleValidSubmit)}
-          onChange={() => {
-            clearErrors("root.serverError");
-          }}
+          onSubmit={onSubmit}
+          // onChange={() => {
+          //   clearErrors("root.serverError");
+          // }}
         >
           <QueryContainer css={{ pt: "0px", pb: "$2" }}>
             <ResponsiveContainer>
@@ -342,71 +320,16 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                           autoComplete={`webauthn ${
                             isEmailIdentifierAllowed ? "email" : ""
                           }${isPhoneIdentifierAllowed ? "tel" : ""}`}
-                          state={isError ? "invalid" : "valid"}
                           fieldType="text"
                           allowedIdentifiers={allowedIdentifiers}
-                          onChange={console.log}
-                          registerFormAttr={register("identifier", {
-                            required: t("signInOrUp.identifierRequired"),
-                            validate: {
-                              maxLength: (v) => {
-                                let isValidOrError: boolean | string = true;
-
-                                if (allowedIdentifiers.includes("email")) {
-                                  isValidOrError =
-                                    v.length <= 50 ||
-                                    t("signInOrUp.emailLimit");
-                                }
-
-                                if (
-                                  allowedIdentifiers.includes("phone") &&
-                                  isMaybePhoneNumber(v)
-                                ) {
-                                  const isValidPhoneOrError: boolean | string =
-                                    true;
-                                  isValidOrError =
-                                    isValidPhoneOrError || isValidOrError;
-                                }
-
-                                return isValidOrError;
-                              },
-                              matchPattern: (v) => {
-                                let isValidOrError: boolean | string = true;
-
-                                if (allowedIdentifiers.includes("email")) {
-                                  isValidOrError =
-                                    /^\S+@\S+\.\S+$/.test(v) ||
-                                    t("signInOrUp.emailValid");
-                                }
-
-                                if (
-                                  allowedIdentifiers.includes("phone") &&
-                                  isMaybePhoneNumber(v)
-                                ) {
-                                  const isValidPhoneOrError: boolean | string =
-                                    isValidPhoneNumber(v, t);
-                                  isValidOrError =
-                                    isValidPhoneOrError || isValidOrError;
-                                }
-                                console.log({ isValidOrError, v });
-                                return isValidOrError;
-                              },
-                            },
-                          })}
+                          onChange={setIdentifier}
+                          isDirty={isDirty}
+                          t={t}
+                          error={error}
+                          setError={setError}
+                          identifier={identifier}
+                          setIdentifier={setIdentifier}
                         />
-
-                        {isError ? (
-                          <Text
-                            size="1"
-                            css={{ color: "$errorColor", pt: "$2" }}
-                          >
-                            <>
-                              {errors.identifier?.message ||
-                                errors.root?.serverError.message ||
-                                t("general.unknownError")}
-                            </>
-                          </Text>
-                        ) : null}
                       </Group>
                     </>
                   )}

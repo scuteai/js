@@ -5,8 +5,15 @@ import "react-international-phone/style.css";
 
 import { CountrySelector, usePhoneInput } from "react-international-phone";
 import { useState } from "react";
-import { isMaybePhoneNumber, cleanPhoneFormat } from "../helpers/phone";
+import {
+  isMaybePhoneNumber,
+  cleanPhoneFormat,
+  isValidPhoneNumber,
+} from "../helpers/phone";
 import { ScuteIdentifierType } from "@scute/core";
+import { Text } from "./Text";
+import { TFunction } from "i18next";
+import { isValidEmail } from "../helpers/isValidEmail";
 
 type FloatingLabelTextFieldProps = {
   domId: string;
@@ -23,6 +30,12 @@ type FloatingLabelTextFieldProps = {
 type FloatingLabelIdFieldProps = FloatingLabelTextFieldProps & {
   allowedIdentifiers: ScuteIdentifierType[];
   onChange: (identifier: string) => void;
+  isDirty: boolean;
+  t: TFunction;
+  error: boolean | string;
+  setError: (error: boolean | string) => void;
+  identifier: string;
+  setIdentifier: (identifier: string) => void;
 };
 
 const Container = styled("div", {
@@ -93,30 +106,40 @@ export const FloatingLabelTextField = ({
 };
 
 export const FloatingLabelIdField = ({
-  domId = "phoneId",
-  label = "Email or Phone",
-  fieldType = "tel",
+  domId,
+  label,
+  fieldType = "text",
   size = 2,
   autoCapitalize = "none",
   autoCorrect = "off",
   autoComplete = "off",
-  state,
   allowedIdentifiers,
   onChange,
+  isDirty,
+  t,
+  error,
+  setError,
+  identifier,
+  setIdentifier,
 }: FloatingLabelIdFieldProps) => {
   const [idState, setIdState] = useState(
     allowedIdentifiers.includes("email") ? "email" : "phone"
   );
-  const [identifier, setIdentifier] = useState("");
 
-  const {
-    inputValue,
-    phone,
-    country,
-    setCountry,
-    handlePhoneValueChange,
-    inputRef,
-  } = usePhoneInput({});
+  const { inputValue, country, setCountry, handlePhoneValueChange, inputRef } =
+    usePhoneInput({
+      value: "+000",
+      onChange: ({ phone }) => {
+        onChange(phone);
+        setIdentifier(phone);
+        const isValidPhone = isValidPhoneNumber(phone, t);
+        if (isValidPhone !== true) {
+          setError(isValidPhone);
+        } else {
+          setError(false);
+        }
+      },
+    });
 
   return (
     <Container>
@@ -143,7 +166,7 @@ export const FloatingLabelIdField = ({
         autoCapitalize={autoCapitalize}
         autoCorrect={autoCorrect}
         autoComplete={autoComplete}
-        state={state}
+        state={error && isDirty ? "invalid" : "valid"}
         size={size}
         value={idState === "phone" ? inputValue : identifier}
         ref={inputRef}
@@ -152,19 +175,31 @@ export const FloatingLabelIdField = ({
             allowedIdentifiers.includes("phone") &&
             isMaybePhoneNumber(e.target.value)
           ) {
+            if (idState === "email") {
+              setIdentifier(e.target.value);
+              onChange(e.target.value);
+            }
             setIdState("phone");
             handlePhoneValueChange(e);
-            setIdentifier(phone);
-            onChange(phone);
           } else {
             if (idState === "phone") {
               const id = cleanPhoneFormat(e.target.value);
+              //handlePhoneValueChange(e);
               setIdentifier(id);
               onChange(id);
             } else {
               setIdentifier(e.target.value);
               onChange(e.target.value);
             }
+
+            if (e.target.value === "") {
+              setError(t("signInOrUp.identifierRequired"));
+            } else if (!isValidEmail(e.target.value)) {
+              setError(t("signInOrUp.emailValid"));
+            } else {
+              setError(false);
+            }
+
             setIdState("email");
           }
         }}
@@ -177,6 +212,11 @@ export const FloatingLabelIdField = ({
         }
       />
       <label htmlFor={domId}>{label}</label>
+      {error && isDirty ? (
+        <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
+          {error}
+        </Text>
+      ) : null}
     </Container>
   );
 };
