@@ -126,9 +126,14 @@ export const FloatingLabelIdField = ({
     allowedIdentifiers.includes("email") ? "email" : "phone"
   );
 
+  const phoneOnly =
+    allowedIdentifiers.length === 1 && allowedIdentifiers[0] === "phone";
+
+  console.log({ allowedIdentifiers });
+
   const { inputValue, country, setCountry, handlePhoneValueChange, inputRef } =
     usePhoneInput({
-      value: "+000",
+      value: !phoneOnly ? "+000" : "",
       onChange: ({ phone }) => {
         onChange(phone);
         setIdentifier(phone);
@@ -181,7 +186,7 @@ export const FloatingLabelIdField = ({
             }
             setIdState("phone");
             handlePhoneValueChange(e);
-          } else {
+          } else if (allowedIdentifiers.includes("email")) {
             if (idState === "phone") {
               const id = cleanPhoneFormat(e.target.value);
               //handlePhoneValueChange(e);
