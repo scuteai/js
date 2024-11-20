@@ -14,7 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ArrowIcon, FingerprintIcon, MagicMailIcon } from "../assets/icons";
+import { ArrowIcon, MagicMailIcon } from "../assets/icons";
 import type { CommonViewProps } from "./common";
 import {
   Button,
@@ -32,14 +32,15 @@ import {
   ResponsiveRight,
 } from "../components";
 
-import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
 import { getIdentifierType } from "../helpers/identifierType";
 // import PhoneInput from "../components/PhoneInput";
 import { VIEWS } from "@scute/ui-shared";
 import { translateError } from "../helpers/i18n/service";
 import { RegisterForm } from "./RegisterForm";
 import { FloatingLabelIdField } from "../components/FloatingLabelTextField";
-import { isMaybePhoneNumber, isValidPhoneNumber } from "../helpers/phone";
+import { getISO2CountryCode, isValidPhoneNumber } from "../helpers/phone";
+
+import { FlagImage } from "react-international-phone";
 
 export interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   identifier: ScuteIdentifier;
@@ -130,10 +131,19 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     t("signInOrUp.identifierRequired")
   );
 
+  const [rememberedIdentifierISO2Code, setRememberedIdentifierISO2Code] =
+    useState<string | null>(null);
+
   useEffect(() => {
     if (rememberedIdentifier) {
       setError(false);
       setIdentifier(rememberedIdentifier);
+      if (isValidPhoneNumber(rememberedIdentifier, t)) {
+        const countryIso2 = getISO2CountryCode(rememberedIdentifier);
+        if (countryIso2) {
+          setRememberedIdentifierISO2Code(countryIso2.toLowerCase());
+        }
+      }
     }
   }, [rememberedIdentifier]);
 
@@ -283,6 +293,16 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                               }}
                               variant="inherit"
                             >
+                              {rememberedIdentifierISO2Code && (
+                                <FlagImage
+                                  iso2={rememberedIdentifierISO2Code}
+                                  style={{
+                                    position: "relative",
+                                    top: 5,
+                                    marginRight: 4,
+                                  }}
+                                />
+                              )}
                               {rememberedIdentifier}
                             </Text>
                           </Flex>

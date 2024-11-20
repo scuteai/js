@@ -26,3 +26,9 @@ export const isValidPhoneNumber = (phone: string, t: TFunction) => {
     return t("signInOrUp.phoneValid");
   }
 };
+
+export const getISO2CountryCode = (phone: string) => {
+  return phoneUtil.getRegionCodeForNumber(
+    phoneUtil.parseAndKeepRawInput(phone)
+  );
+};
