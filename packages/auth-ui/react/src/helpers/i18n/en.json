@@ -37,6 +37,7 @@
     "emailValid": "Email address must be a valid address",
     "phoneValid": "Phone number must be a valid number",
     "signinWith": "Sign in with {{provider}}",
+    "signIn": "Sign in",
     "continueWith": "Continue with {{provider}}",
     "continueTo": "Continue to {{appName}}",
     "privacy": "Privacy",

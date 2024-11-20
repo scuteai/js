@@ -14,7 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FingerprintIcon, MagicMailIcon } from "../assets/icons";
+import { ArrowIcon, FingerprintIcon, MagicMailIcon } from "../assets/icons";
 import type { CommonViewProps } from "./common";
 import {
   Button,
@@ -330,10 +330,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   <Flex css={{ mb: "$3" }}>
                     {isWebauthnAvailable || mode === "sign_up" ? (
                       <Button size="2" type="submit">
-                        <span>
-                          {t("signInOrUp.signinWith", { provider: "Passkey" })}
-                        </span>
-                        {isWebauthnAvailable ? <FingerprintIcon /> : null}
+                        <span>{t("signInOrUp.signIn")}</span>
+                        <ArrowIcon className="right" />
                       </Button>
                     ) : (
                       <Button size="2" type="submit">

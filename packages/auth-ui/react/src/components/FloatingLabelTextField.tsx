@@ -168,7 +168,7 @@ export const FloatingLabelIdField = ({
         placeholder="&nbsp;"
         autoCapitalize={autoCapitalize}
         autoCorrect={autoCorrect}
-        autoComplete={autoComplete}
+        autoComplete={idState === "phone" ? "tel" : "email"}
         state={error && isDirty ? "invalid" : "valid"}
         size={size}
         value={idState === "phone" ? inputValue : identifier}
