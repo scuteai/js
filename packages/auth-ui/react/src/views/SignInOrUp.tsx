@@ -138,7 +138,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     if (rememberedIdentifier) {
       setError(false);
       setIdentifier(rememberedIdentifier);
-      if (isValidPhoneNumber(rememberedIdentifier, t)) {
+      if (isValidPhoneNumber(rememberedIdentifier, t) === true) {
         const countryIso2 = getISO2CountryCode(rememberedIdentifier);
         if (countryIso2) {
           setRememberedIdentifierISO2Code(countryIso2.toLowerCase());
