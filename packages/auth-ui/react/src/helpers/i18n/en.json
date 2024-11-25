@@ -38,6 +38,8 @@
     "phoneValid": "Phone number must be a valid number",
     "signinWith": "Sign in with {{provider}}",
     "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signInOrUp": "Sign up or Log in",
     "continueWith": "Continue with {{provider}}",
     "continueTo": "Continue to {{appName}}",
     "privacy": "Privacy",

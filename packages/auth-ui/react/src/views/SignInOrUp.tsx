@@ -14,7 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ArrowIcon, MagicMailIcon } from "../assets/icons";
+import { ArrowIcon } from "../assets/icons";
 import type { CommonViewProps } from "./common";
 import {
   Button,
@@ -211,7 +211,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       }
     }
   };
-
   return (
     <>
       {!showRegisterForm ? (
@@ -348,15 +347,15 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   )}
 
                   <Flex css={{ mb: "$3" }}>
-                    {isWebauthnAvailable || mode === "sign_up" ? (
+                    {rememberedIdentifier ? (
                       <Button size="2" type="submit">
                         <span>{t("signInOrUp.signIn")}</span>
                         <ArrowIcon className="right" />
                       </Button>
                     ) : (
                       <Button size="2" type="submit">
-                        <span>{t("general.continueWithMagicLink")}</span>
-                        <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
+                        <span>{t("signInOrUp.signInOrUp")}</span>
+                        <ArrowIcon className="right" />
                       </Button>
                     )}
                   </Flex>
