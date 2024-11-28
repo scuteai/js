@@ -81,6 +81,8 @@
     "bodyP1Part1": "We’ve sent an email to your inbox with",
     "bodyP1Part2": "a one-time link.",
     "bodyP2": "You will be automatically signed in here once you click that link.",
+    "manualOtpBody": "To keep your account secure, we need to verify it’s you. Enter the code from your {{source}}",
+    "verify": "Verify OTP",
     "loading": {
       "title": "Sending email..."
     }

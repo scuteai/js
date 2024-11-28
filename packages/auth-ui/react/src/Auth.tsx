@@ -35,7 +35,6 @@ import {
 } from "./views";
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
-import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
 import { initI18n, translate as t } from "./helpers/i18n/service";
 import { AppLogo } from "./components/AppLogo";
 import { LogoText } from "./components/Logo";

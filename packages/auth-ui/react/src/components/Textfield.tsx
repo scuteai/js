@@ -9,9 +9,8 @@ const focusGlow =
 const errorGlow =
   "0 0 0 1px transparent, 0 0 1px #c84648, 0 0 0 4px var(--scute-colors-errorColor)";
 
-export const TextField = styled("input", {
-  // Reset
-  appearance: "none",
+export const textFieldStyles = {
+  appearance: "none" as const,
   borderWidth: "0",
   boxSizing: "border-box",
   fontFamily: "inherit",
@@ -67,7 +66,10 @@ export const TextField = styled("input", {
   "&:read-only": {
     backgroundColor: "$inputDisabledBg",
   },
+};
 
+export const TextField = styled("input", {
+  ...textFieldStyles,
   variants: {
     size: {
       "1": {

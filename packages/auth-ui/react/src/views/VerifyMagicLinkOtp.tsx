@@ -18,7 +18,6 @@ import {
   Badge,
   Button,
   Flex,
-  Header,
   Heading,
   Inner,
   LargeSpinner,
@@ -36,7 +35,6 @@ import { CommonViewProps } from "./common";
 import { translateError } from "../helpers/i18n/service";
 
 export interface VerifyMagicLinkOtpProps extends CommonViewProps {
-  isWebauthnNewDevice?: boolean;
   magicLinkId?: UniqueIdentifier;
   magicLinkToken?: string;
   getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
@@ -51,7 +49,6 @@ const VerifyMagicLinkOtp = ({
   setIsFatalError,
   magicLinkId,
   magicLinkToken: _magicLinkToken,
-  isWebauthnNewDevice,
   getAuthPayloadCallback,
   setIslandProps,
   resetIslandProps,
@@ -247,11 +244,7 @@ const VerifyMagicLinkOtp = ({
               },
             }}
           >
-            <Heading size="4">
-              {isWebauthnNewDevice
-                ? t("verifyOTP.newDeviceTitle")
-                : t("verifyOTP.newDeviceTitle")}
-            </Heading>
+            <Heading size="4">{t("verifyOTP.newDeviceTitle")}</Heading>
             <Text size="2" css={{ mb: "$4" }}>
               {t("verifyOTP.newDeviceBody")}
             </Text>
