@@ -35,6 +35,7 @@ import { CommonViewProps } from "./common";
 import { translateError } from "../helpers/i18n/service";
 
 export interface VerifyMagicLinkOtpProps extends CommonViewProps {
+  isWebauthnNewDevice?: boolean;
   magicLinkId?: UniqueIdentifier;
   magicLinkToken?: string;
   getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
