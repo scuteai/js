@@ -17,6 +17,7 @@ import {
   SCUTE_BROADCAST_CHANNEL,
   SCUTE_MAGIC_PARAM,
   SCUTE_SKIP_PARAM,
+  SCUTE_OAUTH_PKCE_PARAM,
 } from "./lib/constants";
 
 import {
@@ -550,7 +551,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const skip = new URL(url ?? window.location.href).searchParams.get(
       SCUTE_SKIP_PARAM
     );
-    return skip === "true";
+
+    const pkce = new URL(url ?? window.location.href).searchParams.get(
+      SCUTE_OAUTH_PKCE_PARAM
+    );
+
+    return skip === "true" || pkce;
   }
 
   /**

@@ -40,6 +40,7 @@ export type InternalEvent = {
 export const SCUTE_BROADCAST_CHANNEL = "sct_broadcast";
 export const SCUTE_MAGIC_PARAM = "sct_magic";
 export const SCUTE_SKIP_PARAM = "sct_sk";
+export const SCUTE_OAUTH_PKCE_PARAM = "sct_pkce";
 export const SCUTE_CRED_STORAGE_KEY = "sct_cred_data";
 export const SCUTE_LAST_LOGIN_STORAGE_KEY = "sct_last_login";
 

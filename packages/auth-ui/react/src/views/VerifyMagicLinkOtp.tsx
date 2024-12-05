@@ -2,6 +2,7 @@ import {
   AUTH_CHANGE_EVENTS,
   getMeaningfulError,
   SCUTE_MAGIC_PARAM,
+  SCUTE_OAUTH_PKCE_PARAM,
   SCUTE_SKIP_PARAM,
   type ScuteIdentifier,
   type ScuteTokenPayload,
@@ -61,7 +62,9 @@ const VerifyMagicLinkOtp = ({
   const [time, setTime] = useState(TIMER_START);
   const [resendDisabled, setResendDisabled] = useState(false);
   const [shouldSkip] = useState(
-    () => !!new URL(window.location.href).searchParams.get(SCUTE_SKIP_PARAM)
+    () =>
+      !!new URL(window.location.href).searchParams.get(SCUTE_SKIP_PARAM) ||
+      !!new URL(window.location.href).searchParams.get(SCUTE_OAUTH_PKCE_PARAM)
   );
 
   const { t } = useTranslation();
@@ -205,6 +208,7 @@ const VerifyMagicLinkOtp = ({
     return () => {
       url.searchParams.delete(SCUTE_MAGIC_PARAM);
       url.searchParams.delete(SCUTE_SKIP_PARAM);
+      url.searchParams.delete(SCUTE_OAUTH_PKCE_PARAM);
       window.history.replaceState(window.history.state, "", url.toString());
     };
   });

@@ -10,6 +10,7 @@ import {
   SCUTE_MAGIC_PARAM,
   decodeMagicLinkToken,
   SCUTE_SKIP_PARAM,
+  SCUTE_OAUTH_PKCE_PARAM,
 } from "@scute/core";
 import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
 
@@ -100,6 +101,14 @@ function Auth(props: AuthProps) {
   };
 
   const [_authView, setAuthView] = useState<Views>(() => {
+    if (
+      typeof window !== "undefined" &&
+      typeof URLSearchParams !== "undefined" &&
+      new URL(window.location.href).searchParams.has(SCUTE_OAUTH_PKCE_PARAM)
+    ) {
+      return VIEWS.PKCE_OAUTH;
+    }
+
     if (
       typeof window !== "undefined" &&
       typeof URLSearchParams !== "undefined" &&
