@@ -135,7 +135,8 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
                   : user.email?.split("@")?.[0] ?? ""}
               </Text>
 
-              <Text css={{ mt: "$2" }}>{user.email}</Text>
+              {user?.email && <Text css={{ mt: "$2" }}>{user.email}</Text>}
+              {user?.phone && <Text css={{ mt: "$2" }}>{user.phone}</Text>}
             </Flex>
             <Flex
               css={{

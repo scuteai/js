@@ -58,9 +58,11 @@ const RegisterDevice = ({
         data: { user },
       } = await scuteClient.getUser(authPayload.access);
 
-      if (user) {
+      if (user && user.email) {
         // TODO: phone?
         setIdentifier(user.email);
+      } else if (user && user.phone) {
+        setIdentifier(user.phone);
       }
     }
 

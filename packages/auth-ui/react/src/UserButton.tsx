@@ -139,6 +139,9 @@ const UserButton = ({
                   {user?.email?.slice(0, 24) +
                     ((user?.email?.length || 0) > 24 ? "..." : "")}
                 </DropdownEmail>
+                {user?.phone && (
+                  <DropdownEmail css={{ mt: 2 }}>{user.phone}</DropdownEmail>
+                )}
               </Flex>
             </DropdownUserInfo>
             {profileUrl && (
