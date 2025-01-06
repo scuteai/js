@@ -112,7 +112,6 @@ export const FloatingLabelIdField = ({
   size = 2,
   autoCapitalize = "none",
   autoCorrect = "off",
-  autoComplete = "off",
   allowedIdentifiers,
   onChange,
   isDirty,
