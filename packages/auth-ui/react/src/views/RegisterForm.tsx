@@ -58,6 +58,7 @@ export const RegisterForm = ({
     clearErrors,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors, isDirty, isValid, isSubmitted },
   } = useForm();
   const [idError, setIdError] = useState<string | boolean>(false);
@@ -201,7 +202,7 @@ export const RegisterForm = ({
                   <>
                     <Group>
                       <FloatingLabelIdField
-                        domId="email_field__floating_label"
+                        domId={`${maybeNeededIdentifierType}__floating_label`}
                         label={maybeNeededIdentifierLabel}
                         autoCorrect="off"
                         autoCapitalize="none"
@@ -221,7 +222,7 @@ export const RegisterForm = ({
                         setError={(error) => {
                           setIdError(error);
                         }}
-                        identifier={identifier}
+                        identifier={getValues(maybeNeededIdentifierType) || ""}
                         setIdentifier={(value) =>
                           setValue(maybeNeededIdentifierType, value)
                         }
