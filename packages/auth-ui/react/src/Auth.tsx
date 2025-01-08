@@ -302,6 +302,8 @@ function Auth(props: AuthProps) {
             webauthn={webauthn}
             authPayload={authPayload}
             isWebauthnSupported={scuteClient.isWebauthnSupported()}
+            setIslandProps={setIslandProps}
+            resetIslandProps={resetIslandProps}
           />
         </Container>
       ) : (

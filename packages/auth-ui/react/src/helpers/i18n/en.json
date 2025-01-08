@@ -57,6 +57,7 @@
   "registerDevice": {
     "registerDeviceTitle": "Enable passkey",
     "trustDeviceTitle": "Do you trust this device?",
+    "verifyIdentityTitle": "You are verified",
     "registerDevice": "Register Device",
     "registeringDevice": "Registering device",
     "trustDevice": "Yes, trust device",
@@ -84,7 +85,9 @@
     "manualOtpBody": "To keep your account secure, we need to verify it’s you. Enter the code from your {{source}}",
     "verify": "Verify OTP",
     "loading": {
-      "title": "Sending email..."
+      "title": "Sending email...",
+      "verifyIdentityTitle": "Verifying identity...",
+      "verifyIdentityBody": "Please wait while we verify your identity"
     }
   },
 

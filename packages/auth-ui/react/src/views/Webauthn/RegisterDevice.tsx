@@ -1,4 +1,5 @@
 import {
+  SCUTE_ID_VERIFICATION_PARAM,
   SCUTE_REMEMBER_STORAGE_KEY,
   ScuteBrowserCookieStorage,
   getMeaningfulError,
@@ -44,13 +45,18 @@ const RegisterDevice = ({
   webauthn = "optional",
   authPayload,
   isWebauthnSupported,
+  resetIslandProps,
 }: RegisterDeviceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [identifier, setIdentifier] = useState<string | null>(_identifier);
 
   const cookieStore = new ScuteBrowserCookieStorage();
+  const isIdVerification = new URL(window.location.href).searchParams.get(
+    SCUTE_ID_VERIFICATION_PARAM
+  );
 
   useEffect(() => {
+    resetIslandProps?.();
     if (identifier) return;
 
     async function getUser() {
@@ -124,10 +130,10 @@ const RegisterDevice = ({
               px: "$2",
             }}
           >
-            {isWebauthnSupported ? (
-              <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
-            ) : (
+            {!isWebauthnSupported || isIdVerification ? (
               <CircleCheckIcon color="var(--scute-colors-svgIconColor)" />
+            ) : (
+              <BiometricsIcon color="var(--scute-colors-svgIconColor)" />
             )}
           </Header>
           <Inner
@@ -142,7 +148,9 @@ const RegisterDevice = ({
             }}
           >
             <Heading size="4">
-              {isWebauthnSupported
+              {isIdVerification
+                ? t("registerDevice.verifyIdentityTitle")
+                : isWebauthnSupported
                 ? t("registerDevice.registerDeviceTitle")
                 : t("registerDevice.trustDeviceTitle")}
             </Heading>
