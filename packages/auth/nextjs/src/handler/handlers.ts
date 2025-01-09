@@ -29,12 +29,9 @@ async function ScuteRouteHandler(
   const query = Object.fromEntries(url.searchParams);
   const body = await getBody(req);
   const cookies = Object.fromEntries(
-    context
-      .cookies()
-      .getAll()
-      .map((c) => [c.name, c.value])
+    (await context.cookies()).getAll().map((c) => [c.name, c.value])
   );
-  const headers = context.headers();
+  const headers = await context.headers();
 
   const scute = createRouteHandlerClient({ cookies: context.cookies });
   const response = await internalHandler(scute, {

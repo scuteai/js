@@ -36,7 +36,9 @@ export abstract class ScuteCookieStorage extends ScuteStorage {
     };
   }
 
-  protected abstract getCookie(name: string): string | null;
+  protected abstract getCookie(
+    name: string
+  ): Promise<string | null> | string | null;
   protected abstract setCookie(
     name: string,
     value: string,

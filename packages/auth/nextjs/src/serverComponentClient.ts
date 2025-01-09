@@ -16,8 +16,8 @@ class ScuteNextServerComponentStorage extends ScuteCookieStorage {
     super(defaultCookieOptions);
   }
 
-  protected getCookie(name: string): string | null {
-    const nextCookies = this.context.cookies();
+  protected async getCookie(name: string): Promise<string | null> {
+    const nextCookies = await this.context.cookies();
     return nextCookies.get(name)?.value ?? null;
   }
 

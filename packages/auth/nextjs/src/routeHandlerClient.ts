@@ -12,22 +12,25 @@ class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
     super(defaultCookieOptions);
   }
 
-  protected getCookie(name: string): string | null {
-    const nextCookies = this.context.cookies();
+  protected async getCookie(name: string): Promise<string | null> {
+    const nextCookies = await this.context.cookies();
     return nextCookies.get(name)?.value ?? null;
   }
 
-  protected setCookie(
+  protected async setCookie(
     name: string,
     value: string,
     options?: CookieAttributes
-  ): void {
-    const nextCookies = this.context.cookies();
+  ): Promise<void> {
+    const nextCookies = await this.context.cookies();
     nextCookies.set(name, value, options);
   }
 
-  protected deleteCookie(name: string, options?: CookieAttributes): void {
-    const nextCookies = this.context.cookies();
+  protected async deleteCookie(
+    name: string,
+    options?: CookieAttributes
+  ): Promise<void> {
+    const nextCookies = await this.context.cookies();
     nextCookies.set(name, "", {
       ...options,
       maxAge: 0,
