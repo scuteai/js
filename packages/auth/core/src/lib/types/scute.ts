@@ -130,6 +130,10 @@ export type ScuteMagicLinkIdResponse = {
   magic_link: { id: UniqueIdentifier };
 };
 
+export type ScuteOtpResponse = {
+  success: boolean;
+};
+
 export type ScuteUserSession = {
   id: UniqueIdentifier;
   // TODO refresh_expiration: string;

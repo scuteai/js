@@ -18,6 +18,7 @@ export const AUTH_CHANGE_EVENTS = {
   WEBAUTHN_REGISTER_SUCCESS: "webauthn_register_success",
   WEBAUTHN_VERIFY_START: "webauthn_verify_start",
   WEBAUTHN_VERIFY_SUCCESS: "webauthn_verify_success",
+  OTP_PENDING: "otp_pending",
 } as const;
 
 export type AuthChangeEvent = ValueOf<typeof AUTH_CHANGE_EVENTS>;

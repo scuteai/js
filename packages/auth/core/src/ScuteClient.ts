@@ -75,6 +75,7 @@ import type {
   ScuteUser,
   ScuteUserData,
   UserMeta,
+  ScuteOtpResponse,
 } from "./lib/types/scute";
 
 class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
@@ -1209,6 +1210,118 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   async getMagicLinkStatus(id: UniqueIdentifier) {
     return this.post<ScuteTokenPayload>("/magic_links/status", {
       id,
+    });
+  }
+
+  /**
+   * Send login OTP and emit the pending event.
+   * @param identifier {ScuteIdentifier}
+   * @param webauthnEnabled {boolean}
+   * @param emitEvent {boolean} - Emit pending event. Default true.
+   */
+  async sendLoginOtp(
+    identifier: ScuteIdentifier,
+    webauthnEnabled?: boolean,
+    emitEvent: boolean = true
+  ) {
+    const response = await this._sendLoginOtpRequest(
+      identifier,
+      webauthnEnabled
+    );
+
+    if (!response.error && emitEvent) {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.OTP_PENDING);
+    }
+
+    return response;
+  }
+
+  /**
+   * Send login OTP.
+   * @param identifier {ScuteIdentifier}
+   * @param webauthnEnabled {boolean}
+   * @internal
+   * @see {@link sendLoginOtp}
+   */
+  private async _sendLoginOtpRequest(
+    identifier: ScuteIdentifier,
+    webauthnEnabled?: boolean
+  ) {
+    return this._sendOtpRequest(
+      identifier,
+      "login",
+      undefined,
+      webauthnEnabled
+    );
+  }
+
+  /**
+   * Send register OTP and emit the pending event.
+   * @param identifier {ScuteIdentifier}
+   * @param userMeta {UserMeta}
+   * @param webauthnEnabled {boolean}
+   * @param emitEvent {boolean} - Emit pending event. Default true.
+   */
+  async sendRegisterOtp(
+    identifier: ScuteIdentifier,
+    userMeta?: UserMeta,
+    webauthnEnabled?: boolean,
+    emitEvent: boolean = true
+  ) {
+    const response = await this._sendRegisterOtpRequest(
+      identifier,
+      userMeta,
+      webauthnEnabled
+    );
+
+    if (!response.error && emitEvent) {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.OTP_PENDING);
+    }
+
+    return response;
+  }
+
+  /**
+   * Send register OTP.
+   * @param identifier {ScuteIdentifier}
+   * @param userMeta {UserMeta}
+   * @param webauthnEnabled {boolean}
+   * @internal
+   * @see {@link sendRegisterOtp}
+   */
+  private async _sendRegisterOtpRequest(
+    identifier: ScuteIdentifier,
+    userMeta?: UserMeta,
+    webauthnEnabled?: boolean
+  ) {
+    return this._sendOtpRequest(
+      identifier,
+      "register",
+      userMeta,
+      webauthnEnabled
+    );
+  }
+
+  /**
+   * Send OTP request.
+   * @param identifier {ScuteIdentifier}
+   * @param method {string} - "login" or "register"
+   * @param userMeta {UserMeta}
+   * @param webauthnEnabled {boolean}
+   * @internal
+   * @see {@link sendLoginOtp}
+   * @see {@link sendRegisterOtp}
+   */
+  private async _sendOtpRequest(
+    identifier: ScuteIdentifier,
+    method: "login" | "register",
+    userMeta?: UserMeta,
+    webauthnEnabled?: boolean
+  ) {
+    return this.post<ScuteOtpResponse>(`/otp/${method}`, {
+      identifier,
+      ...(method === "register" ? { user_meta: userMeta } : null),
+      webauthn_enabled: webauthnEnabled ?? isWebauthnSupported(),
     });
   }
 
