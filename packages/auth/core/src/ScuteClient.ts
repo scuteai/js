@@ -445,7 +445,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         if (verifyError instanceof NewDeviceError) {
           if (
             isMaybePhoneNumber(identifier) ||
-            options?.emailAuthType === "otp"
+            this.appData.email_auth_type === "otp"
           ) {
             this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.OTP_NEW_DEVICE_PENDING);
             return this._sendLoginOtp(identifier);
@@ -461,7 +461,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: null };
     }
 
-    if (isMaybePhoneNumber(identifier) || options?.emailAuthType === "otp") {
+    if (
+      isMaybePhoneNumber(identifier) ||
+      this.appData.email_auth_type === "otp"
+    ) {
       return this.sendLoginOtp(identifier);
     }
 
@@ -502,7 +505,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     identifier: ScuteIdentifier,
     options?: ScuteSignUpOptions
   ) {
-    if (isMaybePhoneNumber(identifier) || options?.emailAuthType === "otp") {
+    if (
+      isMaybePhoneNumber(identifier) ||
+      this.appData.email_auth_type === "otp"
+    ) {
       return this.sendRegisterOtp(identifier, options?.userMeta);
     }
 

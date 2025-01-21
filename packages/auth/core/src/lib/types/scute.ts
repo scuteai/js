@@ -39,6 +39,7 @@ export type ScuteAppData = {
   scute_branding: boolean;
   allowed_identifiers: ScuteIdentifierType[];
   required_identifiers: ScuteIdentifierType[];
+  email_auth_type: "magic" | "otp";
   default_language: string;
   user_meta_data_schema: ScuteUserMetaDataSchema[];
   oauth_providers?: ScuteOAuthProviderConfig[];
@@ -115,18 +116,15 @@ export type ScuteWebauthnOption = "strict" | "optional" | "disabled";
 
 export type ScuteSignInOptions = {
   webauthn?: ScuteWebauthnOption;
-  emailAuthType?: "magic" | "otp";
 } & Record<string, unknown>; // TODO
 
 export type ScuteSignUpOptions = {
   webauthn?: ScuteWebauthnOption;
   userMeta?: Metadata;
-  emailAuthType?: "magic" | "otp";
 } & Record<string, unknown>; // TODO
 
 export type ScuteSignInOrUpOptions = {
   webauthn?: ScuteWebauthnOption;
-  emailAuthType?: "magic" | "otp";
 } & Record<string, unknown>; // TODO
 
 export type ScuteMagicLinkIdResponse = {
