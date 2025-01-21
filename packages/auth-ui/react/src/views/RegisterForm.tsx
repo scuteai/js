@@ -6,6 +6,7 @@ import {
   SCUTE_SKIP_PARAM,
   type ScuteError,
   getMeaningfulError,
+  ScuteOtpResponse,
 } from "@scute/core";
 
 import { useTranslation } from "react-i18next";
@@ -79,9 +80,13 @@ export const RegisterForm = ({
   const isError = Object.keys(errors).length !== 0;
 
   const handleContinue: SubmitHandler<FieldValues> = async (values) => {
-    let data: ScuteMagicLinkIdResponse | ScuteTokenPayload | null = null;
+    let data:
+      | ScuteMagicLinkIdResponse
+      | ScuteTokenPayload
+      | ScuteOtpResponse
+      | null = null;
     let error: ScuteError | null = null;
-    console.log({ idError, errors });
+
     if (idError && typeof idError === "string") {
       console.log("idError", idError);
       return;

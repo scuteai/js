@@ -13,6 +13,11 @@ export const isBrowser = () =>
   typeof window.document !== "undefined" &&
   typeof window.document.createElement !== "undefined";
 
+export const isMaybePhoneNumber = (phone: string) => {
+  const phoneRegex = /^\+?[\d\s()-]*$/;
+  return phone && phoneRegex.test(phone.replace(/\s+/g, ""));
+};
+
 export class Deferred<T> {
   promise: Promise<T>;
   resolve!: (value: T) => void;

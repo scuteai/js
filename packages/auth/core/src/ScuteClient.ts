@@ -26,6 +26,7 @@ import {
   decodeMagicLinkToken,
   Deferred,
   isBrowser,
+  isMaybePhoneNumber,
   isWebauthnSupported,
   refreshTokenHeaders,
 } from "./lib/helpers";
@@ -442,6 +443,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       if (verifyError) {
         this._reportClientError(verifyError, "webauthn");
         if (verifyError instanceof NewDeviceError) {
+          if (
+            isMaybePhoneNumber(identifier) ||
+            options?.emailAuthType === "otp"
+          ) {
+            this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.OTP_NEW_DEVICE_PENDING);
+            return this._sendLoginOtp(identifier);
+          }
+
           this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING);
           return this._sendLoginMagicLink(identifier);
         }
@@ -450,6 +459,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       }
 
       return { data: null, error: null };
+    }
+
+    if (isMaybePhoneNumber(identifier) || options?.emailAuthType === "otp") {
+      return this.sendLoginOtp(identifier);
     }
 
     return this.sendLoginMagicLink(identifier);
@@ -489,6 +502,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     identifier: ScuteIdentifier,
     options?: ScuteSignUpOptions
   ) {
+    if (isMaybePhoneNumber(identifier) || options?.emailAuthType === "otp") {
+      return this.sendRegisterOtp(identifier, options?.userMeta);
+    }
+
     return this.sendRegisterMagicLink(identifier, options?.userMeta);
   }
 
@@ -1224,10 +1241,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     webauthnEnabled?: boolean,
     emitEvent: boolean = true
   ) {
-    const response = await this._sendLoginOtpRequest(
-      identifier,
-      webauthnEnabled
-    );
+    const response = await this._sendLoginOtp(identifier, webauthnEnabled);
 
     if (!response.error && emitEvent) {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.OTP_PENDING);
@@ -1243,7 +1257,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @internal
    * @see {@link sendLoginOtp}
    */
-  private async _sendLoginOtpRequest(
+  private async _sendLoginOtp(
     identifier: ScuteIdentifier,
     webauthnEnabled?: boolean
   ) {
@@ -1268,7 +1282,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     webauthnEnabled?: boolean,
     emitEvent: boolean = true
   ) {
-    const response = await this._sendRegisterOtpRequest(
+    const response = await this._sendRegisterOtp(
       identifier,
       userMeta,
       webauthnEnabled
@@ -1289,7 +1303,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @internal
    * @see {@link sendRegisterOtp}
    */
-  private async _sendRegisterOtpRequest(
+  private async _sendRegisterOtp(
     identifier: ScuteIdentifier,
     userMeta?: UserMeta,
     webauthnEnabled?: boolean

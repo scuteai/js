@@ -115,15 +115,18 @@ export type ScuteWebauthnOption = "strict" | "optional" | "disabled";
 
 export type ScuteSignInOptions = {
   webauthn?: ScuteWebauthnOption;
+  emailAuthType?: "magic" | "otp";
 } & Record<string, unknown>; // TODO
 
 export type ScuteSignUpOptions = {
   webauthn?: ScuteWebauthnOption;
   userMeta?: Metadata;
+  emailAuthType?: "magic" | "otp";
 } & Record<string, unknown>; // TODO
 
 export type ScuteSignInOrUpOptions = {
   webauthn?: ScuteWebauthnOption;
+  emailAuthType?: "magic" | "otp";
 } & Record<string, unknown>; // TODO
 
 export type ScuteMagicLinkIdResponse = {

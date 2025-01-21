@@ -97,6 +97,7 @@ function Auth(props: AuthProps) {
     useState<IslandProps>(islandPropsInitial);
 
   const resetIslandProps = () => {
+    if (!islandProps.active) return;
     setIslandProps(islandPropsInitial);
   };
 
@@ -158,7 +159,6 @@ function Auth(props: AuthProps) {
 
   useEffect(() => {
     if (isFatalError) return;
-
     (async () => {
       const { data, error: appDataError } = await scuteClient.getAppData(true);
 
