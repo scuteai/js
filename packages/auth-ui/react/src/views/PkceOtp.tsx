@@ -73,10 +73,8 @@ export const PkceOtp = ({
           }
 
           if (!data.meta) {
-            console.log("Meta fields are not filled.");
             setLoading(false);
           } else {
-            console.log("Meta fields are filled.");
             await scuteClient.verifyMagicLinkToken(magicLinkToken);
           }
         }

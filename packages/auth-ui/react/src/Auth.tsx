@@ -174,7 +174,6 @@ function Auth(props: AuthProps) {
 
   useEffect(() => {
     const unsubscribe = scuteClient.onAuthStateChange(async (event) => {
-      console.log("event", event);
       if (event === AUTH_CHANGE_EVENTS.SIGNED_IN) {
         onSignIn?.();
       } else if (event === AUTH_CHANGE_EVENTS.SIGNED_OUT) {

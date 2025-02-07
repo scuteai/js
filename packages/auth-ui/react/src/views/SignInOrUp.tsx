@@ -167,7 +167,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     }
 
     if (user) {
-      console.log("user", user);
       if (user.status === "inactive") {
         // TODO
         const error = new UnknownSignInError();
@@ -204,7 +203,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       }
     } else {
       // register
-      console.log("register");
       if (!shouldSkipRegisterForm) {
         setShowRegisterForm(true);
       } else {
