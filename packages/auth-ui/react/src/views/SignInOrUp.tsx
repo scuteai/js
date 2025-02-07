@@ -33,7 +33,6 @@ import {
 } from "../components";
 
 import { getIdentifierType } from "../helpers/identifierType";
-// import PhoneInput from "../components/PhoneInput";
 import { VIEWS } from "@scute/ui-shared";
 import { translateError } from "../helpers/i18n/service";
 import { RegisterForm } from "./RegisterForm";
@@ -71,6 +70,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   } = props;
 
   const { t } = useTranslation();
+
+  const isPhone = isValidPhoneNumber(identifier, t) === true;
 
   const providers = appData.oauth_providers || [];
 
@@ -166,6 +167,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     }
 
     if (user) {
+      console.log("user", user);
       if (user.status === "inactive") {
         // TODO
         const error = new UnknownSignInError();
@@ -175,7 +177,18 @@ const SignInOrUp = (props: SignInOrUpProps) => {
 
       // login
       if (webauthnEnabled && user.webauthn_enabled) {
-        setAuthView(VIEWS.WEBAUTHN_VERIFY);
+        return setAuthView(VIEWS.WEBAUTHN_VERIFY);
+      }
+
+      if (isPhone) {
+        const { error: otpError } = await scuteClient.sendLoginOtp(identifier);
+
+        if (otpError) {
+          const { isFatal } = getMeaningfulError(otpError);
+          setIsFatalError?.(isFatal);
+          setError(translateError(otpError));
+          return;
+        }
       } else {
         const { data, error: magicLinkError } =
           await scuteClient.sendLoginMagicLink(identifier);
@@ -191,6 +204,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       }
     } else {
       // register
+      console.log("register");
       if (!shouldSkipRegisterForm) {
         setShowRegisterForm(true);
       } else {
@@ -205,8 +219,10 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         }
 
         if (pollingData) {
-          const magicLinkId = pollingData.magic_link.id;
-          getMagicLinkIdCallback?.(magicLinkId);
+          if ("magic_link" in pollingData) {
+            const magicLinkId = pollingData.magic_link.id;
+            getMagicLinkIdCallback?.(magicLinkId);
+          }
         }
       }
     }

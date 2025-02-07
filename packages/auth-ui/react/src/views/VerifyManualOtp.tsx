@@ -3,7 +3,7 @@ import { Button, Heading, Inner, ManualOTPWrapper, Text } from "../components";
 import { CommonViewProps } from "./common";
 import { isValidEmail } from "../helpers/isValidEmail";
 import { useEffect, useState } from "react";
-import { ScuteIdentifier } from "@scute/core";
+import { ScuteIdentifier, ScuteTokenPayload } from "@scute/core";
 import OTPInput from "react-otp-input";
 import { globalCss } from "../stitches.config";
 import { textFieldStyles } from "../components/Textfield";
@@ -26,10 +26,16 @@ const globalStyles = globalCss({
   },
 });
 
+interface VerifyManualOtpProps extends CommonViewProps {
+  getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
+}
+
 const VerifyManualOtp = ({
   scuteClient,
   identifier: _identifier,
-}: CommonViewProps) => {
+  setIsFatalError,
+  getAuthPayloadCallback,
+}: VerifyManualOtpProps) => {
   const { t } = useTranslation();
   globalStyles();
 
@@ -68,12 +74,24 @@ const VerifyManualOtp = ({
             numInputs={6}
             inputStyle="otp-input"
             renderInput={(props) => <input {...props} />}
+            shouldAutoFocus
           />
         </div>
         <Button
           size="1"
           type="submit"
           css={{ mt: "$7", width: "100%", maxWidth: "270px" }}
+          onClick={async () => {
+            const { data, error } = await scuteClient.verifyOtp(
+              otp,
+              _identifier
+            );
+            if (error) {
+              setIsFatalError?.(true);
+              return;
+            }
+            getAuthPayloadCallback?.(data);
+          }}
         >
           <span>{t("verifyOTP.verify")}</span>
           <ArrowIcon className="right" />

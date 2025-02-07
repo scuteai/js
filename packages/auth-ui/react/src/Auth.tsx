@@ -41,6 +41,7 @@ import { AppLogo } from "./components/AppLogo";
 import { LogoText } from "./components/Logo";
 import { Island, type IslandProps } from "./components/Island";
 import { PkceOtp } from "./views/PkceOtp";
+import VerifyManualOtp from "./views/VerifyManualOtp";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -173,6 +174,7 @@ function Auth(props: AuthProps) {
 
   useEffect(() => {
     const unsubscribe = scuteClient.onAuthStateChange(async (event) => {
+      console.log("event", event);
       if (event === AUTH_CHANGE_EVENTS.SIGNED_IN) {
         onSignIn?.();
       } else if (event === AUTH_CHANGE_EVENTS.SIGNED_OUT) {
@@ -181,6 +183,8 @@ function Auth(props: AuthProps) {
         setAuthView(VIEWS.MAGIC_PENDING);
       } else if (event === AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING) {
         setAuthView(VIEWS.MAGIC_NEW_DEVICE_PENDING);
+      } else if (event === AUTH_CHANGE_EVENTS.OTP_PENDING) {
+        setAuthView(VIEWS.OTP_PENDING);
       } else if (event === AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START) {
         setAuthView(VIEWS.WEBAUTHN_REGISTER);
       } else if (event === AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_START) {
@@ -340,6 +344,20 @@ function Auth(props: AuthProps) {
             isWebauthnNewDevice={authView === VIEWS.MAGIC_NEW_DEVICE_PENDING}
             setIslandProps={setIslandProps}
             resetIslandProps={resetIslandProps}
+          />
+        </Container>
+      );
+    case VIEWS.OTP_PENDING:
+      return (
+        <Container {...containerProps}>
+          <VerifyManualOtp
+            scuteClient={scuteClient}
+            identifier={identifier}
+            setAuthView={setAuthView}
+            setIsFatalError={setIsFatalError}
+            getAuthPayloadCallback={(payload) => {
+              setAuthPayload(payload);
+            }}
           />
         </Container>
       );

@@ -647,6 +647,50 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /**
+   * Verify OTP
+   * @param otp - OTP
+   * @param identifier - Identifier
+   */
+  async verifyOtp(otp: string, identifier: ScuteIdentifier) {
+    const { data: userData, error } = await this.admin.getUserByIdentifier(
+      identifier
+    );
+    if (error) {
+      return { data: null, error };
+    }
+
+    const user = userData.user;
+    if (!user) {
+      return { data: null, error: new IdentifierNotRecognizedError() };
+    }
+
+    const { data: authPayload, error: verifyError } =
+      await this._verifyOtpRequest(otp, user.id);
+
+    if (verifyError) {
+      return { data: null, error: verifyError };
+    }
+
+    //  TODO: this should be called after device register
+    await this.signInWithTokenPayload(authPayload);
+
+    return { data: authPayload, error: null };
+  }
+
+  /**
+   * Verify OTP
+   * @param otp - OTP
+   * @internal
+   * @see {@link verifyOtp}
+   */
+  private async _verifyOtpRequest(otp: string, user_id: UniqueIdentifier) {
+    return this.post<ScuteTokenPayload>("/otps/verify", {
+      otp,
+      user_id,
+    });
+  }
+
+  /**
    * Register device for webauthn. This method will trigger the browser popup.
    * @returns Scute Device
    */
@@ -1338,7 +1382,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     userMeta?: UserMeta,
     webauthnEnabled?: boolean
   ) {
-    return this.post<ScuteOtpResponse>(`/otp/${method}`, {
+    return this.post<ScuteOtpResponse>(`/otps/login`, {
       identifier,
       ...(method === "register" ? { user_meta: userMeta } : null),
       webauthn_enabled: webauthnEnabled ?? isWebauthnSupported(),

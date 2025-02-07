@@ -132,7 +132,7 @@ export type ScuteMagicLinkIdResponse = {
 };
 
 export type ScuteOtpResponse = {
-  success: boolean;
+  otp: { id: UniqueIdentifier };
 };
 
 export type ScuteUserSession = {
