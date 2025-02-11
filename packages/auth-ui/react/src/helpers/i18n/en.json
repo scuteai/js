@@ -17,6 +17,7 @@
     "pleaseWait": "Please wait",
     "somethingWentWrong": "Something went wrong",
     "changeEmail": "Change email",
+    "changePhone": "Change phone number",
     "resendEmail": "Resend email",
     "backToLogin": "Back to login",
     "loginRequired": "Login required",
@@ -72,7 +73,8 @@
     "verifyDeviceTitle": "Verify your identity",
     "tryAgain": "You can try again or sign in with magic link.",
     "verifyDeviceBody": "Log into your account with the method you already use to unlock yourdevice.",
-    "signInMagicLink": "Sign in with email link"
+    "signInMagicLink": "Sign in with email link",
+    "signInWithOTP": "Sign in with OTP"
   },
 
   "verifyOTP": {

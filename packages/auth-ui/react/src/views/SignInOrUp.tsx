@@ -37,7 +37,11 @@ import { VIEWS } from "@scute/ui-shared";
 import { translateError } from "../helpers/i18n/service";
 import { RegisterForm } from "./RegisterForm";
 import { FloatingLabelIdField } from "../components/FloatingLabelTextField";
-import { getISO2CountryCode, isValidPhoneNumber } from "../helpers/phone";
+import {
+  formatNational,
+  getISO2CountryCode,
+  isValidPhoneNumber,
+} from "../helpers/phone";
 
 import { FlagImage } from "react-international-phone";
 
@@ -139,6 +143,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     if (rememberedIdentifier) {
       setError(false);
       setIdentifier(rememberedIdentifier);
+      console.log("rememberedIdentifier", rememberedIdentifier);
       if (isValidPhoneNumber(rememberedIdentifier, t) === true) {
         const countryIso2 = getISO2CountryCode(rememberedIdentifier);
         if (countryIso2) {
@@ -312,11 +317,13 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                                   style={{
                                     position: "relative",
                                     top: 5,
-                                    marginRight: 4,
+                                    marginRight: 8,
                                   }}
                                 />
                               )}
-                              {rememberedIdentifier}
+                              {rememberedIdentifierISO2Code
+                                ? formatNational(rememberedIdentifier)
+                                : rememberedIdentifier}
                             </Text>
                           </Flex>
                           <Button

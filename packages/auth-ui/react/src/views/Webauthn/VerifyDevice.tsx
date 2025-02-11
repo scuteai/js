@@ -28,6 +28,7 @@ import {
 import useEffectOnce from "../../helpers/useEffectOnce";
 import { type CommonViewProps } from "../common";
 import { translateError } from "../../helpers/i18n/service";
+import { isValidPhoneNumber } from "../../helpers/phone";
 
 interface VerifyDeviceProps extends CommonViewProps {
   getMagicLinkIdCallback?: (id: UniqueIdentifier) => void;
@@ -46,7 +47,7 @@ const VerifyDevice = ({
 
   const { t } = useTranslation();
 
-  const cookieStore = new ScuteBrowserCookieStorage();
+  const isPhone = isValidPhoneNumber(identifier, t) === true;
 
   const handleSendMagicLink = async (isNewDevice = false) => {
     if (submitting) {
@@ -158,10 +159,12 @@ const VerifyDevice = ({
             {identifier && (
               <Flex css={{ jc: "center", py: "$5" }}>
                 <Badge size="1" css={{ color: "$panelText" }}>
-                  <EmailIcon
-                    color="var(--scute-colors-panelText)"
-                    style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
-                  />
+                  {!isPhone && (
+                    <EmailIcon
+                      color="var(--scute-colors-panelText)"
+                      style={{ height: "14px", opacity: 0.5, marginRight: 8 }}
+                    />
+                  )}
                   {identifier}
                 </Badge>
               </Flex>
@@ -195,14 +198,20 @@ const VerifyDevice = ({
                   }
                 }}
               >
-                {!error ? t("general.changeEmail") : t("general.tryAgain")}
+                {error
+                  ? t("general.tryAgain")
+                  : isPhone
+                  ? t("general.changePhone")
+                  : t("general.changeEmail")}
               </Button>
               <Button
                 size="2"
                 variant="alt"
                 onClick={() => handleSendMagicLink()}
               >
-                {t("verifyDevice.signInMagicLink")}
+                {isPhone
+                  ? t("verifyDevice.signInWithOTP")
+                  : t("verifyDevice.signInMagicLink")}
               </Button>
             </Flex>
           </Inner>

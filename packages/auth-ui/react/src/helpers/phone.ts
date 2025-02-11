@@ -15,9 +15,9 @@ export const isValidPhoneNumber = (phone: string, t: TFunction) => {
   if (!phone || phone === "") {
     return t("signInOrUp.phoneValid");
   }
-
+  const _phone = phone.startsWith("+") ? phone : `+${phone}`;
   try {
-    if (phoneUtil.isValidNumber(phoneUtil.parseAndKeepRawInput(phone))) {
+    if (phoneUtil.isValidNumber(phoneUtil.parseAndKeepRawInput(_phone))) {
       return true;
     } else {
       return t("signInOrUp.phoneValid");
