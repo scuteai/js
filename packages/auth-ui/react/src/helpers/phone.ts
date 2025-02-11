@@ -1,4 +1,4 @@
-import { PhoneNumberUtil } from "google-libphonenumber";
+import { PhoneNumberUtil, PhoneNumberFormat } from "google-libphonenumber";
 import { TFunction } from "i18next";
 const phoneUtil = PhoneNumberUtil.getInstance();
 
@@ -28,7 +28,17 @@ export const isValidPhoneNumber = (phone: string, t: TFunction) => {
 };
 
 export const getISO2CountryCode = (phone: string) => {
-  return phoneUtil.getRegionCodeForNumber(
-    phoneUtil.parseAndKeepRawInput(phone)
+  const _phone = phone.startsWith("+") ? phone : `+${phone}`;
+  return phoneUtil
+    .getRegionCodeForNumber(phoneUtil.parseAndKeepRawInput(_phone))
+    ?.toLowerCase();
+};
+
+export const formatNational = (phone: string) => {
+  const _phone = phone.startsWith("+") ? phone : `+${phone}`;
+  const phoneNumber = phoneUtil.parseAndKeepRawInput(
+    _phone,
+    getISO2CountryCode(_phone)
   );
+  return phoneUtil.format(phoneNumber, PhoneNumberFormat.NATIONAL);
 };

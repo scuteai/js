@@ -4,7 +4,7 @@ import { TextField } from "./Textfield";
 import "react-international-phone/style.css";
 
 import { CountrySelector, usePhoneInput } from "react-international-phone";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   isMaybePhoneNumber,
   cleanPhoneFormat,
@@ -130,7 +130,11 @@ export const FloatingLabelIdField = ({
 
   const { inputValue, country, setCountry, handlePhoneValueChange, inputRef } =
     usePhoneInput({
-      value: !phoneOnly ? "+000" : "",
+      value: isValidPhoneNumber(identifier, t)
+        ? identifier
+        : !phoneOnly
+        ? "+000"
+        : "",
       onChange: ({ phone }) => {
         onChange(phone);
         setIdentifier(phone);
@@ -142,6 +146,48 @@ export const FloatingLabelIdField = ({
         }
       },
     });
+
+  useEffect(() => {
+    identifierChangeHandler(identifier);
+  }, [identifier]);
+
+  const identifierChangeHandler = (
+    identifier: string,
+    e?: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (
+      allowedIdentifiers.includes("phone") &&
+      isMaybePhoneNumber(identifier)
+    ) {
+      if (idState === "email") {
+        setIdentifier(identifier);
+        onChange(identifier);
+      }
+      setIdState("phone");
+    } else if (allowedIdentifiers.includes("email")) {
+      if (idState === "phone") {
+        const id = cleanPhoneFormat(identifier);
+        if (e) {
+          handlePhoneValueChange(e);
+        }
+        setIdentifier(id);
+        onChange(id);
+      } else {
+        setIdentifier(identifier);
+        onChange(identifier);
+      }
+
+      if (identifier === "") {
+        setError(t("signInOrUp.identifierRequired"));
+      } else if (!isValidEmail(identifier)) {
+        setError(t("signInOrUp.emailValid"));
+      } else {
+        setError(false);
+      }
+
+      setIdState("email");
+    }
+  };
 
   return (
     <Container>
@@ -186,7 +232,7 @@ export const FloatingLabelIdField = ({
           } else if (allowedIdentifiers.includes("email")) {
             if (idState === "phone") {
               const id = cleanPhoneFormat(e.target.value);
-              //handlePhoneValueChange(e);
+              handlePhoneValueChange(e);
               setIdentifier(id);
               onChange(id);
             } else {

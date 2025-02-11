@@ -25,6 +25,7 @@ import {
   decodeAccessToken,
   decodeMagicLinkToken,
   Deferred,
+  getMagicLinkTokenPayloadFromUser,
   isBrowser,
   isMaybePhoneNumber,
   isWebauthnSupported,
@@ -671,10 +672,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: verifyError };
     }
 
-    //  TODO: this should be called after device register
-    await this.signInWithTokenPayload(authPayload);
-
-    return { data: authPayload, error: null };
+    return {
+      data: {
+        authPayload,
+        magicPayload: getMagicLinkTokenPayloadFromUser(user),
+      },
+      error: null,
+    };
   }
 
   /**
@@ -814,11 +818,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     const user = data.user;
 
-    // TODO(backlog): email or phone or somehow input identifier ?
-    // maybe show only some digits on phone number ?
     if (user.email) {
       this.setRememberedIdentifier(user.email);
+    } else if (user.phone) {
+      this.setRememberedIdentifier(user.phone);
     }
+
     setTimeout(() => {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user);
     }, 100);

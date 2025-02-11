@@ -5,6 +5,7 @@ import {
   _ScuteAccessPayload,
   _ScuteMagicLinkTokenPayload,
 } from "./types/internal";
+import { ScuteUser } from "./types/scute";
 
 export const jwtDecode = _jwtDecode;
 
@@ -101,6 +102,16 @@ export const decodeMagicLinkToken = (
   } catch {
     return null;
   }
+};
+
+export const getMagicLinkTokenPayloadFromUser = (
+  user: ScuteUser
+): _ScuteMagicLinkTokenPayload => {
+  return {
+    uuid: user.id,
+    user_status: user.status,
+    webauthnEnabled: user.webauthn_enabled,
+  };
 };
 
 /**

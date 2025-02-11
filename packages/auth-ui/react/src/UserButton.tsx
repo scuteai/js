@@ -17,6 +17,9 @@ import {
 } from "./components/Dropdown";
 import { useTheme } from "./ThemeContext";
 import { createTheme } from "@stitches/react";
+import { formatNational } from "./helpers/phone";
+import { FlagImage } from "react-international-phone";
+import { getISO2CountryCode } from "./helpers/phone";
 
 export type UserButtonProps = {
   scuteClient: ScuteClient;
@@ -133,14 +136,18 @@ const UserButton = ({
               >
                 {!profilePictureUrl && <span>{firstLetter}</span>}
               </DropdownAvatar>
-              <Flex direction="column">
+              <Flex direction="column" css={{ width: "100%" }}>
                 {name && <DropdownName>{name}</DropdownName>}
-                <DropdownEmail>
+                <DropdownEmail css={{ mb: "$1" }}>
                   {user?.email?.slice(0, 24) +
                     ((user?.email?.length || 0) > 24 ? "..." : "")}
                 </DropdownEmail>
                 {user?.phone && (
-                  <DropdownEmail css={{ mt: 2 }}>{user.phone}</DropdownEmail>
+                  <DropdownEmail
+                    css={{ display: "block", whiteSpace: "nowrap" }}
+                  >
+                    {formatNational(user.phone)}
+                  </DropdownEmail>
                 )}
               </Flex>
             </DropdownUserInfo>

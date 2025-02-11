@@ -8,6 +8,7 @@ import OTPInput from "react-otp-input";
 import { globalCss } from "../stitches.config";
 import { textFieldStyles } from "../components/Textfield";
 import { ArrowIcon } from "../assets/icons";
+import { VIEWS, Views } from "@scute/ui-shared";
 
 const globalStyles = globalCss({
   ".otp-input": {
@@ -35,6 +36,7 @@ const VerifyManualOtp = ({
   identifier: _identifier,
   setIsFatalError,
   getAuthPayloadCallback,
+  setAuthView,
 }: VerifyManualOtpProps) => {
   const { t } = useTranslation();
   globalStyles();
@@ -90,7 +92,8 @@ const VerifyManualOtp = ({
               setIsFatalError?.(true);
               return;
             }
-            getAuthPayloadCallback?.(data);
+            setAuthView(VIEWS.WEBAUTHN_REGISTER);
+            getAuthPayloadCallback?.(data.authPayload);
           }}
         >
           <span>{t("verifyOTP.verify")}</span>
