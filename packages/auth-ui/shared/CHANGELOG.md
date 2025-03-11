@@ -1,5 +1,11 @@
 # @scute/ui-shared
 
+## 1.2.0
+
+### Minor Changes
+
+- adds phone otp
+
 ## 1.1.2
 
 ### Patch Changes

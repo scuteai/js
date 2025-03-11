@@ -1,5 +1,18 @@
 # @scute/ui-elements
 
+## 1.2.0
+
+### Minor Changes
+
+- adds phone otp
+
+### Patch Changes
+
+- Updated dependencies
+  - @scute/ui-react@1.2.0
+  - @scute/ui-shared@1.2.0
+  - @scute/core@1.2.0
+
 ## 1.1.2
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @scute/vue
 
+## 1.2.0
+
+### Minor Changes
+
+- adds phone otp
+
+### Patch Changes
+
+- Updated dependencies
+  - @scute/core@1.2.0
+
 ## 1.1.2
 
 ### Patch Changes
