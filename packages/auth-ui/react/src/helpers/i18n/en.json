@@ -17,6 +17,7 @@
     "pleaseWait": "Please wait",
     "somethingWentWrong": "Something went wrong",
     "changeEmail": "Change email",
+    "changePhone": "Change phone number",
     "resendEmail": "Resend email",
     "backToLogin": "Back to login",
     "loginRequired": "Login required",
@@ -35,7 +36,11 @@
     "identifierRequired": "Identifier is required.",
     "emailLimit": "The email should have at most 50 characters",
     "emailValid": "Email address must be a valid address",
+    "phoneValid": "Phone number must be a valid number",
     "signinWith": "Sign in with {{provider}}",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signInOrUp": "Sign up or Log in",
     "continueWith": "Continue with {{provider}}",
     "continueTo": "Continue to {{appName}}",
     "privacy": "Privacy",
@@ -53,6 +58,7 @@
   "registerDevice": {
     "registerDeviceTitle": "Enable passkey",
     "trustDeviceTitle": "Do you trust this device?",
+    "verifyIdentityTitle": "You are verified",
     "registerDevice": "Register Device",
     "registeringDevice": "Registering device",
     "trustDevice": "Yes, trust device",
@@ -67,7 +73,8 @@
     "verifyDeviceTitle": "Verify your identity",
     "tryAgain": "You can try again or sign in with magic link.",
     "verifyDeviceBody": "Log into your account with the method you already use to unlock yourdevice.",
-    "signInMagicLink": "Sign in with email link"
+    "signInMagicLink": "Sign in with email link",
+    "signInWithOTP": "Sign in with OTP"
   },
 
   "verifyOTP": {
@@ -77,8 +84,12 @@
     "bodyP1Part1": "We’ve sent an email to your inbox with",
     "bodyP1Part2": "a one-time link.",
     "bodyP2": "You will be automatically signed in here once you click that link.",
+    "manualOtpBody": "To keep your account secure, we need to verify it’s you. Enter the code from your {{source}}",
+    "verify": "Verify OTP",
     "loading": {
-      "title": "Sending email..."
+      "title": "Sending email...",
+      "verifyIdentityTitle": "Verifying identity...",
+      "verifyIdentityBody": "Please wait while we verify your identity"
     }
   },
 

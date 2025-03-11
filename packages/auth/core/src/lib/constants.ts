@@ -18,6 +18,8 @@ export const AUTH_CHANGE_EVENTS = {
   WEBAUTHN_REGISTER_SUCCESS: "webauthn_register_success",
   WEBAUTHN_VERIFY_START: "webauthn_verify_start",
   WEBAUTHN_VERIFY_SUCCESS: "webauthn_verify_success",
+  OTP_PENDING: "otp_pending",
+  OTP_NEW_DEVICE_PENDING: "otp_new_device_pending",
 } as const;
 
 export type AuthChangeEvent = ValueOf<typeof AUTH_CHANGE_EVENTS>;
@@ -40,6 +42,8 @@ export type InternalEvent = {
 export const SCUTE_BROADCAST_CHANNEL = "sct_broadcast";
 export const SCUTE_MAGIC_PARAM = "sct_magic";
 export const SCUTE_SKIP_PARAM = "sct_sk";
+export const SCUTE_ID_VERIFICATION_PARAM = "sct_idv";
+export const SCUTE_OAUTH_PKCE_PARAM = "sct_pkce";
 export const SCUTE_CRED_STORAGE_KEY = "sct_cred_data";
 export const SCUTE_LAST_LOGIN_STORAGE_KEY = "sct_last_login";
 

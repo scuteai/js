@@ -24,6 +24,8 @@ import { useTheme } from "./ThemeContext";
 import { AppLogo } from "./components/AppLogo";
 import { SessionIcon } from "./assets/sessionIcons";
 import { initI18n, translate as t } from "./helpers/i18n/service";
+import { formatNational, getISO2CountryCode } from "./helpers/phone";
+import { FlagImage } from "react-international-phone";
 
 export type ProfileProps = {
   scuteClient: ScuteClient;
@@ -135,7 +137,13 @@ const Profile = ({ scuteClient, appearance, language }: ProfileProps) => {
                   : user.email?.split("@")?.[0] ?? ""}
               </Text>
 
-              <Text css={{ mt: "$2" }}>{user.email}</Text>
+              {user?.email && <Text css={{ mt: "$2" }}>{user.email}</Text>}
+              {user?.phone && (
+                <Flex css={{ mt: "$2" }}>
+                  <FlagImage size={21} iso2={getISO2CountryCode(user.phone)} />
+                  <Text css={{ ml: "$2" }}>{formatNational(user.phone)}</Text>
+                </Flex>
+              )}
             </Flex>
             <Flex
               css={{

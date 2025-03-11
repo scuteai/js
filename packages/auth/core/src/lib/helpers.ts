@@ -5,6 +5,7 @@ import {
   _ScuteAccessPayload,
   _ScuteMagicLinkTokenPayload,
 } from "./types/internal";
+import { ScuteUser } from "./types/scute";
 
 export const jwtDecode = _jwtDecode;
 
@@ -12,6 +13,11 @@ export const isBrowser = () =>
   typeof window !== "undefined" &&
   typeof window.document !== "undefined" &&
   typeof window.document.createElement !== "undefined";
+
+export const isMaybePhoneNumber = (phone: string) => {
+  const phoneRegex = /^\+?[\d\s()-]*$/;
+  return phone && phoneRegex.test(phone.replace(/\s+/g, ""));
+};
 
 export class Deferred<T> {
   promise: Promise<T>;
@@ -96,6 +102,16 @@ export const decodeMagicLinkToken = (
   } catch {
     return null;
   }
+};
+
+export const getMagicLinkTokenPayloadFromUser = (
+  user: ScuteUser
+): _ScuteMagicLinkTokenPayload => {
+  return {
+    uuid: user.id,
+    user_status: user.status,
+    webauthnEnabled: user.webauthn_enabled,
+  };
 };
 
 /**

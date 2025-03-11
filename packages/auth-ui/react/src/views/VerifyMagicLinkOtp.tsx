@@ -2,6 +2,7 @@ import {
   AUTH_CHANGE_EVENTS,
   getMeaningfulError,
   SCUTE_MAGIC_PARAM,
+  SCUTE_OAUTH_PKCE_PARAM,
   SCUTE_SKIP_PARAM,
   type ScuteIdentifier,
   type ScuteTokenPayload,
@@ -12,13 +13,12 @@ import { VIEWS } from "@scute/ui-shared";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FatalErrorIcon, EmailIcon } from "../assets/icons";
+import { FatalErrorIcon, EmailIcon, FingerprintIcon } from "../assets/icons";
 
 import {
   Badge,
   Button,
   Flex,
-  Header,
   Heading,
   Inner,
   LargeSpinner,
@@ -34,6 +34,7 @@ import useInterval from "../helpers/useInterval";
 
 import { CommonViewProps } from "./common";
 import { translateError } from "../helpers/i18n/service";
+import { IslandProps } from "../components/Island";
 
 export interface VerifyMagicLinkOtpProps extends CommonViewProps {
   isWebauthnNewDevice?: boolean;
@@ -51,7 +52,6 @@ const VerifyMagicLinkOtp = ({
   setIsFatalError,
   magicLinkId,
   magicLinkToken: _magicLinkToken,
-  isWebauthnNewDevice,
   getAuthPayloadCallback,
   setIslandProps,
   resetIslandProps,
@@ -63,7 +63,9 @@ const VerifyMagicLinkOtp = ({
   const [time, setTime] = useState(TIMER_START);
   const [resendDisabled, setResendDisabled] = useState(false);
   const [shouldSkip] = useState(
-    () => !!new URL(window.location.href).searchParams.get(SCUTE_SKIP_PARAM)
+    () =>
+      !!new URL(window.location.href).searchParams.get(SCUTE_SKIP_PARAM) ||
+      !!new URL(window.location.href).searchParams.get(SCUTE_OAUTH_PKCE_PARAM)
   );
 
   const { t } = useTranslation();
@@ -154,6 +156,12 @@ const VerifyMagicLinkOtp = ({
         Icon: <EmailIcon color="var(--scute-colors-buttonIdleBg)" />,
       });
       return;
+    } else {
+      setIslandProps!({
+        label: t("verifyOTP.loading.verifyIdentityTitle"),
+        active: true,
+        Icon: <FingerprintIcon color="var(--scute-colors-buttonIdleBg)" />,
+      });
     }
 
     const url = new URL(window.location.href);
@@ -191,8 +199,9 @@ const VerifyMagicLinkOtp = ({
 
           const user = userData?.user;
           if (user && user.email) {
-            // TODO: phone?
             setIdentifier(user.email);
+          } else if (user && user.phone) {
+            setIdentifier(user.phone);
           }
         } catch {}
       }
@@ -207,14 +216,12 @@ const VerifyMagicLinkOtp = ({
     return () => {
       url.searchParams.delete(SCUTE_MAGIC_PARAM);
       url.searchParams.delete(SCUTE_SKIP_PARAM);
+      url.searchParams.delete(SCUTE_OAUTH_PKCE_PARAM);
       window.history.replaceState(window.history.state, "", url.toString());
     };
   });
 
   if (magicLinkToken) {
-    if (!isVerifyCalled) {
-      return <LargeSpinner />;
-    }
     return (
       <LoadingMagic
         identifier={identifier}
@@ -247,11 +254,7 @@ const VerifyMagicLinkOtp = ({
               },
             }}
           >
-            <Heading size="4">
-              {isWebauthnNewDevice
-                ? t("verifyOTP.newDeviceTitle")
-                : t("verifyOTP.newDeviceTitle")}
-            </Heading>
+            <Heading size="4">{t("verifyOTP.newDeviceTitle")}</Heading>
             <Text size="2" css={{ mb: "$4" }}>
               {t("verifyOTP.newDeviceBody")}
             </Text>
@@ -320,18 +323,29 @@ const LoadingMagic = ({
   backToLogin,
   error,
   shouldSkip,
+  setIslandProps,
+  resetIslandProps,
 }: {
   identifier: ScuteIdentifier;
   backToLogin: () => void;
   error?: string | null;
   shouldSkip?: boolean;
+  setIslandProps?: (props: IslandProps) => void;
+  resetIslandProps?: () => void;
 }) => {
   const { t } = useTranslation();
 
   return (
     <>
       <QueryContainer>
-        <ResponsiveContainer>
+        <ResponsiveContainer
+          css={{
+            pt: "$7",
+            "@container queryContainer (max-width: 470px)": {
+              pt: "$6",
+            },
+          }}
+        >
           <ResponsiveLeft>
             <Inner
               css={{
@@ -345,16 +359,19 @@ const LoadingMagic = ({
               }}
             >
               <Flex css={{ mb: "$4" }}>
-                {!error ? (
-                  <LargeSpinner spinnerColor="green" />
-                ) : (
+                {error && (
                   <Flex css={{ jc: "center", width: "100%" }}>
                     <FatalErrorIcon color="var(--scute-colors-errorColor)" />
                   </Flex>
                 )}
               </Flex>
               {!error ? (
-                <></>
+                <>
+                  <Heading size="4">{t("verifyOTP.newDeviceTitle")}</Heading>
+                  <Text size="2" css={{ mb: "$4" }}>
+                    {t("verifyOTP.loading.verifyIdentityBody")}
+                  </Text>
+                </>
               ) : (
                 <>
                   <Heading size="4">{t("general.somethingWentWrong")}</Heading>

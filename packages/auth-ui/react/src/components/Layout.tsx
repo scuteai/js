@@ -160,6 +160,18 @@ export const ResponsiveRight = styled("div", {
   flex: 1,
 });
 
+export const ManualOTPWrapper = styled("div", {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  height: "100%",
+  maxWidth: "400px",
+  textAlign: "center",
+  margin: "0 auto",
+  padding: "$5",
+});
+
 export const ProfileWrapper = styled("div", {
   maxWidth: "640px",
   margin: "0 auto",

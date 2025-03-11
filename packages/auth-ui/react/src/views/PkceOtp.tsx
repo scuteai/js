@@ -14,9 +14,12 @@ import {
   ResponsiveLeft,
   ResponsiveRight,
   Text,
-  TextField,
 } from "../components";
-import { decodeMagicLinkToken, SCUTE_MAGIC_PARAM } from "@scute/core";
+import {
+  decodeMagicLinkToken,
+  SCUTE_MAGIC_PARAM,
+  SCUTE_OAUTH_PKCE_PARAM,
+} from "@scute/core";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 
@@ -37,7 +40,8 @@ export const PkceOtp = ({
 
   const [magicLinkToken] = useState(() =>
     typeof window !== "undefined" && typeof URLSearchParams !== "undefined"
-      ? new URL(window.location.href).searchParams.get(SCUTE_MAGIC_PARAM)
+      ? new URL(window.location.href).searchParams.get(SCUTE_MAGIC_PARAM) ??
+        new URL(window.location.href).searchParams.get(SCUTE_OAUTH_PKCE_PARAM)
       : null
   );
 
@@ -54,10 +58,6 @@ export const PkceOtp = ({
 
     const checkMetaFields = async () => {
       if (magicLinkToken) {
-        // const url = new URL(window.location.href);
-        // url.searchParams.delete(SCUTE_MAGIC_PARAM);
-        // url.searchParams.delete(SCUTE_SKIP_PARAM);
-        // window.history.replaceState(window.history.state, "", url.toString());
         if (shouldSkipRegisterForm) {
           await scuteClient.verifyMagicLinkToken(magicLinkToken);
         }
@@ -73,10 +73,8 @@ export const PkceOtp = ({
           }
 
           if (!data.meta) {
-            console.log("Meta fields are not filled.");
             setLoading(false);
           } else {
-            console.log("Meta fields are filled.");
             await scuteClient.verifyMagicLinkToken(magicLinkToken);
           }
         }

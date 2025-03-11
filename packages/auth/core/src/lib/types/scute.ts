@@ -39,6 +39,7 @@ export type ScuteAppData = {
   scute_branding: boolean;
   allowed_identifiers: ScuteIdentifierType[];
   required_identifiers: ScuteIdentifierType[];
+  email_auth_type: "magic" | "otp";
   default_language: string;
   user_meta_data_schema: ScuteUserMetaDataSchema[];
   oauth_providers?: ScuteOAuthProviderConfig[];
@@ -128,6 +129,10 @@ export type ScuteSignInOrUpOptions = {
 
 export type ScuteMagicLinkIdResponse = {
   magic_link: { id: UniqueIdentifier };
+};
+
+export type ScuteOtpResponse = {
+  otp: { id: UniqueIdentifier };
 };
 
 export type ScuteUserSession = {

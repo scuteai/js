@@ -14,7 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FingerprintIcon, MagicMailIcon } from "../assets/icons";
+import { ArrowIcon } from "../assets/icons";
 import type { CommonViewProps } from "./common";
 import {
   Button,
@@ -25,7 +25,6 @@ import {
   Text,
   IconHolder,
   Panel,
-  FloatingLabelTextField,
   ElementCardFooter,
   QueryContainer,
   ResponsiveContainer,
@@ -33,12 +32,18 @@ import {
   ResponsiveRight,
 } from "../components";
 
-import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
 import { getIdentifierType } from "../helpers/identifierType";
-// import PhoneInput from "../components/PhoneInput";
 import { VIEWS } from "@scute/ui-shared";
 import { translateError } from "../helpers/i18n/service";
 import { RegisterForm } from "./RegisterForm";
+import { FloatingLabelIdField } from "../components/FloatingLabelTextField";
+import {
+  formatNational,
+  getISO2CountryCode,
+  isValidPhoneNumber,
+} from "../helpers/phone";
+
+import { FlagImage } from "react-international-phone";
 
 export interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   identifier: ScuteIdentifier;
@@ -53,10 +58,6 @@ export interface SignInOrUpProps extends Omit<CommonViewProps, "identifier"> {
   getMagicLinkIdCallback?: (magicLinkId: UniqueIdentifier) => void;
   getAuthPayloadCallback?: (payload: ScuteTokenPayload) => void;
 }
-
-type IdentifierInput = {
-  identifier: ScuteIdentifier;
-};
 
 const SignInOrUp = (props: SignInOrUpProps) => {
   const {
@@ -73,6 +74,8 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   } = props;
 
   const { t } = useTranslation();
+
+  const isPhone = isValidPhoneNumber(identifier, t) === true;
 
   const providers = appData.oauth_providers || [];
 
@@ -125,46 +128,42 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   const [rememberedIdentifier, setRememberedIdentifier] =
     useRememberedIdentifier(scuteClient);
 
-  const isWebauthnAvailable =
-    webauthnEnabled && scuteClient.isWebauthnSupported();
+  const [isDirty, setIsDirty] = useState(false);
+  const [error, setError] = useState<boolean | string>(
+    t("signInOrUp.identifierRequired")
+  );
 
-  const {
-    register,
-    handleSubmit,
-    setError,
-    clearErrors,
-    formState: { errors, isDirty, isValid },
-  } = useForm<IdentifierInput>({
-    criteriaMode: "all",
-    defaultValues: {
-      identifier: "",
-    },
-  });
-  const isError = Object.keys(errors).length !== 0;
+  const [rememberedIdentifierISO2Code, setRememberedIdentifierISO2Code] =
+    useState<string | null>(null);
 
-  const handleValidSubmit: SubmitHandler<IdentifierInput> = async (values) => {
-    const identifier =
-      values.identifier.length !== 0
-        ? values.identifier
-        : rememberedIdentifier ?? values.identifier;
+  useEffect(() => {
+    if (rememberedIdentifier) {
+      setError(false);
+      setIdentifier(rememberedIdentifier);
+      if (isValidPhoneNumber(rememberedIdentifier, t) === true) {
+        const countryIso2 = getISO2CountryCode(rememberedIdentifier);
+        if (countryIso2) {
+          setRememberedIdentifierISO2Code(countryIso2.toLowerCase());
+        }
+      }
+    }
+  }, [rememberedIdentifier]);
 
-    setIdentifier(identifier);
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsDirty(true);
+    if (error) {
+      return;
+    }
     const user = await scuteClient.identifierExists(identifier);
 
     if (!user && mode === "sign_in") {
       const error = new IdentifierNotRecognizedError();
-      setError("root.serverError", {
-        type: String(error.code),
-        message: translateError(error),
-      });
-
+      setError(translateError(error));
       return;
     } else if (user && mode === "sign_up") {
       const error = new IdentifierAlreadyExistsError();
-      setError("root.serverError", {
-        type: String(error.code),
-        message: translateError(error),
-      });
+      setError(translateError(error));
       return;
     }
 
@@ -172,16 +171,24 @@ const SignInOrUp = (props: SignInOrUpProps) => {
       if (user.status === "inactive") {
         // TODO
         const error = new UnknownSignInError();
-        setError("root.serverError", {
-          type: String(error.code),
-          message: translateError(error),
-        });
+        setError(translateError(error));
         return;
       }
 
       // login
       if (webauthnEnabled && user.webauthn_enabled) {
-        setAuthView(VIEWS.WEBAUTHN_VERIFY);
+        return setAuthView(VIEWS.WEBAUTHN_VERIFY);
+      }
+
+      if (isPhone) {
+        const { error: otpError } = await scuteClient.sendLoginOtp(identifier);
+
+        if (otpError) {
+          const { isFatal } = getMeaningfulError(otpError);
+          setIsFatalError?.(isFatal);
+          setError(translateError(otpError));
+          return;
+        }
       } else {
         const { data, error: magicLinkError } =
           await scuteClient.sendLoginMagicLink(identifier);
@@ -189,10 +196,7 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         if (magicLinkError) {
           const { isFatal } = getMeaningfulError(magicLinkError);
           setIsFatalError?.(isFatal);
-          setError("root.serverError", {
-            type: String(magicLinkError.code),
-            message: translateError(magicLinkError),
-          });
+          setError(translateError(magicLinkError));
           return;
         }
 
@@ -209,31 +213,23 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         if (signUpError) {
           const { isFatal } = getMeaningfulError(signUpError);
           setIsFatalError?.(isFatal);
-          setError("root.serverError", {
-            type: String(signUpError.code),
-            message: translateError(signUpError),
-          });
+          setError(translateError(signUpError));
           return;
         }
 
         if (pollingData) {
-          const magicLinkId = pollingData.magic_link.id;
-          getMagicLinkIdCallback?.(magicLinkId);
+          if ("magic_link" in pollingData) {
+            const magicLinkId = pollingData.magic_link.id;
+            getMagicLinkIdCallback?.(magicLinkId);
+          }
         }
       }
     }
   };
-
   return (
     <>
       {!showRegisterForm ? (
-        <form
-          noValidate
-          onSubmit={handleSubmit(handleValidSubmit)}
-          onChange={() => {
-            clearErrors("root.serverError");
-          }}
-        >
+        <form noValidate onSubmit={onSubmit}>
           <QueryContainer css={{ pt: "0px", pb: "$2" }}>
             <ResponsiveContainer>
               <ResponsiveLeft>
@@ -311,7 +307,19 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                               }}
                               variant="inherit"
                             >
-                              {rememberedIdentifier}
+                              {rememberedIdentifierISO2Code && (
+                                <FlagImage
+                                  iso2={rememberedIdentifierISO2Code}
+                                  style={{
+                                    position: "relative",
+                                    top: 5,
+                                    marginRight: 8,
+                                  }}
+                                />
+                              )}
+                              {rememberedIdentifierISO2Code
+                                ? formatNational(rememberedIdentifier)
+                                : rememberedIdentifier}
                             </Text>
                           </Flex>
                           <Button
@@ -333,86 +341,38 @@ const SignInOrUp = (props: SignInOrUpProps) => {
                   ) : (
                     <>
                       <Group css={{ mt: "$2" }}>
-                        <FloatingLabelTextField
+                        <FloatingLabelIdField
                           domId="email_field__floating_label"
                           label={identifierLabelText}
-                          fieldType="email"
                           autoCorrect="off"
                           autoCapitalize="none"
                           autoComplete={`webauthn ${
                             isEmailIdentifierAllowed ? "email" : ""
                           }${isPhoneIdentifierAllowed ? "tel" : ""}`}
-                          state={isError ? "invalid" : "valid"}
-                          registerFormAttr={register("identifier", {
-                            required: t("signInOrUp.identifierRequired"),
-                            validate: {
-                              maxLength: (v) => {
-                                let isValidOrError: boolean | string = true;
-
-                                if (allowedIdentifiers.includes("email")) {
-                                  isValidOrError =
-                                    v.length <= 50 ||
-                                    t("signInOrUp.emailLimit");
-                                }
-
-                                if (allowedIdentifiers.includes("phone")) {
-                                  const isValidPhoneOrError: boolean | string =
-                                    true;
-                                  isValidOrError =
-                                    isValidPhoneOrError || isValidOrError;
-                                }
-
-                                return isValidOrError;
-                              },
-                              matchPattern: (v) => {
-                                let isValidOrError: boolean | string = true;
-
-                                if (allowedIdentifiers.includes("email")) {
-                                  isValidOrError =
-                                    /^\S+@\S+\.\S+$/.test(v) ||
-                                    t("signInOrUp.emailValid");
-                                }
-
-                                if (allowedIdentifiers.includes("phone")) {
-                                  const isValidPhoneOrError: boolean | string =
-                                    true;
-                                  isValidOrError =
-                                    isValidPhoneOrError || isValidOrError;
-                                }
-
-                                return isValidOrError;
-                              },
-                            },
-                          })}
+                          fieldType="text"
+                          allowedIdentifiers={allowedIdentifiers}
+                          onChange={setIdentifier}
+                          isDirty={isDirty}
+                          t={t}
+                          error={error}
+                          setError={setError}
+                          identifier={identifier}
+                          setIdentifier={setIdentifier}
                         />
-                        {isError ? (
-                          <Text
-                            size="1"
-                            css={{ color: "$errorColor", pt: "$2" }}
-                          >
-                            <>
-                              {errors.identifier?.message ||
-                                errors.root?.serverError.message ||
-                                t("general.unknownError")}
-                            </>
-                          </Text>
-                        ) : null}
                       </Group>
                     </>
                   )}
 
                   <Flex css={{ mb: "$3" }}>
-                    {isWebauthnAvailable || mode === "sign_up" ? (
+                    {rememberedIdentifier ? (
                       <Button size="2" type="submit">
-                        <span>
-                          {t("signInOrUp.signinWith", { provider: "Passkey" })}
-                        </span>
-                        {isWebauthnAvailable ? <FingerprintIcon /> : null}
+                        <span>{t("signInOrUp.signIn")}</span>
+                        <ArrowIcon className="right" />
                       </Button>
                     ) : (
                       <Button size="2" type="submit">
-                        <span>{t("general.continueWithMagicLink")}</span>
-                        <MagicMailIcon color="var(--scute-colors-buttonIconColor)" />
+                        <span>{t("signInOrUp.signInOrUp")}</span>
+                        <ArrowIcon className="right" />
                       </Button>
                     )}
                   </Flex>
@@ -561,7 +521,7 @@ export const useSignInOrUpFormHelpers = (
   mode: SignInOrUpProps["mode"]
 ) => {
   const { t } = useTranslation();
-
+  // TODO: make use of this shit
   const allowedIdentifiers = appData.allowed_identifiers;
   const requiredIdentifiers = appData.required_identifiers;
   const isPublicSignUpAllowed = appData.public_signup !== false;

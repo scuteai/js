@@ -64,6 +64,10 @@ export const Button = styled("button", {
     position: "absolute",
     left: "$4",
     width: "34px",
+    "&.right": {
+      left: "auto",
+      right: "$4",
+    },
   },
 
   "& svg path": {

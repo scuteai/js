@@ -10,6 +10,7 @@ import {
   SCUTE_MAGIC_PARAM,
   decodeMagicLinkToken,
   SCUTE_SKIP_PARAM,
+  SCUTE_OAUTH_PKCE_PARAM,
 } from "@scute/core";
 import { type Theme, VIEWS, type Views } from "@scute/ui-shared";
 
@@ -35,12 +36,12 @@ import {
 } from "./views";
 import { createTheme } from "./stitches.config";
 import { useTheme } from "./ThemeContext";
-import RegisterDeviceInProgress from "./views/Webauthn/RegisterDeviceInProgress";
 import { initI18n, translate as t } from "./helpers/i18n/service";
 import { AppLogo } from "./components/AppLogo";
 import { LogoText } from "./components/Logo";
 import { Island, type IslandProps } from "./components/Island";
 import { PkceOtp } from "./views/PkceOtp";
+import VerifyManualOtp from "./views/VerifyManualOtp";
 
 export type AuthProps = {
   scuteClient: ScuteClient;
@@ -97,10 +98,19 @@ function Auth(props: AuthProps) {
     useState<IslandProps>(islandPropsInitial);
 
   const resetIslandProps = () => {
+    if (!islandProps.active) return;
     setIslandProps(islandPropsInitial);
   };
 
   const [_authView, setAuthView] = useState<Views>(() => {
+    if (
+      typeof window !== "undefined" &&
+      typeof URLSearchParams !== "undefined" &&
+      new URL(window.location.href).searchParams.has(SCUTE_OAUTH_PKCE_PARAM)
+    ) {
+      return VIEWS.PKCE_OAUTH;
+    }
+
     if (
       typeof window !== "undefined" &&
       typeof URLSearchParams !== "undefined" &&
@@ -150,7 +160,6 @@ function Auth(props: AuthProps) {
 
   useEffect(() => {
     if (isFatalError) return;
-
     (async () => {
       const { data, error: appDataError } = await scuteClient.getAppData(true);
 
@@ -173,6 +182,8 @@ function Auth(props: AuthProps) {
         setAuthView(VIEWS.MAGIC_PENDING);
       } else if (event === AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING) {
         setAuthView(VIEWS.MAGIC_NEW_DEVICE_PENDING);
+      } else if (event === AUTH_CHANGE_EVENTS.OTP_PENDING) {
+        setAuthView(VIEWS.OTP_PENDING);
       } else if (event === AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START) {
         setAuthView(VIEWS.WEBAUTHN_REGISTER);
       } else if (event === AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_START) {
@@ -294,6 +305,8 @@ function Auth(props: AuthProps) {
             webauthn={webauthn}
             authPayload={authPayload}
             isWebauthnSupported={scuteClient.isWebauthnSupported()}
+            setIslandProps={setIslandProps}
+            resetIslandProps={resetIslandProps}
           />
         </Container>
       ) : (
@@ -330,6 +343,20 @@ function Auth(props: AuthProps) {
             isWebauthnNewDevice={authView === VIEWS.MAGIC_NEW_DEVICE_PENDING}
             setIslandProps={setIslandProps}
             resetIslandProps={resetIslandProps}
+          />
+        </Container>
+      );
+    case VIEWS.OTP_PENDING:
+      return (
+        <Container {...containerProps}>
+          <VerifyManualOtp
+            scuteClient={scuteClient}
+            identifier={identifier}
+            setAuthView={setAuthView}
+            setIsFatalError={setIsFatalError}
+            getAuthPayloadCallback={(payload) => {
+              setAuthPayload(payload);
+            }}
           />
         </Container>
       );

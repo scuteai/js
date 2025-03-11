@@ -11,6 +11,7 @@ export const VIEWS = {
   MAGIC_PENDING: "magic-pending",
   MAGIC_NEW_DEVICE_PENDING: "magic-new-device-pending",
   PKCE_OAUTH: "pkce-oauth",
+  OTP_PENDING: "otp-pending",
 } as const;
 
 export type Views = ValueOf<typeof VIEWS>;

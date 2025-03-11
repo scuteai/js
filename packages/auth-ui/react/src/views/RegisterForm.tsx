@@ -6,6 +6,7 @@ import {
   SCUTE_SKIP_PARAM,
   type ScuteError,
   getMeaningfulError,
+  ScuteOtpResponse,
 } from "@scute/core";
 
 import { useTranslation } from "react-i18next";
@@ -20,7 +21,6 @@ import {
   Inner,
   Label,
   Text,
-  TextField,
   LargeSpinner,
   FloatingLabelTextField,
   QueryContainer,
@@ -33,6 +33,8 @@ import { SubmitHandler, useForm, type FieldValues } from "react-hook-form";
 import { VIEWS } from "@scute/ui-shared";
 import { translateError } from "../helpers/i18n/service";
 import { SignInOrUpProps, useSignInOrUpFormHelpers } from "./SignInOrUp";
+import { FloatingLabelIdField } from "../components/FloatingLabelTextField";
+import { useState } from "react";
 
 export interface RegisterFormProps extends SignInOrUpProps {
   shouldSkipRegisterForm: boolean;
@@ -56,15 +58,15 @@ export const RegisterForm = ({
     setError,
     clearErrors,
     handleSubmit,
-    formState: { errors, isDirty, isValid },
+    setValue,
+    getValues,
+    formState: { errors, isDirty, isValid, isSubmitted },
   } = useForm();
-  const isError = Object.keys(errors).length !== 0;
-
+  const [idError, setIdError] = useState<string | boolean>(false);
   const { t } = useTranslation();
 
   const {
     allowedIdentifiers,
-    requiredIdentifiers,
     maybeNeededIdentifierType,
     maybeNeededIdentifierLabel,
   } = useSignInOrUpFormHelpers(identifier, appData, mode);
@@ -75,9 +77,20 @@ export const RegisterForm = ({
     }
   });
 
+  const isError = Object.keys(errors).length !== 0;
+
   const handleContinue: SubmitHandler<FieldValues> = async (values) => {
-    let data: ScuteMagicLinkIdResponse | ScuteTokenPayload | null = null;
+    let data:
+      | ScuteMagicLinkIdResponse
+      | ScuteTokenPayload
+      | ScuteOtpResponse
+      | null = null;
     let error: ScuteError | null = null;
+
+    if (idError && typeof idError === "string") {
+      console.log("idError", idError);
+      return;
+    }
 
     if (mode !== "confirm_invite") {
       ({ data, error } = await scuteClient.signUp(identifier, {
@@ -129,7 +142,7 @@ export const RegisterForm = ({
     }
   };
 
-  if (isError) {
+  if (errors.root?.serverError.message) {
     return (
       <>
         <Text
@@ -143,6 +156,7 @@ export const RegisterForm = ({
             variant="alt"
             size="2"
             onClick={() => {
+              setIdError(false);
               backToLogin();
             }}
           >
@@ -179,7 +193,7 @@ export const RegisterForm = ({
               <Text size="2" css={{ mb: "$4" }}>
                 {t("registerForm.needInfo")}
               </Text>
-              {isError ? (
+              {isError || (idError && isSubmitted) ? (
                 <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
                   {t("general.correctErrors")}
                 </Text>
@@ -192,27 +206,35 @@ export const RegisterForm = ({
                 {allowedIdentifiers.length > 1 ? (
                   <>
                     <Group>
-                      <Label>{maybeNeededIdentifierLabel}</Label>
-                      <TextField
-                        placeholder={maybeNeededIdentifierLabel}
-                        {...register(maybeNeededIdentifierType, {
-                          required: requiredIdentifiers.includes(
-                            maybeNeededIdentifierType
-                          )
-                            ? t("general.requiredField")
-                            : undefined,
-                        })}
-                        size="2"
+                      <FloatingLabelIdField
+                        domId={`${maybeNeededIdentifierType}__floating_label`}
+                        label={maybeNeededIdentifierLabel}
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        autoComplete={
+                          maybeNeededIdentifierType === "email"
+                            ? "email"
+                            : "tel"
+                        }
+                        fieldType="text"
+                        allowedIdentifiers={[maybeNeededIdentifierType]}
+                        onChange={(value) =>
+                          setValue(maybeNeededIdentifierType, value)
+                        }
+                        isDirty={isSubmitted}
+                        t={t}
+                        error={idError}
+                        setError={(error) => {
+                          setIdError(error);
+                        }}
+                        identifier={getValues(maybeNeededIdentifierType) || ""}
+                        setIdentifier={(value) =>
+                          setValue(maybeNeededIdentifierType, value)
+                        }
                       />
                     </Group>
-                    {errors[maybeNeededIdentifierType] ? (
-                      <Text size="1" css={{ color: "$errorColor", pt: "$2" }}>
-                        <>{errors[maybeNeededIdentifierType]?.message}</>
-                      </Text>
-                    ) : null}
                   </>
-                ) : // )
-                null}
+                ) : null}
                 {appData.user_meta_data_schema
                   .filter((metadata) => metadata.visible_registration)
                   .map(({ field_name, name, field_type, required }, i) => {

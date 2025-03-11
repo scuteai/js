@@ -17,6 +17,7 @@ import {
   SCUTE_BROADCAST_CHANNEL,
   SCUTE_MAGIC_PARAM,
   SCUTE_SKIP_PARAM,
+  SCUTE_OAUTH_PKCE_PARAM,
 } from "./lib/constants";
 
 import {
@@ -24,7 +25,9 @@ import {
   decodeAccessToken,
   decodeMagicLinkToken,
   Deferred,
+  getMagicLinkTokenPayloadFromUser,
   isBrowser,
+  isMaybePhoneNumber,
   isWebauthnSupported,
   refreshTokenHeaders,
 } from "./lib/helpers";
@@ -74,6 +77,7 @@ import type {
   ScuteUser,
   ScuteUserData,
   UserMeta,
+  ScuteOtpResponse,
 } from "./lib/types/scute";
 
 class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
@@ -440,6 +444,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       if (verifyError) {
         this._reportClientError(verifyError, "webauthn");
         if (verifyError instanceof NewDeviceError) {
+          if (
+            isMaybePhoneNumber(identifier) ||
+            this.appData.email_auth_type === "otp"
+          ) {
+            this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.OTP_NEW_DEVICE_PENDING);
+            return this._sendLoginOtp(identifier);
+          }
+
           this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING);
           return this._sendLoginMagicLink(identifier);
         }
@@ -448,6 +460,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       }
 
       return { data: null, error: null };
+    }
+
+    if (
+      isMaybePhoneNumber(identifier) ||
+      this.appData.email_auth_type === "otp"
+    ) {
+      return this.sendLoginOtp(identifier);
     }
 
     return this.sendLoginMagicLink(identifier);
@@ -487,6 +506,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     identifier: ScuteIdentifier,
     options?: ScuteSignUpOptions
   ) {
+    if (
+      isMaybePhoneNumber(identifier) ||
+      this.appData.email_auth_type === "otp"
+    ) {
+      return this.sendRegisterOtp(identifier, options?.userMeta);
+    }
+
     return this.sendRegisterMagicLink(identifier, options?.userMeta);
   }
 
@@ -550,7 +576,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const skip = new URL(url ?? window.location.href).searchParams.get(
       SCUTE_SKIP_PARAM
     );
-    return skip === "true";
+
+    const pkce = new URL(url ?? window.location.href).searchParams.get(
+      SCUTE_OAUTH_PKCE_PARAM
+    );
+
+    return skip === "true" || pkce;
   }
 
   /**
@@ -613,6 +644,53 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   private async _verifyMagicLinkTokenRequest(token: string) {
     return this.patch<ScuteTokenPayload>("/magic_links/authenticate", {
       token,
+    });
+  }
+
+  /**
+   * Verify OTP
+   * @param otp - OTP
+   * @param identifier - Identifier
+   */
+  async verifyOtp(otp: string, identifier: ScuteIdentifier) {
+    const { data: userData, error } = await this.admin.getUserByIdentifier(
+      identifier
+    );
+    if (error) {
+      return { data: null, error };
+    }
+
+    const user = userData.user;
+    if (!user) {
+      return { data: null, error: new IdentifierNotRecognizedError() };
+    }
+
+    const { data: authPayload, error: verifyError } =
+      await this._verifyOtpRequest(otp, user.id);
+
+    if (verifyError) {
+      return { data: null, error: verifyError };
+    }
+
+    return {
+      data: {
+        authPayload,
+        magicPayload: getMagicLinkTokenPayloadFromUser(user),
+      },
+      error: null,
+    };
+  }
+
+  /**
+   * Verify OTP
+   * @param otp - OTP
+   * @internal
+   * @see {@link verifyOtp}
+   */
+  private async _verifyOtpRequest(otp: string, user_id: UniqueIdentifier) {
+    return this.post<ScuteTokenPayload>("/otps/verify", {
+      otp,
+      user_id,
     });
   }
 
@@ -740,11 +818,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     const user = data.user;
 
-    // TODO(backlog): email or phone or somehow input identifier ?
-    // maybe show only some digits on phone number ?
     if (user.email) {
       this.setRememberedIdentifier(user.email);
+    } else if (user.phone) {
+      this.setRememberedIdentifier(user.phone);
     }
+
     setTimeout(() => {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user);
     }, 100);
@@ -1203,6 +1282,115 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   async getMagicLinkStatus(id: UniqueIdentifier) {
     return this.post<ScuteTokenPayload>("/magic_links/status", {
       id,
+    });
+  }
+
+  /**
+   * Send login OTP and emit the pending event.
+   * @param identifier {ScuteIdentifier}
+   * @param webauthnEnabled {boolean}
+   * @param emitEvent {boolean} - Emit pending event. Default true.
+   */
+  async sendLoginOtp(
+    identifier: ScuteIdentifier,
+    webauthnEnabled?: boolean,
+    emitEvent: boolean = true
+  ) {
+    const response = await this._sendLoginOtp(identifier, webauthnEnabled);
+
+    if (!response.error && emitEvent) {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.OTP_PENDING);
+    }
+
+    return response;
+  }
+
+  /**
+   * Send login OTP.
+   * @param identifier {ScuteIdentifier}
+   * @param webauthnEnabled {boolean}
+   * @internal
+   * @see {@link sendLoginOtp}
+   */
+  private async _sendLoginOtp(
+    identifier: ScuteIdentifier,
+    webauthnEnabled?: boolean
+  ) {
+    return this._sendOtpRequest(
+      identifier,
+      "login",
+      undefined,
+      webauthnEnabled
+    );
+  }
+
+  /**
+   * Send register OTP and emit the pending event.
+   * @param identifier {ScuteIdentifier}
+   * @param userMeta {UserMeta}
+   * @param webauthnEnabled {boolean}
+   * @param emitEvent {boolean} - Emit pending event. Default true.
+   */
+  async sendRegisterOtp(
+    identifier: ScuteIdentifier,
+    userMeta?: UserMeta,
+    webauthnEnabled?: boolean,
+    emitEvent: boolean = true
+  ) {
+    const response = await this._sendRegisterOtp(
+      identifier,
+      userMeta,
+      webauthnEnabled
+    );
+
+    if (!response.error && emitEvent) {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.OTP_PENDING);
+    }
+
+    return response;
+  }
+
+  /**
+   * Send register OTP.
+   * @param identifier {ScuteIdentifier}
+   * @param userMeta {UserMeta}
+   * @param webauthnEnabled {boolean}
+   * @internal
+   * @see {@link sendRegisterOtp}
+   */
+  private async _sendRegisterOtp(
+    identifier: ScuteIdentifier,
+    userMeta?: UserMeta,
+    webauthnEnabled?: boolean
+  ) {
+    return this._sendOtpRequest(
+      identifier,
+      "register",
+      userMeta,
+      webauthnEnabled
+    );
+  }
+
+  /**
+   * Send OTP request.
+   * @param identifier {ScuteIdentifier}
+   * @param method {string} - "login" or "register"
+   * @param userMeta {UserMeta}
+   * @param webauthnEnabled {boolean}
+   * @internal
+   * @see {@link sendLoginOtp}
+   * @see {@link sendRegisterOtp}
+   */
+  private async _sendOtpRequest(
+    identifier: ScuteIdentifier,
+    method: "login" | "register",
+    userMeta?: UserMeta,
+    webauthnEnabled?: boolean
+  ) {
+    return this.post<ScuteOtpResponse>(`/otps/login`, {
+      identifier,
+      ...(method === "register" ? { user_meta: userMeta } : null),
+      webauthn_enabled: webauthnEnabled ?? isWebauthnSupported(),
     });
   }
 
