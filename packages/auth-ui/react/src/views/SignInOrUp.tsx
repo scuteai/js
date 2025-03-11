@@ -175,6 +175,12 @@ const SignInOrUp = (props: SignInOrUpProps) => {
         return;
       }
 
+      // meta necessary for login
+
+      if (user.required_fields && user.required_fields.length > 0) {
+        return setShowRegisterForm(true);
+      }
+
       // login
       if (webauthnEnabled && user.webauthn_enabled) {
         return setAuthView(VIEWS.WEBAUTHN_VERIFY);

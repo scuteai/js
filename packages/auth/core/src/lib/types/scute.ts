@@ -84,6 +84,10 @@ export type ScuteUser = {
   phone: string | null;
   phone_verified: boolean;
   webauthn_enabled: boolean;
+  required_fields: Array<{
+    field: string;
+    required: boolean;
+  }>;
 };
 
 export type ScuteUserData = {
@@ -99,6 +103,10 @@ export type ScuteUserData = {
   signup_date: string;
   webauthn_types: string[]; // TODO
   sessions: ScuteUserSession[];
+  required_fields: Array<{
+    field: string;
+    required: boolean;
+  }>;
 };
 
 type Metadata = Record<string, string | boolean | number>;

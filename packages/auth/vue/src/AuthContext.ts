@@ -57,7 +57,7 @@ export const AuthContextProvider = defineComponent(
 
     provide(AuthContext, {
       session: readonly(session),
-      user: readonly(user),
+      user: readonly(user) as Readonly<Ref<null>> | Readonly<Ref<ScuteUser>>,
       //@ts-ignore
       isAuthenticated: computed(() => session.value.status === "authenticated"),
       //@ts-ignore
