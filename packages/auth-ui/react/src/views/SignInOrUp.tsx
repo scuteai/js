@@ -128,9 +128,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
   const [rememberedIdentifier, setRememberedIdentifier] =
     useRememberedIdentifier(scuteClient);
 
-  const isWebauthnAvailable =
-    webauthnEnabled && scuteClient.isWebauthnSupported();
-
   const [isDirty, setIsDirty] = useState(false);
   const [error, setError] = useState<boolean | string>(
     t("signInOrUp.identifierRequired")
@@ -143,7 +140,6 @@ const SignInOrUp = (props: SignInOrUpProps) => {
     if (rememberedIdentifier) {
       setError(false);
       setIdentifier(rememberedIdentifier);
-      console.log("rememberedIdentifier", rememberedIdentifier);
       if (isValidPhoneNumber(rememberedIdentifier, t) === true) {
         const countryIso2 = getISO2CountryCode(rememberedIdentifier);
         if (countryIso2) {
