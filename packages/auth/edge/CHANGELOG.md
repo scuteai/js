@@ -1,5 +1,13 @@
 # @scute/edge
 
+## 1.2.1
+
+### Patch Changes
+
+- hotfix: register form
+- Updated dependencies
+  - @scute/core@1.2.1
+
 ## 1.2.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @scute/core
 
+## 1.2.1
+
+### Patch Changes
+
+- hotfix: register form
+
 ## 1.2.0
 
 ### Minor Changes
