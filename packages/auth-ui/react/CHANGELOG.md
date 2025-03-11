@@ -1,5 +1,14 @@
 # @scute/ui-react
 
+## 1.2.2
+
+### Patch Changes
+
+- fixes the register form check
+- Updated dependencies
+  - @scute/ui-shared@1.2.2
+  - @scute/core@1.2.2
+
 ## 1.2.1
 
 ### Patch Changes

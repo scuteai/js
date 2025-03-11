@@ -1,5 +1,11 @@
 # @scute/core
 
+## 1.2.2
+
+### Patch Changes
+
+- fixes the register form check
+
 ## 1.2.1
 
 ### Patch Changes
