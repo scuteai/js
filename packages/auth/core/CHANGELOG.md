@@ -1,5 +1,11 @@
 # @scute/js-core
 
+## 0.2.3
+
+### Patch Changes
+
+- Strip down ui and keep the core logic with react hooks and next handlers
+
 ## 0.2.2
 
 ### Patch Changes

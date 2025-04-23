@@ -1,5 +1,14 @@
 # @scute/nextjs-handlers
 
+## 0.2.3
+
+### Patch Changes
+
+- Strip down ui and keep the core logic with react hooks and next handlers
+- Updated dependencies
+  - @scute/js-core@0.2.3
+  - @scute/react-hooks@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes
