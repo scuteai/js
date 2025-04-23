@@ -9,11 +9,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { BaseNextResponse } from "next/dist/server/base-http";
-import { serialize } from "cookie";
-import {
-  SCUTE_REFRESH_STORAGE_KEY,
-  SCUTE_REMEMBER_STORAGE_KEY,
-} from "@scute/js-core";
 
 type RouteHandlerContext = {
   cookies: () => ReadonlyRequestCookies;
@@ -42,21 +37,6 @@ async function ScuteRouteHandler(
     cookies,
     headers,
   });
-
-  // TODO: This is a temporary workaround to clear the refresh token cookie
-
-  // const rememberMe =
-  //   context.cookies().get(SCUTE_REMEMBER_STORAGE_KEY)?.value === "true";
-
-  // if (!rememberMe) {
-  //   response.headers.set(
-  //     "set-cookie",
-  //     serialize(SCUTE_REFRESH_STORAGE_KEY, "", {
-  //       maxAge: -1,
-  //       path: "/",
-  //     })
-  //   );
-  // }
 
   return response;
 }
