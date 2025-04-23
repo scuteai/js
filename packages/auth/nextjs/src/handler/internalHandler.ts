@@ -1,4 +1,4 @@
-import { ScuteClient, ScuteTokenPayload } from "@scute/core";
+import { ScuteClient, ScuteTokenPayload } from "@scute/js-core";
 import {
   createCsrfToken,
   deleteCsrfToken,

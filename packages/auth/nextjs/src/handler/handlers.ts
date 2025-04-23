@@ -13,7 +13,7 @@ import { serialize } from "cookie";
 import {
   SCUTE_REFRESH_STORAGE_KEY,
   SCUTE_REMEMBER_STORAGE_KEY,
-} from "@scute/core";
+} from "@scute/js-core";
 
 type RouteHandlerContext = {
   cookies: () => ReadonlyRequestCookies;

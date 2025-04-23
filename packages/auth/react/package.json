@@ -1,6 +1,6 @@
 {
-  "name": "@scute/react",
-  "version": "1.2.2",
+  "name": "@scute/react-hooks",
+  "version": "0.2.2",
   "publishConfig": {},
   "files": [
     "dist"
@@ -19,7 +19,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@scute/core": "workspace:*"
+    "@scute/js-core": "workspace:*"
   },
   "peerDependencies": {
     "react": "^16.8 || ^17.0 || ^18.0",

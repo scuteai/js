@@ -1,8 +1,0 @@
-{
-  "extends": "@scute/tsconfig/base.json",
-  "compilerOptions": {
-    "lib": ["ES2018", "DOM"]
-  },
-  "include": ["src", "index.ts"],
-  "exclude": ["dist", "build", "node_modules"]
-}

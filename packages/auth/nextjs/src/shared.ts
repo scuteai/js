@@ -5,7 +5,7 @@ import {
   type ScuteClientPreferences,
   ScuteError,
   ScuteClient,
-} from "@scute/core";
+} from "@scute/js-core";
 import { Prettify } from "./utils";
 
 export type ScuteNextjsClientConfig = Prettify<

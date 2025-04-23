@@ -1,4 +1,4 @@
-# `@scute/core`
+# `@scute/js-core`
 
 An isomorphic JavaScript client library for the Scute Auth API and Scute Management API.
 
@@ -7,5 +7,5 @@ An isomorphic JavaScript client library for the Scute Auth API and Scute Managem
 Install
 
 ```bash
-npm install --save @scute/core
+npm install --save @scute/js-core
 ```

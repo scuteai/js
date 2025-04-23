@@ -1,1 +1,0 @@
-export const SCUTE_PREFIX = "scute-";
