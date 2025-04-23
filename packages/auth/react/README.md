@@ -1,4 +1,4 @@
-# `@scute/react`
+# `@scute/react-hooks`
 
 A React client library for the Scute Auth API and Management API.
 
@@ -7,5 +7,5 @@ A React client library for the Scute Auth API and Management API.
 Install
 
 ```bash
-npm install --save @scute/react
+npm install --save @scute/react-hooks
 ```

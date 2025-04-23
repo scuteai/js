@@ -1,102 +1,102 @@
-# @scute/core
+# @scute/js-core
 
-## 1.2.2
+## 0.2.2
 
 ### Patch Changes
 
 - fixes the register form check
 
-## 1.2.1
+## 0.2.1
 
 ### Patch Changes
 
 - hotfix: register form
 
-## 1.2.0
+## 0.2.0
 
 ### Minor Changes
 
 - adds phone otp
 
-## 1.1.2
+## 0.1.2
 
 ### Patch Changes
 
 - Adds UserButton component
 
-## 1.1.1
+## 0.1.1
 
 ### Patch Changes
 
 - Fixes a minor issue where back to login pops up during oauth flow
 
-## 1.1.0
+## 0.1.0
 
 ### Minor Changes
 
 - oAuth provider login
 
-## 1.0.11
+## 0.0.11
 
 ### Patch Changes
 
 - Fine tuning the design, fonts and spacings
 
-## 1.0.10
+## 0.0.10
 
 ### Patch Changes
 
 - Mobile UI for new designs
 
-## 1.0.9
+## 0.0.9
 
 ### Patch Changes
 
 - Hotfxes for themeing
 
-## 1.0.8
+## 0.0.8
 
 ### Patch Changes
 
 - Profile styling and theme fixes
 
-## 1.0.7
+## 0.0.7
 
 ### Patch Changes
 
 - New design themes
 
-## 1.0.6
+## 0.0.6
 
 ### Patch Changes
 
 - New design
 
-## 1.0.5
+## 0.0.5
 
 ### Patch Changes
 
 - Fixes translations for profile and cross login issues
 
-## 1.0.4
+## 0.0.4
 
 ### Patch Changes
 
 - Fix errors and update tsup for better TS compatibility
 
-## 1.0.3
+## 0.0.3
 
 ### Patch Changes
 
 - Added language translations and an error reporting service
 
-## 1.0.2
+## 0.0.2
 
 ### Patch Changes
 
 - General improvements and bugfixes
 
-## 1.0.0
+## 0.0.0
 
 ### Major Changes
 

@@ -1,6 +1,6 @@
 {
-  "name": "@scute/nextjs",
-  "version": "1.2.2",
+  "name": "@scute/nextjs-handlers",
+  "version": "0.2.2",
   "publishConfig": {},
   "files": [
     "dist"
@@ -19,8 +19,8 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@scute/react": "workspace:*",
-    "@scute/core": "workspace:*",
+    "@scute/react-hooks": "workspace:*",
+    "@scute/js-core": "workspace:*",
     "set-cookie-parser": "^2.6.0",
     "cookie": "^0.5.0"
   },

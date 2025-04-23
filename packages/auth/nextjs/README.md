@@ -1,4 +1,4 @@
-# `@scute/nextjs`
+# `@scute/nextjs-handlers`
 
 A Next.js client library for the Scute Auth API and Management API.
 
@@ -7,5 +7,5 @@ A Next.js client library for the Scute Auth API and Management API.
 Install
 
 ```bash
-npm install --save @scute/nextjs
+npm install --save @scute/nextjs-handlers
 ```

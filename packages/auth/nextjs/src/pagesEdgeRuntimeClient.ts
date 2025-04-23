@@ -1,4 +1,4 @@
-import { ScuteCookieStorage, type CookieAttributes } from "@scute/core";
+import { ScuteCookieStorage, type CookieAttributes } from "@scute/js-core";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import type { NextRequest } from "next/server";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";

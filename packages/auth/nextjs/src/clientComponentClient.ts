@@ -3,7 +3,7 @@ import {
   ScuteBrowserCookieStorage,
   UnknownSignInError,
   type ScuteTokenPayload,
-} from "@scute/core";
+} from "@scute/js-core";
 import {
   fetchWithCsrf,
   REFRESH_HANDLER,

@@ -10,7 +10,7 @@ import {
   type Session,
   type ScuteUserData,
   sessionLoadingState,
-} from "@scute/core";
+} from "@scute/js-core";
 
 export type AuthSession = {
   session: Session;

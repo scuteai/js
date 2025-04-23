@@ -1,4 +1,4 @@
-import { ScuteCookieStorage, type CookieAttributes } from "@scute/core";
+import { ScuteCookieStorage, type CookieAttributes } from "@scute/js-core";
 import type { NextRequest, NextResponse } from "next/server";
 import { parse as parseCookies, serialize as serializeCookie } from "cookie";
 import { splitCookiesString } from "set-cookie-parser";

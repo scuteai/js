@@ -1,6 +1,6 @@
 {
-  "name": "@scute/core",
-  "version": "1.2.2",
+  "name": "@scute/js-core",
+  "version": "0.2.2",
   "publishConfig": {},
   "files": [
     "dist"

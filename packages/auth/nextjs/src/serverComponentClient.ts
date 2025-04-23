@@ -2,7 +2,7 @@ import {
   isBrowser,
   ScuteCookieStorage,
   type CookieAttributes,
-} from "@scute/core";
+} from "@scute/js-core";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 
