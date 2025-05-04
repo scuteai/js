@@ -18,7 +18,7 @@ export const getMeaningfulError = (error: ScuteError | Error) => {
     !(error.code >= 200 && error.code < 300)
   ) {
     isFatal = true;
-    const serverErrorMsg = error.json?.error?.message; // TODO
+    const serverErrorMsg = error.json?.error;
     message = serverErrorMsg;
 
     if (error.code === 500) {
@@ -364,6 +364,7 @@ export function identifyAuthenticationError({
 export type CustomScuteErrorCode =
   | "identifier-not-recognized"
   | "identifier-already-exists"
+  | "identifier-invalid"
   | "new-device"
   | "login-required"
   | "invalid-auth-token"
@@ -400,6 +401,13 @@ export class IdentifierAlreadyExistsError extends CustomScuteError {
       "identifier_already_exists"
     );
     Object.setPrototypeOf(this, IdentifierAlreadyExistsError.prototype);
+  }
+}
+
+export class IdentifierInvalidError extends CustomScuteError {
+  constructor() {
+    super("Identifier is invalid.", "identifier-invalid", "identifier_invalid");
+    Object.setPrototypeOf(this, IdentifierInvalidError.prototype);
   }
 }
 
