@@ -10,9 +10,8 @@ import {
 } from "@scute/react-hooks";
 import { redirect } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { RegisterDevice } from "./register-device";
 
-export default function MagicLinkLogin() {
+export default function SignInOrUp() {
   const [identifier, setIdentifier] = useState("");
   const [component, setComponent] = useState("login");
   const [magicLinkToken, setMagicLinkToken] = useState<string | null>(null);
@@ -36,23 +35,31 @@ export default function MagicLinkLogin() {
       {component === "login" && (
         <LoginForm
           scuteClient={scuteClient}
-          setComponent={setComponent}
           identifier={identifier}
           setIdentifier={setIdentifier}
+          setComponent={setComponent}
         />
       )}
 
       {component === "magic_verify" && (
         <MagicVerify
           scuteClient={scuteClient}
-          setComponent={setComponent}
           magicLinkToken={magicLinkToken}
           setTokenPayload={setTokenPayload}
+          setComponent={setComponent}
         />
       )}
       {component === "magic_sent" && <MagicSent identifier={identifier} />}
       {component === "register_device" && (
         <RegisterDevice scuteClient={scuteClient} tokenPayload={tokenPayload} />
+      )}
+      {component === "otp_verify" && (
+        <OtpForm
+          scuteClient={scuteClient}
+          identifier={identifier}
+          setComponent={setComponent}
+          setTokenPayload={setTokenPayload}
+        />
       )}
     </>
   );
@@ -60,18 +67,19 @@ export default function MagicLinkLogin() {
 
 const LoginForm = ({
   scuteClient,
-  setComponent,
   identifier,
   setIdentifier,
+  setComponent,
 }: {
   scuteClient: ScuteClient;
-  setComponent: (component: string) => void;
   identifier: string;
   setIdentifier: (identifier: string) => void;
+  setComponent: (component: string) => void;
 }) => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const { data, error } = await scuteClient.signInOrUp(identifier);
+
     if (error) {
       console.log("signInOrUp error");
       return console.log({
@@ -80,11 +88,26 @@ const LoginForm = ({
         meaningfulError: error && getMeaningfulError(error),
       });
     }
+
     if (!data) {
-      // webauthn enabled and device is registered
+      // passkey verified.
       redirect("/profile");
     } else {
+      if (identifier.includes("@")) {
+        setComponent("magic_sent");
+      } else {
+        setComponent("otp_verify");
+      }
+    }
+  };
+
+  const handleSendCode = async () => {
+    if (identifier.includes("@")) {
+      await scuteClient.sendLoginMagicLink(identifier);
       setComponent("magic_sent");
+    } else {
+      await scuteClient.sendLoginOtp(identifier);
+      setComponent("otp_verify");
     }
   };
 
@@ -95,12 +118,28 @@ const LoginForm = ({
   return (
     <form onSubmit={handleSubmit}>
       <h5>Sign in or up</h5>
+      <p>
+        Enter your email or phone number without any spaces{" "}
+        <small>(eg. 12125551212)</small>
+      </p>
       <input
-        type="email"
+        type="text"
         value={identifier}
         onChange={(e) => setIdentifier(e.target.value)}
       />
+      <p style={{ fontSize: "0.625rem", textAlign: "left" }}>
+        Try to sign in with a passkey if you have one. Will send a magic link or
+        otp if no devices are registered for webauthn.
+      </p>
       <button type="submit">Sign in or up</button>
+      <hr />
+      <p style={{ fontSize: "0.625rem", textAlign: "left" }}>
+        Will always send a magic link or otp.
+      </p>
+      <button type="button" onClick={handleSendCode}>
+        Send otp or magic link
+      </button>
+      <hr />
       <button type="button" onClick={handleSignInWithGoogle}>
         Sign in with Google
       </button>
@@ -173,6 +212,110 @@ const MagicVerify = ({
   return (
     <div className="card">
       <h5>Verifying Magic Link...</h5>
+    </div>
+  );
+};
+
+const OtpForm = ({
+  scuteClient,
+  identifier,
+  setComponent,
+  setTokenPayload,
+}: {
+  scuteClient: ScuteClient;
+  identifier: string;
+  setComponent: (component: string) => void;
+  setTokenPayload: (tokenPayload: ScuteTokenPayload | null) => void;
+}) => {
+  const [otp, setOtp] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const { data, error } = await scuteClient.verifyOtp(otp, identifier);
+    if (error) {
+      console.log("verifyOtp error");
+      console.log({ data, error, meaningfulError: getMeaningfulError(error) });
+      return;
+    }
+
+    if (data) {
+      setTokenPayload(data.authPayload);
+      setComponent("register_device");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <h5>Enter OTP</h5>
+      <input
+        type="text"
+        placeholder="OTP"
+        value={otp}
+        onChange={(e) => setOtp(e.target.value)}
+      />
+      <button type="submit">Verify OTP</button>
+    </form>
+  );
+};
+
+export const RegisterDevice = ({
+  scuteClient,
+  tokenPayload,
+}: {
+  scuteClient: ScuteClient;
+  tokenPayload: ScuteTokenPayload | null;
+}) => {
+  const handleRegisterDevice = async () => {
+    if (!tokenPayload) {
+      console.error("No token payload");
+      return;
+    }
+    const { error: signInError } = await scuteClient.signInWithTokenPayload(
+      tokenPayload
+    );
+    if (signInError) {
+      console.log("signInWithTokenPayload error");
+      console.log({
+        signInError,
+        meaningfulError: getMeaningfulError(signInError),
+      });
+      return;
+    }
+    const { data, error } = await scuteClient.addDevice();
+    if (error) {
+      console.log("addDevice error");
+      console.log({ data, error, meaningfulError: getMeaningfulError(error) });
+      return;
+    }
+    redirect("/profile");
+  };
+
+  const handleSkipDeviceRegistration = async () => {
+    if (!tokenPayload) {
+      console.error("No token payload");
+      return;
+    }
+    const { error: signInError } = await scuteClient.signInWithTokenPayload(
+      tokenPayload
+    );
+    if (signInError) {
+      console.log("signInWithTokenPayload error");
+      console.log({
+        signInError,
+        meaningfulError: getMeaningfulError(signInError),
+      });
+      return;
+    }
+    redirect("/profile");
+  };
+
+  return (
+    <div className="card">
+      <h5>Register Device</h5>
+      <button onClick={handleRegisterDevice}>Register Device</button>
+      <button onClick={handleSkipDeviceRegistration}>
+        Skip Device Registration
+      </button>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 "use client";
 import styles from "./page.module.css";
-import MagicLinkLogin from "@/components/magiclink-login";
+import SignInOrUp from "@/components/sign-in-or-up";
 import { useEffect } from "react";
 import { useScuteClient } from "@scute/react-hooks";
 import { redirect } from "next/navigation";
@@ -21,10 +21,7 @@ export default function Home() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <MagicLinkLogin />
-        <Link href="/otp-login" className={styles.link}>
-          Go to OTP Login
-        </Link>
+        <SignInOrUp />
       </main>
     </div>
   );
