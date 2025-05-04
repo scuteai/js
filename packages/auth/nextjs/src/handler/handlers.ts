@@ -11,8 +11,8 @@ import type { NextFetchEvent, NextRequest } from "next/server";
 import { BaseNextResponse } from "next/dist/server/base-http";
 
 type RouteHandlerContext = {
-  cookies: () => ReadonlyRequestCookies;
-  headers: () => Headers;
+  cookies: () => ReadonlyRequestCookies | Promise<ReadonlyRequestCookies>;
+  headers: () => Headers | Promise<Headers>;
 };
 
 async function ScuteRouteHandler(
@@ -23,12 +23,19 @@ async function ScuteRouteHandler(
   const method = req.method;
   const query = Object.fromEntries(url.searchParams);
   const body = await getBody(req);
-  const cookies = Object.fromEntries(
-    (await context.cookies()).getAll().map((c) => [c.name, c.value])
-  );
-  const headers = await context.headers();
 
-  const scute = createRouteHandlerClient({ cookies: context.cookies });
+  // Handle both sync and async APIs
+  const cookiesResult = await Promise.resolve(context.cookies());
+  const headersResult = await Promise.resolve(context.headers());
+
+  const cookies = Object.fromEntries(
+    cookiesResult.getAll().map((c) => [c.name, c.value])
+  );
+  const headers = headersResult;
+
+  const scute = createRouteHandlerClient({
+    cookies: async () => Promise.resolve(context.cookies()),
+  });
   const response = await internalHandler(scute, {
     url,
     method,
@@ -110,16 +117,19 @@ async function ScuteEdgeApiHandler(req: NextRequest) {
 }
 
 export function ScuteHandler(context: {
-  cookies: () => ReadonlyRequestCookies;
-  headers: () => Headers;
+  cookies: () => ReadonlyRequestCookies | Promise<ReadonlyRequestCookies>;
+  headers: () => Headers | Promise<Headers>;
 }): (req: NextRequest) => ReturnType<typeof ScuteRouteHandler>;
+
 export function ScuteHandler(
   req: NextRequest
 ): ReturnType<typeof ScuteEdgeApiHandler>;
+
 export function ScuteHandler(
   req: NextApiRequest,
   res: NextApiResponse
 ): ReturnType<typeof ScuteNodeApiHandler>;
+
 export function ScuteHandler(
   ...args:
     | [RouteHandlerContext]
