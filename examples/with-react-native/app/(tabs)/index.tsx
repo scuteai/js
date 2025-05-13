@@ -1,12 +1,20 @@
 import { Image } from "expo-image";
-import { Platform, StyleSheet } from "react-native";
+import { StyleSheet, TextInput, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { HelloWave } from "@/components/HelloWave";
 import ParallaxScrollView from "@/components/ParallaxScrollView";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { useScuteClient } from "@scute/react-hooks";
+import { useState } from "react";
+import { router } from "expo-router";
 
 export default function HomeScreen() {
+  const scuteClient = useScuteClient();
+  const [identifier, setIdentifier] = useState("");
+  const [showOtpForm, setShowOtpForm] = useState(false);
+  const [otp, setOtp] = useState("");
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
@@ -21,41 +29,78 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit{" "}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText>{" "}
-          to see changes. Press{" "}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: "cmd + d",
-              android: "cmd + m",
-              web: "F12",
-            })}
-          </ThemedText>{" "}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">
-            npm run reset-project
-          </ThemedText>{" "}
-          to get a fresh <ThemedText type="defaultSemiBold">app</ThemedText>{" "}
-          directory. This will move the current{" "}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{" "}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
+
+      {!showOtpForm ? (
+        <ThemedView style={styles.authContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email or phone number"
+            placeholderTextColor="#666"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={identifier}
+            onChangeText={setIdentifier}
+          />
+
+          <TouchableOpacity
+            style={styles.signInButton}
+            onPress={async () => {
+              await scuteClient.sendLoginOtp(identifier);
+              setShowOtpForm(true);
+            }}
+          >
+            <ThemedText style={styles.buttonText}>Sign in / Sign up</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.googleButton}>
+            <Ionicons
+              name="logo-google"
+              size={20}
+              color="#fff"
+              style={styles.googleIcon}
+            />
+            <ThemedText style={styles.buttonText}>
+              Sign in with Google
+            </ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      ) : (
+        <ThemedView style={styles.authContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter the code you received"
+            placeholderTextColor="#666"
+            keyboardType="numeric"
+            autoCapitalize="none"
+            value={otp}
+            onChangeText={setOtp}
+          />
+          <TouchableOpacity
+            style={styles.signInButton}
+            onPress={async () => {
+              const { data, error } = await scuteClient.verifyOtp(
+                otp,
+                identifier
+              );
+              if (error) {
+                console.log(error);
+              } else {
+                scuteClient.signInWithTokenPayload(data.authPayload);
+                setShowOtpForm(false);
+                router.push("/profile");
+              }
+            }}
+          >
+            <ThemedText style={styles.buttonText}>Verify</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.signInButton}
+            onPress={() => setShowOtpForm(false)}
+          >
+            <ThemedText style={styles.buttonText}>Back</ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      )}
     </ParallaxScrollView>
   );
 }
@@ -76,5 +121,43 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     position: "absolute",
+  },
+  authContainer: {
+    padding: 20,
+    gap: 16,
+    marginTop: 20,
+  },
+  input: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  signInButton: {
+    backgroundColor: "#007AFF",
+    height: 50,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  googleButton: {
+    backgroundColor: "#DB4437",
+    height: 50,
+    borderRadius: 8,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  googleIcon: {
+    marginRight: 8,
   },
 });
