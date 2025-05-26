@@ -284,7 +284,15 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param provider - OAuth provider name
    */
   signInWithOAuthProvider(provider: string) {
-    window.location.href = `${this.baseOAuthURL}${provider}`;
+    window.location.href = this.getOAuthUrl(provider);
+  }
+
+  /**
+   * Get the OAuth URL for a provider.
+   * @param provider - OAuth provider name
+   */
+  getOAuthUrl(provider: string) {
+    return `${this.baseOAuthURL}${provider}`;
   }
 
   /**

@@ -1,20 +1,90 @@
 import { Image } from "expo-image";
-import { StyleSheet, TextInput, TouchableOpacity } from "react-native";
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { HelloWave } from "@/components/HelloWave";
 import ParallaxScrollView from "@/components/ParallaxScrollView";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useScuteClient } from "@scute/react-hooks";
+import { SCUTE_MAGIC_PARAM, useScuteClient } from "@scute/react-hooks";
 import { useState } from "react";
 import { router } from "expo-router";
+import { WebView } from "react-native-webview";
+
+const userAgent = Platform.select({
+  android:
+    "Mozilla/5.0 (Linux; Android 10; Android SDK built for x86) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36",
+  ios: "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1",
+});
 
 export default function HomeScreen() {
   const scuteClient = useScuteClient();
   const [identifier, setIdentifier] = useState("");
   const [showOtpForm, setShowOtpForm] = useState(false);
   const [otp, setOtp] = useState("");
+  const [oAuthUrl, setOAuthUrl] = useState<string | null>(null);
+
+  if (oAuthUrl) {
+    return (
+      <ScrollView>
+        <ThemedView style={{ ...styles.authContainer, height: "100%" }}>
+          <WebView
+            source={{ uri: oAuthUrl }}
+            style={{ height: 550, width: "100%" }}
+            userAgent={userAgent}
+            sharedCookiesEnabled={true}
+            thirdPartyCookiesEnabled={true}
+            setSupportMultipleWindows={false}
+            originWhitelist={["*"]}
+            pullToRefreshEnabled={true}
+            webviewDebuggingEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.warn("WebView error: ", nativeEvent);
+            }}
+            onHttpError={(event) => {
+              console.log("http error", event);
+            }}
+            onMessage={(event) => {
+              console.log("Message from webview:", event.nativeEvent.data);
+            }}
+            onNavigationStateChange={async (event) => {
+              const url = new URL(event.url);
+              const code = url.searchParams.get(SCUTE_MAGIC_PARAM);
+              if (!code) {
+                return;
+              }
+              const { data, error } = await scuteClient.verifyMagicLinkToken(
+                code
+              );
+              if (error) {
+                console.log(error);
+              } else {
+                scuteClient.signInWithTokenPayload(data.authPayload);
+                setShowOtpForm(false);
+                router.push("/profile");
+              }
+            }}
+          />
+          <TouchableOpacity
+            style={styles.signInButton}
+            onPress={() => setOAuthUrl(null)}
+          >
+            <ThemedText style={styles.buttonText}>Back</ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      </ScrollView>
+    );
+  }
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
@@ -25,12 +95,15 @@ export default function HomeScreen() {
         />
       }
     >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
+      {!oAuthUrl && (
+        <ThemedView style={styles.titleContainer}>
+          <ThemedText type="title">Welcome!</ThemedText>
+          <HelloWave />
+        </ThemedView>
+      )}
 
-      {!showOtpForm ? (
+      {/* Sign in / Sign up */}
+      {!showOtpForm && !oAuthUrl && (
         <ThemedView style={styles.authContainer}>
           <TextInput
             style={styles.input}
@@ -52,7 +125,14 @@ export default function HomeScreen() {
             <ThemedText style={styles.buttonText}>Sign in / Sign up</ThemedText>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.googleButton}>
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={() => {
+              console.log("google");
+              const url = scuteClient.getOAuthUrl("google");
+              setOAuthUrl(url);
+            }}
+          >
             <Ionicons
               name="logo-google"
               size={20}
@@ -64,7 +144,11 @@ export default function HomeScreen() {
             </ThemedText>
           </TouchableOpacity>
         </ThemedView>
-      ) : (
+      )}
+
+      {/* OTP */}
+
+      {showOtpForm && (
         <ThemedView style={styles.authContainer}>
           <TextInput
             style={styles.input}
@@ -123,7 +207,7 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   authContainer: {
-    padding: 20,
+    padding: 0,
     gap: 16,
     marginTop: 20,
   },
@@ -142,6 +226,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 16,
   },
   googleButton: {
     backgroundColor: "#DB4437",
