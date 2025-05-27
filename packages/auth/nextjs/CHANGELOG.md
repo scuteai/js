@@ -1,5 +1,14 @@
 # @scute/nextjs-handlers
 
+## 0.2.4
+
+### Patch Changes
+
+- adds support for react native
+- Updated dependencies
+  - @scute/js-core@0.2.4
+  - @scute/react-hooks@0.2.4
+
 ## 0.2.3
 
 ### Patch Changes
