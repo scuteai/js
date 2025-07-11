@@ -569,9 +569,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param url - (Optional) magic link url with sct_magic param. Default `window.location.href`.
    */
   getMagicLinkToken(url?: string | URL) {
-    const token = new URL(url ?? window.location.href).searchParams.get(
-      SCUTE_MAGIC_PARAM
-    );
+    const params = new URL(url ?? window.location.href).searchParams;
+    const token =
+      params.get(SCUTE_MAGIC_PARAM) || params.get(SCUTE_OAUTH_PKCE_PARAM);
 
     return token;
   }

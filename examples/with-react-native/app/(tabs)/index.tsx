@@ -12,7 +12,11 @@ import { HelloWave } from "@/components/HelloWave";
 import ParallaxScrollView from "@/components/ParallaxScrollView";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { SCUTE_MAGIC_PARAM, useScuteClient } from "@scute/react-hooks";
+import {
+  SCUTE_MAGIC_PARAM,
+  SCUTE_OAUTH_PKCE_PARAM,
+  useScuteClient,
+} from "@scute/react-hooks";
 import { useState } from "react";
 import { router } from "expo-router";
 import { WebView } from "react-native-webview";
@@ -58,7 +62,10 @@ export default function HomeScreen() {
             }}
             onNavigationStateChange={async (event) => {
               const url = new URL(event.url);
-              const code = url.searchParams.get(SCUTE_MAGIC_PARAM);
+              const code =
+                url.searchParams.get(SCUTE_MAGIC_PARAM) ||
+                url.searchParams.get(SCUTE_OAUTH_PKCE_PARAM);
+
               if (!code) {
                 return;
               }

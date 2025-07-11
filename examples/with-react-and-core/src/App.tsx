@@ -19,6 +19,7 @@ function App() {
   );
 
   // Catch magic link token from url if it exists and verify it
+  // Oauth token is also a magic link token and will be handled by this block.
   useEffect(() => {
     const magicLinkToken = scuteClient.getMagicLinkToken();
     if (magicLinkToken) {
