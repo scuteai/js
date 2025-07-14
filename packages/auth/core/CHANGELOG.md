@@ -1,5 +1,11 @@
 # @scute/js-core
 
+## 0.2.5
+
+### Patch Changes
+
+- fixes the oauth token handling
+
 ## 0.2.4
 
 ### Patch Changes

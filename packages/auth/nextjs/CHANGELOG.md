@@ -1,5 +1,14 @@
 # @scute/nextjs-handlers
 
+## 0.2.5
+
+### Patch Changes
+
+- fixes the oauth token handling
+- Updated dependencies
+  - @scute/js-core@0.2.5
+  - @scute/react-hooks@0.2.5
+
 ## 0.2.4
 
 ### Patch Changes
