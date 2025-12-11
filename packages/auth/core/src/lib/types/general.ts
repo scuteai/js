@@ -2,6 +2,8 @@ import type { BaseHttpError } from "../errors";
 
 export type UniqueIdentifier = string | number;
 
+export type Promisable<T> = T | Promise<T>;
+
 export interface CookieAttributes {
   domain?: string;
   expires?: Date;

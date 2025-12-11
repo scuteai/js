@@ -6,7 +6,7 @@ import {
   SCUTE_LAST_LOGIN_STORAGE_KEY,
   SCUTE_REFRESH_STORAGE_KEY,
 } from "./constants";
-import { InvalidAuthTokenError, LoginRequiredError, ScuteError } from "./errors";
+import { InvalidAuthTokenError, ScuteError } from "./errors";
 import {
   decodeAccessToken,
   decodeRefreshToken,
@@ -301,7 +301,7 @@ export abstract class ScuteSession {
     const { access, accessExpiresAt, refresh, refreshExpiresAt } = state;
 
     if (access) {
-      this.scuteStorage.setItem(SCUTE_ACCESS_STORAGE_KEY, access, {
+      await this.scuteStorage.setItem(SCUTE_ACCESS_STORAGE_KEY, access, {
         expires: accessExpiresAt,
         sameSite: "lax",
         httpOnly: false,
@@ -310,7 +310,7 @@ export abstract class ScuteSession {
     }
 
     if (refresh) {
-      this.scuteStorage.setItem(SCUTE_REFRESH_STORAGE_KEY, refresh, {
+      await this.scuteStorage.setItem(SCUTE_REFRESH_STORAGE_KEY, refresh, {
         expires: refreshExpiresAt,
         sameSite: "lax",
         httpOnly: !browser ? true : false,
@@ -324,6 +324,11 @@ export abstract class ScuteSession {
    */
   protected async removeSession(): Promise<void> {
     const browser = isBrowser();
+
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.removeItem(SCUTE_ACCESS_STORAGE_KEY);
+      window.localStorage.removeItem(SCUTE_REFRESH_STORAGE_KEY);
+    }
 
     await this.scuteStorage.removeItem(SCUTE_ACCESS_STORAGE_KEY, {
       httpOnly: false,
@@ -687,11 +692,6 @@ export abstract class ScuteSession {
       SCUTE_LAST_LOGIN_STORAGE_KEY
     );
 
-    if (!identifier && typeof window !== "undefined" && window.localStorage) {
-      // fallback method
-      return window.localStorage.getItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
-    }
-
     return identifier;
   }
 
@@ -700,11 +700,10 @@ export abstract class ScuteSession {
    */
   async clearRememberedIdentifier() {
     if (typeof window !== "undefined" && window.localStorage) {
-      // fallback method
       window.localStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
     }
 
-    return this.scuteStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY, {
+    await this.scuteStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY, {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
       path: "/",
@@ -718,12 +717,7 @@ export abstract class ScuteSession {
   protected async setRememberedIdentifier(
     identifier: ScuteIdentifier
   ): Promise<void> {
-    if (typeof window !== "undefined" && window.localStorage) {
-      // fallback method
-      window.localStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier);
-    }
-
-    return this.scuteStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier, {
+    await this.scuteStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier, {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
       path: "/",
@@ -762,7 +756,7 @@ export abstract class ScuteSession {
       window.localStorage.setItem(SCUTE_CRED_STORAGE_KEY, value);
     }
 
-    return this.scuteStorage.setItem(SCUTE_CRED_STORAGE_KEY, value, {
+    await this.scuteStorage.setItem(SCUTE_CRED_STORAGE_KEY, value, {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
       path: "/",

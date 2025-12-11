@@ -1,11 +1,12 @@
 import { ScuteCookieStorage, type CookieAttributes } from "@scute/js-core";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
+import type { Promisable } from "./utils";
 
 class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
   constructor(
     private readonly context: {
-      cookies: () => ReadonlyRequestCookies | Promise<ReadonlyRequestCookies>;
+      cookies: () => Promisable<ReadonlyRequestCookies>;
     },
     defaultCookieOptions?: CookieAttributes
   ) {
@@ -13,7 +14,7 @@ class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
   }
 
   protected async getCookie(name: string): Promise<string | null> {
-    const nextCookies = await Promise.resolve(this.context.cookies());
+    const nextCookies = await this.context.cookies();
     return nextCookies.get(name)?.value ?? null;
   }
 
@@ -22,7 +23,7 @@ class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
     value: string,
     options?: CookieAttributes
   ): Promise<void> {
-    const nextCookies = await Promise.resolve(this.context.cookies());
+    const nextCookies = await this.context.cookies();
     nextCookies.set(name, value, options);
   }
 
@@ -30,7 +31,7 @@ class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
     name: string,
     options?: CookieAttributes
   ): Promise<void> {
-    const nextCookies = await Promise.resolve(this.context.cookies());
+    const nextCookies = await this.context.cookies();
     nextCookies.set(name, "", {
       ...options,
       maxAge: 0,
@@ -40,7 +41,7 @@ class ScuteNextRouteHandlerStorage extends ScuteCookieStorage {
 
 export const createRouteHandlerClient = (
   context: {
-    cookies: () => ReadonlyRequestCookies | Promise<ReadonlyRequestCookies>;
+    cookies: () => Promisable<ReadonlyRequestCookies>;
   },
   config?: ScuteNextjsClientConfig
 ) => {

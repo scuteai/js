@@ -1,11 +1,12 @@
 import mitt, { type Emitter, type Handler } from "mitt";
+import { load as loadFingerprintJS } from "@fingerprintjs/fingerprintjs";
 
 import ScuteAdminApi from "./ScuteAdminApi";
 import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
 import { ScuteSession, sessionUnAuthenticatedState } from "./lib/ScuteSession";
 import {
   ScuteCookieStorage,
-  ScuteNoneStorage,
+  ScuteMemoryStorage,
   ScuteStorage,
 } from "./lib/ScuteStorage";
 
@@ -152,19 +153,17 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       refetchInverval: config.preferences?.refetchInverval ?? 60 * 5,
     };
 
-    this.scuteStorage =
-      browser && typeof window !== "undefined" && window.localStorage
-        ? // supressing, sync -> async
-          (window.localStorage as any)
-        : ScuteNoneStorage;
-
-    if (config.preferences?.sessionStorageAdapter) {
-      this.scuteStorage = config.preferences.sessionStorageAdapter;
-    }
-
-    if (!this.config.persistSession) {
-      this.scuteStorage = ScuteNoneStorage;
-    }
+    this.scuteStorage = !this.config.persistSession
+      ? // memory
+        ScuteMemoryStorage
+      : config.preferences?.sessionStorageAdapter
+      ? // adapter
+        config.preferences.sessionStorageAdapter
+      : browser && typeof window !== "undefined" && window.localStorage
+      ? // browser (localstorage)
+        window.localStorage
+      : // fallback (memory)
+        ScuteMemoryStorage;
 
     this.admin = new ScuteAdminApi({
       appId,
@@ -179,6 +178,31 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     if (browser) {
       this.channel = new BroadcastChannel(SCUTE_BROADCAST_CHANNEL);
+
+      if (config.preferences?.fingerprinting !== false) {
+        setTimeout(() => {
+          loadFingerprintJS().then(async (fp) => {
+            const { visitorId } = await fp.get();
+
+            this.wretcher._middlewares.push((next) => (url, opts) => {
+              const options: RequestInit = opts;
+
+              if (
+                !options.method ||
+                options.method === "GET" ||
+                options.method === "get"
+              ) {
+                return next(url, opts);
+              }
+
+              options.headers = new Headers(options.headers);
+              options.headers.set("X-Fingerprint", visitorId);
+
+              return next(url, opts);
+            });
+          });
+        }, 0);
+      }
     }
 
     this._initialize();
@@ -1035,8 +1059,6 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       };
     }
 
-    this.storeCredentialId(decodedToken.userId, credential.id);
-
     const { data, error: finalizeError } =
       await this._webauthnDeviceRegisterFinalizeRequest(
         credential,
@@ -1046,6 +1068,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (finalizeError) {
       return { data: null, error: finalizeError };
     }
+
+    this.storeCredentialId(decodedToken.userId, credential.id);
 
     this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS);
 

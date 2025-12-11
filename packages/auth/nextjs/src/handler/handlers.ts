@@ -2,7 +2,7 @@ import internalHandler from "./internalHandler";
 import { createPagesEdgeRuntimeClient } from "../pagesEdgeRuntimeClient";
 import { createPagesServerClient } from "../pagesServerClient";
 import { createRouteHandlerClient } from "../routeHandlerClient";
-import { getBody, getInitUrl } from "../utils";
+import { getBody, getInitUrl, type Promisable } from "../utils";
 
 import { splitCookiesString } from "set-cookie-parser";
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -11,8 +11,8 @@ import type { NextFetchEvent, NextRequest } from "next/server";
 import { BaseNextResponse } from "next/dist/server/base-http";
 
 type RouteHandlerContext = {
-  cookies: () => ReadonlyRequestCookies | Promise<ReadonlyRequestCookies>;
-  headers: () => Headers | Promise<Headers>;
+  cookies: () => Promisable<ReadonlyRequestCookies>;
+  headers: () => Promisable<Headers>;
 };
 
 async function ScuteRouteHandler(
@@ -24,18 +24,16 @@ async function ScuteRouteHandler(
   const query = Object.fromEntries(url.searchParams);
   const body = await getBody(req);
 
-  // Handle both sync and async APIs
-  const cookiesResult = await Promise.resolve(context.cookies());
-  const headersResult = await Promise.resolve(context.headers());
-
   const cookies = Object.fromEntries(
-    cookiesResult.getAll().map((c) => [c.name, c.value])
+    (await context.cookies()).getAll().map((c) => [c.name, c.value])
   );
-  const headers = headersResult;
+
+  const headers = await context.headers();
 
   const scute = createRouteHandlerClient({
-    cookies: async () => Promise.resolve(context.cookies()),
+    cookies: context.cookies
   });
+
   const response = await internalHandler(scute, {
     url,
     method,
@@ -117,8 +115,8 @@ async function ScuteEdgeApiHandler(req: NextRequest) {
 }
 
 export function ScuteHandler(context: {
-  cookies: () => ReadonlyRequestCookies | Promise<ReadonlyRequestCookies>;
-  headers: () => Headers | Promise<Headers>;
+  cookies: () => Promisable<ReadonlyRequestCookies>;
+  headers: () => Promisable<Headers>;
 }): (req: NextRequest) => ReturnType<typeof ScuteRouteHandler>;
 
 export function ScuteHandler(

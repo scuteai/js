@@ -5,11 +5,12 @@ import {
 } from "@scute/js-core";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
+import type { Promisable } from "./utils";
 
 class ScuteNextServerComponentStorage extends ScuteCookieStorage {
   constructor(
     private readonly context: {
-      cookies: () => ReadonlyRequestCookies;
+      cookies: () => Promisable<ReadonlyRequestCookies>;
     },
     defaultCookieOptions?: CookieAttributes
   ) {
@@ -35,7 +36,7 @@ class ScuteNextServerComponentStorage extends ScuteCookieStorage {
 
 export const createServerComponentClient = (
   context: {
-    cookies: () => ReadonlyRequestCookies;
+    cookies: () => Promisable<ReadonlyRequestCookies>;
   },
   config?: ScuteNextjsClientConfig
 ) => {

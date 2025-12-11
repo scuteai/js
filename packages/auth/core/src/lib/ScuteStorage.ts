@@ -1,21 +1,21 @@
-import type { CookieAttributes } from "./types/general";
+import type { CookieAttributes, Promisable } from "./types/general";
 
 export interface ScuteStorageInferface {
-  getItem: (key: string) => Promise<string | null>;
-  setItem: (key: string, value: string) => Promise<void>;
-  removeItem: (key: string) => Promise<void>;
+  getItem: (key: string) => Promisable<string | null>;
+  setItem: (key: string, value: string) => Promisable<void>;
+  removeItem: (key: string) => Promisable<void>;
 }
 
 export abstract class ScuteStorage implements ScuteStorageInferface {
-  abstract getItem(key: string): Promise<string | null>;
-  abstract setItem(key: string, value: string): Promise<void>;
-  abstract removeItem(key: string): Promise<void>;
+  abstract getItem(key: string): Promisable<string | null>;
+  abstract setItem(key: string, value: string): Promisable<void>;
+  abstract removeItem(key: string): Promisable<void>;
 }
 
-const memoryStorage = new Map<string, any>();
-export const ScuteNoneStorage: ScuteStorage = {
+const memoryStorage = new Map<string, string>();
+export const ScuteMemoryStorage: ScuteStorage = {
   async getItem(key) {
-    return memoryStorage.get(key);
+    return memoryStorage.get(key) ?? null;
   },
   async setItem(key, value) {
     memoryStorage.set(key, value);
@@ -38,16 +38,16 @@ export abstract class ScuteCookieStorage extends ScuteStorage {
 
   protected abstract getCookie(
     name: string
-  ): Promise<string | null> | string | null;
+  ): Promisable<string | null> | string | null;
   protected abstract setCookie(
     name: string,
     value: string,
     cookieOptions: CookieAttributes
-  ): void;
+  ): Promisable<void>;
   protected abstract deleteCookie(
     name: string,
     cookieOptions: CookieAttributes
-  ): void;
+  ): Promisable<void>;
 
   async getItem(key: string): Promise<string | null> {
     return this.getCookie(key);
@@ -58,7 +58,7 @@ export abstract class ScuteCookieStorage extends ScuteStorage {
     value: string,
     cookieOptions?: CookieAttributes
   ): Promise<void> {
-    this.setCookie(key, value, {
+    await this.setCookie(key, value, {
       ...this.defaultCookieOptions,
       ...cookieOptions,
     });
@@ -68,7 +68,7 @@ export abstract class ScuteCookieStorage extends ScuteStorage {
     key: string,
     cookieOptions?: CookieAttributes
   ): Promise<void> {
-    this.deleteCookie(key, {
+    await this.deleteCookie(key, {
       ...this.defaultCookieOptions,
       ...cookieOptions,
       maxAge: 0,

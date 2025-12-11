@@ -25,6 +25,8 @@ export type ScuteClientPreferences = {
    * Refetch interval in seconds
    * @default 300 */
   refetchInverval?: number;
+  /** @default true */
+  fingerprinting?: boolean
 };
 
 export type ScuteAdminApiConfig = {

@@ -24,7 +24,8 @@
     "js-cookie": "^3.0.5",
     "jwt-decode": "^3.1.2",
     "ts-mixer": "^6.0.3",
-    "wretch": "^2.6.0"
+    "wretch": "^2.6.0",
+    "@fingerprintjs/fingerprintjs": "^5.0.1"
   },
   "devDependencies": {
     "@scute/tsconfig": "workspace:*",

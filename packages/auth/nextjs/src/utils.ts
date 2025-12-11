@@ -50,3 +50,5 @@ export function randomBytes(length: number) {
 export type Prettify<T> = {
   [K in keyof T]: T[K];
 } & {};
+
+export type Promisable<T> = T | Promise<T>;
