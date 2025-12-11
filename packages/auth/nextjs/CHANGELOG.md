@@ -1,5 +1,17 @@
 # @scute/nextjs-handlers
 
+## 0.3.0
+
+### Minor Changes
+
+- fingerprinting & maintenance
+
+### Patch Changes
+
+- Updated dependencies
+  - @scute/js-core@0.3.0
+  - @scute/react-hooks@0.3.0
+
 ## 0.2.5
 
 ### Patch Changes
