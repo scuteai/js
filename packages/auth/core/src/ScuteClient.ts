@@ -1,5 +1,4 @@
 import mitt, { type Emitter, type Handler } from "mitt";
-import { load as loadFingerprintJS } from "@fingerprintjs/fingerprintjs";
 
 import ScuteAdminApi from "./ScuteAdminApi";
 import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
@@ -81,6 +80,14 @@ import type {
   ScuteOtpResponse,
 } from "./lib/types/scute";
 
+const DEFAULT_PREFERENCES = {
+  persistSession: true,
+  autoRefreshToken: true,
+  refetchOnWindowFocus: true,
+  refetchInverval: 300, // in seconds
+  fingerprinting: true,
+} as const satisfies ScuteClientPreferences;
+
 class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   protected readonly appId: ScuteClientConfig["appId"];
   protected appData!: ScuteAppData;
@@ -147,10 +154,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     this.appId = appId;
 
     this.config = {
-      persistSession: config.preferences?.persistSession !== false,
-      autoRefreshToken: true, // default
+      persistSession:
+        config.preferences?.persistSession ??
+        DEFAULT_PREFERENCES.persistSession,
+      autoRefreshToken:
+        config.preferences?.autoRefreshToken ??
+        DEFAULT_PREFERENCES.autoRefreshToken,
       refetchOnWindowFocus: config.preferences?.refetchOnWindowFocus !== false,
-      refetchInverval: config.preferences?.refetchInverval ?? 60 * 5,
+      refetchInverval:
+        config.preferences?.refetchInverval ??
+        DEFAULT_PREFERENCES.refetchInverval,
     };
 
     this.scuteStorage = !this.config.persistSession
@@ -178,10 +191,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     if (browser) {
       this.channel = new BroadcastChannel(SCUTE_BROADCAST_CHANNEL);
+      const fingerprinting =
+        config.preferences?.fingerprinting ??
+        DEFAULT_PREFERENCES.fingerprinting;
 
-      if (config.preferences?.fingerprinting !== false) {
+      if (fingerprinting) {
         setTimeout(() => {
-          loadFingerprintJS().then(async (fp) => {
+          import("@fingerprintjs/fingerprintjs").then(async ({ load }) => {
+            const fp = await load();
             const { visitorId } = await fp.get();
 
             this.wretcher._middlewares.push((next) => (url, opts) => {
@@ -205,6 +222,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       }
     }
 
+    config.onBeforeInitialize?.bind(this)();
     this._initialize();
   }
 
@@ -370,9 +388,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
     ];
 
+    let unsubscribed = false;
+
     const handler: Handler<
       InternalEvent[typeof INTERNAL_EVENTS.AUTH_STATE_CHANGED]
     > = async ({ event, session, user }) => {
+      if (unsubscribed) return;
+
       if (
         sessionEvents.includes(event) &&
         (!session || (session.access !== null && !user))
@@ -393,13 +415,18 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         } = await this._getSession(force, emitRefetchEvent));
       }
 
+      if (unsubscribed) return;
+
       callback(event, session ?? sessionUnAuthenticatedState(), user ?? null);
     };
 
     this.emitter.on(INTERNAL_EVENTS.AUTH_STATE_CHANGED, handler);
     handler({ event: AUTH_CHANGE_EVENTS.INITIAL_SESSION });
 
-    return () => this.emitter.off(INTERNAL_EVENTS.AUTH_STATE_CHANGED, handler);
+    return () => {
+      unsubscribed = true;
+      this.emitter.off(INTERNAL_EVENTS.AUTH_STATE_CHANGED, handler);
+    };
   }
 
   /**
@@ -834,17 +861,25 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   async signInWithTokenPayload(payload: ScuteTokenPayload) {
     const session = (await this.setSession(payload)) as AuthenticatedSession;
+    return await this._signInWithCheck(session);
+  }
+
+  /**
+   * @internal
+   * @param session {AuthenticatedSession} - Session data
+   */
+  protected async _signInWithCheck(session: AuthenticatedSession) {
     const { data, error: getUserError } = await this.getCurrentUser(
       session.access
     );
 
     if (getUserError) {
       // something went wrong
-      await this._signOut(session.access);
-      const error = new UnknownSignInError();
-      this._reportClientError(error, "token-payload");
+      // this could also be a session that was immediately removed
+      await this.removeSession();
+
       return {
-        error,
+        error: new UnknownSignInError(),
       };
     }
 
@@ -856,9 +891,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       this.setRememberedIdentifier(user.phone);
     }
 
-    setTimeout(() => {
-      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user);
-    }, 100);
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user);
 
     return { error: null };
   }
@@ -1581,7 +1614,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @internal
    * @see {@link refreshSession}
    */
-  protected async _refreshRequest(jwt: string) {
+  protected async _refreshRequest(jwt: string) {    
     return this.post<ScuteTokenPayload>(
       "/tokens/refresh",
       null,

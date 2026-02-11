@@ -28,7 +28,7 @@ export {
 } from "./lib/helpers";
 export type { CookieAttributes, UniqueIdentifier } from "./lib/types/general";
 export * from "./lib/types/scute";
-
+export * from "./lib/types/session";
 export * from "./lib/types/config";
 export {
   AUTH_CHANGE_EVENTS,

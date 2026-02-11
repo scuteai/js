@@ -3,6 +3,8 @@ import {
   ScuteBrowserCookieStorage,
   UnknownSignInError,
   type ScuteTokenPayload,
+  type AuthenticatedSession,
+  ScuteClient,
 } from "@scute/js-core";
 import {
   fetchWithCsrf,
@@ -37,10 +39,12 @@ export const createClientComponentClient = (
     }
 
     if (config?.preferences?.httpOnlyRefresh !== false) {
-      const originalSignInWithTokenPayload = scute["signInWithTokenPayload"];
       // patch `signInWithTokenPayload`
       // wait for the next api route / route handler to respond
-      const signInWithTokenPayload = async (payload: ScuteTokenPayload) => {
+      async function signInWithTokenPayload(
+        this: ScuteClient,
+        payload: ScuteTokenPayload
+      ) {
         const res = await fetchWithCsrf(
           SIGN_IN_HANDLER,
           {
@@ -49,26 +53,22 @@ export const createClientComponentClient = (
               Authorization: `Bearer ${payload.access}`,
             },
           },
-          handlersPrefix
+          config?.handlersPrefix
         );
+
         if (!res.ok) {
           // something went wrong
-          await scute.signOut();
+          await this.removeSession();
           return { error: new UnknownSignInError() };
         } else {
-          const { access} = await scute[
-            "initialSessionState"
-          ]();
+          const session =
+            (await this.initialSessionState()) as AuthenticatedSession;
 
-          return originalSignInWithTokenPayload.bind(scute)({
-            access,
-          } as any);
+          return await this._signInWithCheck(session);
         }
-      };
+      }
 
-      scute["signInWithTokenPayload"] = async (payload) => {
-        return signInWithTokenPayload(payload);
-      };
+      scute["signInWithTokenPayload"] = signInWithTokenPayload.bind(scute);
 
       const handlersPrefix = config?.handlersPrefix;
       scute.onAuthStateChange(async (event) => {

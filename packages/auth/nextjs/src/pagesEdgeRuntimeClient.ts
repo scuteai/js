@@ -49,7 +49,7 @@ export const createPagesEdgeRuntimeClient = (
     preferences: {
       ...config?.preferences,
       sessionStorageAdapter: new ScuteNextPagesEdgeRuntimeStorage(
-        context as any,
+        context,
         {
           secure: process.env.NODE_ENV === "production",
         }

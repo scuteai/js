@@ -1,6 +1,4 @@
-import { settings, Mixin, hasMixin } from "ts-mixer";
-// settings.prototypeStrategy = "copy";
-// settings.initFunction = "__init__";
+import { Mixin, hasMixin } from "ts-mixer";
 
 export default Mixin;
 export { hasMixin, Mixin };

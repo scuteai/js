@@ -1,8 +1,4 @@
-import {
-  isBrowser,
-  ScuteCookieStorage,
-  type CookieAttributes,
-} from "@scute/js-core";
+import { ScuteCookieStorage, type CookieAttributes } from "@scute/js-core";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
 import type { Promisable } from "./utils";
@@ -40,23 +36,17 @@ export const createServerComponentClient = (
   },
   config?: ScuteNextjsClientConfig
 ) => {
-  const browser = isBrowser();
-  const scuteClient = createScuteClient(
-    {
-      ...config,
-      preferences: {
-        ...config?.preferences,
-        sessionStorageAdapter: new ScuteNextServerComponentStorage(context, {
-          secure: process.env.NODE_ENV === "production",
-        }),
-      },
+  const scuteClient = createScuteClient({
+    ...config,
+    preferences: {
+      ...config?.preferences,
+      // server components does not support refreshing
+      autoRefreshToken: false,
+      sessionStorageAdapter: new ScuteNextServerComponentStorage(context, {
+        secure: process.env.NODE_ENV === "production",
+      }),
     },
-    function onBeforeInitialize() {
-      this["config"].autoRefreshToken = browser
-        ? this["config"].autoRefreshToken
-        : false;
-    }
-  );
+  });
 
   return scuteClient;
 };
