@@ -1,5 +1,16 @@
 # @scute/react
 
+## 0.4.0
+
+### Minor Changes
+
+- minor changes
+
+### Patch Changes
+
+- Updated dependencies
+  - @scute/js-core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

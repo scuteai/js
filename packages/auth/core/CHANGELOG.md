@@ -1,5 +1,11 @@
 # @scute/js-core
 
+## 0.4.0
+
+### Minor Changes
+
+- minor changes
+
 ## 0.3.0
 
 ### Minor Changes
