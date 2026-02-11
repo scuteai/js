@@ -1,14 +1,15 @@
+import { BaseNextResponse } from "next/dist/server/base-http";
+import type { NextApiRequest, NextApiResponse } from "next";
+import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
+import type { NextFetchEvent, NextRequest } from "next/server";
+import { splitCookiesString } from "set-cookie-parser";
+
 import internalHandler from "./internalHandler";
 import { createPagesEdgeRuntimeClient } from "../pagesEdgeRuntimeClient";
 import { createPagesServerClient } from "../pagesServerClient";
 import { createRouteHandlerClient } from "../routeHandlerClient";
 import { getBody, getInitUrl, type Promisable } from "../utils";
-
-import { splitCookiesString } from "set-cookie-parser";
-import type { NextApiRequest, NextApiResponse } from "next";
-import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
-import type { NextFetchEvent, NextRequest } from "next/server";
-import { BaseNextResponse } from "next/dist/server/base-http";
+import type { ScuteNextjsClientConfig } from "../shared";
 
 type RouteHandlerContext = {
   cookies: () => Promisable<ReadonlyRequestCookies>;
@@ -17,7 +18,8 @@ type RouteHandlerContext = {
 
 async function ScuteRouteHandler(
   req: NextRequest,
-  context: RouteHandlerContext
+  context: RouteHandlerContext,
+  config?: ScuteNextjsClientConfig
 ) {
   const url = req.nextUrl;
   const method = req.method;
@@ -30,9 +32,12 @@ async function ScuteRouteHandler(
 
   const headers = await context.headers();
 
-  const scute = createRouteHandlerClient({
-    cookies: context.cookies
-  });
+  const scute = createRouteHandlerClient(
+    {
+      cookies: context.cookies,
+    },
+    config
+  );
 
   const response = await internalHandler(scute, {
     url,
@@ -46,7 +51,11 @@ async function ScuteRouteHandler(
   return response;
 }
 
-async function ScuteNodeApiHandler(req: NextApiRequest, res: NextApiResponse) {
+async function ScuteNodeApiHandler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  config?: ScuteNextjsClientConfig
+) {
   const url = getInitUrl(req);
   const method = req.method ?? "GET";
   const query = req.query as Record<string, string>;
@@ -54,7 +63,7 @@ async function ScuteNodeApiHandler(req: NextApiRequest, res: NextApiResponse) {
   const cookies = req.cookies as Record<string, string>;
   const headers = new Headers(req.headers as Record<string, string>);
 
-  const scute = createPagesServerClient({ req, res });
+  const scute = createPagesServerClient({ req, res }, config);
   const response = await internalHandler(scute, {
     url,
     method,
@@ -91,7 +100,10 @@ async function ScuteNodeApiHandler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function ScuteEdgeApiHandler(req: NextRequest) {
+async function ScuteEdgeApiHandler(
+  req: NextRequest,
+  config?: ScuteNextjsClientConfig
+) {
   const url = req.nextUrl;
   const method = req.method;
   const query = Object.fromEntries(url.searchParams);
@@ -101,7 +113,7 @@ async function ScuteEdgeApiHandler(req: NextRequest) {
   );
   const headers = req.headers;
 
-  const scute = createPagesEdgeRuntimeClient({ request: req });
+  const scute = createPagesEdgeRuntimeClient({ request: req }, config);
   const response = await internalHandler(scute, {
     url,
     method,
@@ -114,39 +126,42 @@ async function ScuteEdgeApiHandler(req: NextRequest) {
   return response;
 }
 
-export function ScuteHandler(context: {
-  cookies: () => Promisable<ReadonlyRequestCookies>;
-  headers: () => Promisable<Headers>;
-}): (req: NextRequest) => ReturnType<typeof ScuteRouteHandler>;
-
 export function ScuteHandler(
-  req: NextRequest
+  context: RouteHandlerContext,
+  config?: ScuteNextjsClientConfig
+): (req: NextRequest) => ReturnType<typeof ScuteRouteHandler>;
+export function ScuteHandler(
+  req: NextRequest,
+  config?: ScuteNextjsClientConfig
 ): ReturnType<typeof ScuteEdgeApiHandler>;
-
 export function ScuteHandler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
+  config?: ScuteNextjsClientConfig
 ): ReturnType<typeof ScuteNodeApiHandler>;
+export function ScuteHandler() {
+  const args = Array.from(arguments);
+  const config =
+    args.length > 1
+      ? ((args[1] as NextApiResponse)._write ||
+          (args[1] as NextFetchEvent).waitUntil) &&
+        args.length === 2
+        ? undefined // 2 arguments, no config
+        : args.pop() // the last is config
+      : undefined;
 
-export function ScuteHandler(
-  ...args:
-    | [RouteHandlerContext]
-    | [NextRequest]
-    | [NextApiRequest, NextApiResponse]
-) {
   if (args.length === 1) {
     if (typeof (args[0] as NextRequest).nextUrl !== "undefined") {
-      return ScuteEdgeApiHandler(args[0] as NextRequest);
+      return ScuteEdgeApiHandler(args[0], config);
     } else {
-      return (req: NextRequest) =>
-        ScuteRouteHandler(req, args[0] as RouteHandlerContext);
+      return (req: NextRequest) => ScuteRouteHandler(req, args[0], config);
     }
   } else if (args.length > 1) {
-    if ((args[1] as unknown as NextFetchEvent).waitUntil) {
+    if ((args[1] as NextFetchEvent).waitUntil) {
       // pages api (edge)
-      return ScuteEdgeApiHandler(args[0] as unknown as NextRequest);
+      return ScuteEdgeApiHandler(args[0], config);
     }
     // pages api (node)
-    return ScuteNodeApiHandler(...args);
+    return ScuteNodeApiHandler(args[0], args[1], config);
   }
 }

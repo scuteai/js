@@ -6,7 +6,7 @@ import {
   ScuteError,
   ScuteClient,
 } from "@scute/js-core";
-import { Prettify } from "./utils";
+import type { Prettify } from "./utils";
 
 export type ScuteNextjsClientConfig = Prettify<
   Omit<ScuteClientConfig, "appId" | "preferences"> & {
@@ -20,10 +20,7 @@ export type ScuteNextjsClientConfig = Prettify<
   }
 >;
 
-export const createScuteClient = (
-  config: ScuteNextjsClientConfig,
-  onBeforeInitialize?: (this: PScuteClient) => void
-) => {
+export const createScuteClient = (config: ScuteNextjsClientConfig) => {
   const browser = isBrowser();
 
   const appId = config?.appId ?? process.env.NEXT_PUBLIC_SCUTE_APP_ID;
@@ -38,19 +35,16 @@ export const createScuteClient = (
     });
   }
 
-  const scuteClient = new PScuteClient(
-    {
-      ...config,
-      appId,
-      baseUrl,
-      secretKey,
-      preferences: {
-        ...config.preferences,
-        persistSession: true,
-      },
+  const scuteClient = new ScuteClient({
+    ...config,
+    appId,
+    baseUrl,
+    secretKey,
+    preferences: {
+      ...config.preferences,
+      persistSession: true,
     },
-    onBeforeInitialize
-  ) as ScuteClient;
+  });
 
   [scuteClient["wretcher"], scuteClient.admin["wretcher"]].forEach(
     (wretcher) => {
@@ -65,19 +59,3 @@ export const createScuteClient = (
 
   return scuteClient;
 };
-
-class PScuteClient extends ScuteClient {
-  protected onBeforeInitialize?: (this: PScuteClient) => void;
-  constructor(
-    config: ScuteClientConfig,
-    onBeforeInitialize?: (this: PScuteClient) => void
-  ) {
-    super(config);
-    this.onBeforeInitialize = onBeforeInitialize;
-  }
-
-  protected async _initialize(): Promise<{ error: ScuteError | null }> {
-    this.onBeforeInitialize?.();
-    return super._initialize();
-  }
-}

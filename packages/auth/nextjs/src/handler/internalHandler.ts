@@ -35,7 +35,7 @@ const internalHandler = async (
     cookies: Record<string, string>;
     headers: Headers;
   }
-): Promise<Response> => {
+): Promise<Response> => {  
   if (isSignInRequest(url, method)) {
     if (!isCsrfTokenValid({ cookies, headers })) {
       const response = getCsrfErrorResponse();
@@ -105,13 +105,22 @@ const internalHandler = async (
 
     const { data, error } = await scute.refreshSession();
 
+    if (error) {
+      return new Response(null, {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
     return new Response(
       JSON.stringify({
-        access: data?.access,
-        access_expires_at: data?.accessExpiresAt,
+        access: data.access,
+        access_expires_at: data.accessExpiresAt?.toString(),
       } as Partial<ScuteTokenPayload>),
       {
-        status: !data?.access || error ? 401 : 200,
+        status: 200,
         headers: {
           "Content-Type": "application/json",
         },

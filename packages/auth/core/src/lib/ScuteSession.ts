@@ -63,8 +63,19 @@ export abstract class ScuteSession {
     | (() => Promise<Partial<ScuteTokenPayload> | void>)
     | null = null;
 
-  protected refreshDeferred: Deferred<
+  /** @internal */
+  protected _refreshDeferred: Deferred<
     Awaited<ReturnType<ScuteSession["__refresh"]>>
+  > | null = null;
+
+  /** @internal */
+  protected _getSessionDeferred: Deferred<
+    Awaited<ReturnType<ScuteSession["__getSession"]>>
+  > | null = null;
+
+  /** @internal */
+  protected _expireSessionDeferred: Deferred<
+    Awaited<ReturnType<ScuteSession["_expireSession"]>>
   > | null = null;
 
   protected autoRefreshTicker: ReturnType<typeof setInterval> | null = null;
@@ -78,13 +89,31 @@ export abstract class ScuteSession {
   }
 
   /**
+   * @internal
+   * @see {@link __getSession}
+   */
+  protected async _getSession(...params: Parameters<typeof this.__getSession>) {
+    // getSession is already in progress
+    if (this._getSessionDeferred) {
+      return this._getSessionDeferred.promise;
+    }
+
+    this._getSessionDeferred = new Deferred();
+    const result = await this.__getSession(...params);
+    this._getSessionDeferred.resolve(result);
+    this._getSessionDeferred = null;
+
+    return result;
+  }
+
+  /**
    * * `fresh` needs to be set to `true` to get the latest data from the server.
    * @param fresh - Fetch new data from the server
    * @param emitRefetchEvent - Emit refetch event when getting fresh data
    * @internal
    * @see {@link getSession}
    */
-  protected async _getSession(fresh?: boolean, emitRefetchEvent = true) {
+  private async __getSession(fresh?: boolean, emitRefetchEvent = true) {
     const { error: initializeError } = await this._initialize();
     if (initializeError) {
       return { data: { session: null, user: null }, error: initializeError };
@@ -187,8 +216,8 @@ export abstract class ScuteSession {
   async refetchSession() {
     let session: Session | null = null;
 
-    if (this.refreshDeferred?.promise) {
-      session = (await this.refreshDeferred.promise).data;
+    if (this._refreshDeferred?.promise) {
+      session = (await this._refreshDeferred.promise).data;
     }
 
     if (!session) {
@@ -345,8 +374,15 @@ export abstract class ScuteSession {
 
   /**
    * Expire the current sesion.
+   * @internal
    */
-  private async _expireSession() {
+  private async _expireSession(): Promise<Session> {
+    if (this._expireSessionDeferred) {
+      return this._expireSessionDeferred.promise;
+    }
+
+    this._expireSessionDeferred = new Deferred();
+
     const unauthenticatedSession = unAuthenticatedState();
     this.emitAuthChangeEvent(
       AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
@@ -354,6 +390,9 @@ export abstract class ScuteSession {
     );
 
     await this.removeSession();
+
+    this._expireSessionDeferred.resolve(unauthenticatedSession);
+    this._expireSessionDeferred = null;
 
     return unauthenticatedSession;
   }
@@ -363,7 +402,7 @@ export abstract class ScuteSession {
    * @internal
    * @see {@link ScuteClient.signOut}
    */
-  protected async _signOut(accessToken?: string | null) {
+  protected async _signOut(accessToken?: string | null): Promise<boolean> {
     await this.removeSession();
 
     if (accessToken) {
@@ -389,7 +428,7 @@ export abstract class ScuteSession {
    */
   async setRefreshProxyCallback(
     callback: NonNullable<ScuteSession["refreshProxyCallback"]>
-  ) {
+  ): Promise<void> {
     this.refreshProxyCallback = async () => {
       try {
         return await callback();
@@ -419,7 +458,7 @@ export abstract class ScuteSession {
    * Start auto refresh interval in the background. The session is checked
    * every few seconds.
    */
-  async startAutoRefresh() {
+  async startAutoRefresh(): Promise<void> {
     this._removeVisibilityChangedCallback();
     await this._startAutoRefresh();
   }
@@ -427,7 +466,7 @@ export abstract class ScuteSession {
   /**
    * Stop auto refresh interval in the background (if any).
    */
-  async stopAutoRefresh() {
+  async stopAutoRefresh(): Promise<void> {
     this._removeVisibilityChangedCallback();
     await this._stopAutoRefresh();
   }
@@ -436,8 +475,10 @@ export abstract class ScuteSession {
    * @internal
    * @see {@link startAutoRefresh}
    */
-  private async _startAutoRefresh() {
-    await this._stopAutoRefresh();
+  private async _startAutoRefresh(): Promise<void> {
+    if (this.autoRefreshTicker) {
+      await this._stopAutoRefresh();
+    }
 
     this.autoRefreshTicker = setInterval(
       () => this._autoRefreshTokenTick(),
@@ -457,7 +498,7 @@ export abstract class ScuteSession {
    * @internal
    * @see {@link stopAutoRefresh}
    */
-  private async _stopAutoRefresh() {
+  private async _stopAutoRefresh(): Promise<void> {
     const ticker = this.autoRefreshTicker;
     this.autoRefreshTicker = null;
 
@@ -471,7 +512,7 @@ export abstract class ScuteSession {
   /**
    * Runs the auto refresh token tick.
    */
-  private async _autoRefreshTokenTick() {
+  private async _autoRefreshTokenTick(): Promise<void> {
     this.debug("#_autoRefreshTokenTick", "start");
 
     const now = new Date();
@@ -512,14 +553,14 @@ export abstract class ScuteSession {
    */
   private async _refresh(...params: Parameters<typeof this.__refresh>) {
     // refreshing is already in progress
-    if (this.refreshDeferred) {
-      return this.refreshDeferred.promise;
+    if (this._refreshDeferred) {
+      return this._refreshDeferred.promise;
     }
 
-    this.refreshDeferred = new Deferred();
+    this._refreshDeferred = new Deferred();
     const response = await this.__refresh(...params);
-    this.refreshDeferred.resolve(response);
-    this.refreshDeferred = null;
+    this._refreshDeferred.resolve(response);
+    this._refreshDeferred = null;
 
     return response;
   }
@@ -608,7 +649,7 @@ export abstract class ScuteSession {
    * Register callback for `visibilitychange` browser event.
    * * (browser-only)
    */
-  protected async registerVisibilityChange() {
+  protected async registerVisibilityChange(): Promise<void> {
     if (!isBrowser()) {
       return;
     }
@@ -627,8 +668,8 @@ export abstract class ScuteSession {
    * Register refetch interval
    * * (browser-only)
    */
-  protected async registerRefetchInterval() {
-    if (this.config.refetchInverval && this.config.refetchInverval !== 0) {
+  protected async registerRefetchInterval(): Promise<void> {
+    if (this.config.refetchInverval) {
       setInterval(async () => {
         const session = await this.initialSessionState();
         if (
@@ -648,7 +689,7 @@ export abstract class ScuteSession {
    * @see {@link startAutoRefresh}
    * @see {@link stopAutoRefresh}
    */
-  private _removeVisibilityChangedCallback() {
+  private _removeVisibilityChangedCallback(): void {
     const callback = this.visibilityChangedCallback;
     this.visibilityChangedCallback = null;
 
@@ -660,7 +701,7 @@ export abstract class ScuteSession {
   /**
    * Callback registered with `window.addEventListener('visibilitychange')`.
    */
-  private async _onVisibilityChanged(isInitial: boolean) {
+  private async _onVisibilityChanged(isInitial: boolean): Promise<void> {
     if (!this.config.autoRefreshToken) {
       return;
     }
@@ -698,7 +739,7 @@ export abstract class ScuteSession {
   /**
    * Clear remembered (last logged) identifier.
    */
-  async clearRememberedIdentifier() {
+  async clearRememberedIdentifier(): Promise<void> {
     if (typeof window !== "undefined" && window.localStorage) {
       window.localStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
     }
@@ -750,7 +791,7 @@ export abstract class ScuteSession {
    * @param value Store value string
    * @internal
    */
-  private async _saveCredentialStore(value: string) {
+  private async _saveCredentialStore(value: string): Promise<void> {
     if (typeof window !== "undefined" && window.localStorage) {
       // fallback method
       window.localStorage.setItem(SCUTE_CRED_STORAGE_KEY, value);
@@ -803,7 +844,7 @@ export abstract class ScuteSession {
   protected async storeCredentialId(
     userId: UniqueIdentifier,
     credentialId: UniqueIdentifier
-  ) {
+  ): Promise<void> {
     const store = await this._getCredentialStore();
 
     const value = JSON.stringify({
@@ -829,7 +870,7 @@ export abstract class ScuteSession {
   protected async deleteCredentialId(
     userId: UniqueIdentifier,
     credentialId: UniqueIdentifier
-  ) {
+  ): Promise<void> {
     const store = await this._getCredentialStore();
 
     const value = JSON.stringify({
