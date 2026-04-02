@@ -14,4 +14,5 @@ export type _ScuteMagicLinkTokenPayload = {
   uuid: UniqueIdentifier;
   user_status: ScuteUserData["status"];
   webauthnEnabled?: boolean;
+  email?: string;
 } & Record<string, any>;
