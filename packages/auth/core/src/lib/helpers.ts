@@ -98,6 +98,7 @@ export const decodeMagicLinkToken = (
       uuid: payload.uuid,
       user_status: payload.user_status,
       webauthnEnabled: payload.webauthnEnabled,
+      email: payload.email,
     };
   } catch {
     return null;
@@ -111,6 +112,7 @@ export const getMagicLinkTokenPayloadFromUser = (
     uuid: user.id,
     user_status: user.status,
     webauthnEnabled: user.webauthn_enabled,
+    email: user.email ?? undefined,
   };
 };
 
