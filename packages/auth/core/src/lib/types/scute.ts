@@ -143,6 +143,25 @@ export type ScuteOtpResponse = {
   otp: { id: UniqueIdentifier };
 };
 
+export type ScuteChallengeResponse = {
+  token: string;
+  status: string;
+  purpose: string;
+  method: string;
+  expires_at: string;
+  remaining_attempts?: number;
+  time_remaining?: number;
+  delivery_required?: boolean;
+};
+
+export type ScuteMfaRequiredResponse = {
+  mfa_required: true;
+  app_user_id: string;
+  mfa_challenge: ScuteChallengeResponse;
+  available_methods: string[];
+};
+
+
 export type ScuteUserSession = {
   id: UniqueIdentifier;
   // TODO refresh_expiration: string;

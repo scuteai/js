@@ -78,6 +78,8 @@ import type {
   ScuteUserData,
   UserMeta,
   ScuteOtpResponse,
+  ScuteChallengeResponse,
+  ScuteMfaRequiredResponse,
 } from "./lib/types/scute";
 
 const DEFAULT_PREFERENCES = {
@@ -583,7 +585,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const { data, error: verifyError } = await this.verifyMagicLinkToken(token);
     if (verifyError) return { error: verifyError };
 
-    return this.signInWithTokenPayload(data.authPayload);
+    // If MFA is required, the event was already emitted by verifyMagicLinkToken
+    if (data && "mfaRequired" in data && data.mfaRequired) {
+      return { data, error: null };
+    }
+
+    return this.signInWithTokenPayload((data as { authPayload: ScuteTokenPayload }).authPayload);
   }
 
   /**
@@ -682,14 +689,24 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: verifyError };
     }
 
+    // Check if MFA is required
+    if (authPayload && "mfa_required" in authPayload && authPayload.mfa_required) {
+      this._pendingMfaChallenge = authPayload as unknown as ScuteMfaRequiredResponse;
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      return {
+        data: { mfaRequired: true, mfaChallenge: (authPayload as unknown as ScuteMfaRequiredResponse).mfa_challenge, availableMethods: (authPayload as unknown as ScuteMfaRequiredResponse).available_methods },
+        error: null,
+      };
+    }
+
     if (shouldSkipDeviceRegister) {
-      await this.signInWithTokenPayload(authPayload);
+      await this.signInWithTokenPayload(authPayload as ScuteTokenPayload);
     } else {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_VERIFIED);
     }
 
     return {
-      data: { authPayload, magicPayload: decodedMagicLinkToken },
+      data: { authPayload: authPayload as ScuteTokenPayload, magicPayload: decodedMagicLinkToken },
       error: null,
     };
   }
@@ -701,9 +718,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @see {@link verifyMagicLinkToken}
    */
   private async _verifyMagicLinkTokenRequest(token: string) {
-    return this.patch<ScuteTokenPayload>("/magic_links/authenticate", {
-      token,
-    });
+    return this.patch<ScuteTokenPayload | ScuteMfaRequiredResponse>(
+      "/magic_links/authenticate",
+      { token }
+    );
   }
 
   /**
@@ -731,9 +749,19 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: verifyError };
     }
 
+    // Check if MFA is required
+    if (authPayload && "mfa_required" in authPayload && authPayload.mfa_required) {
+      this._pendingMfaChallenge = authPayload as unknown as ScuteMfaRequiredResponse;
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      return {
+        data: { mfaRequired: true, mfaChallenge: (authPayload as unknown as ScuteMfaRequiredResponse).mfa_challenge, availableMethods: (authPayload as unknown as ScuteMfaRequiredResponse).available_methods },
+        error: null,
+      };
+    }
+
     return {
       data: {
-        authPayload,
+        authPayload: authPayload as ScuteTokenPayload,
         magicPayload: getMagicLinkTokenPayloadFromUser(user),
       },
       error: null,
@@ -747,10 +775,107 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @see {@link verifyOtp}
    */
   private async _verifyOtpRequest(otp: string, user_id: UniqueIdentifier) {
-    return this.post<ScuteTokenPayload>("/otps/verify", {
-      otp,
-      user_id,
-    });
+    return this.post<ScuteTokenPayload | ScuteMfaRequiredResponse>(
+      "/otps/verify",
+      {
+        otp,
+        user_id,
+      }
+    );
+  }
+
+  // ─── Challenge / MFA Methods ─────────────────────────────────────────
+
+  /** Pending MFA challenge data, set when MFA is triggered during login. */
+  private _pendingMfaChallenge: ScuteMfaRequiredResponse | null = null;
+
+  /** Get the pending MFA challenge (if any). */
+  get pendingMfaChallenge() {
+    return this._pendingMfaChallenge;
+  }
+
+  /**
+   * Verify an MFA challenge.
+   * @param token - Challenge token
+   * @param code - Verification code (OTP, TOTP, or backup code)
+   */
+  async verifyMfaChallenge(token: string, code: string) {
+    const { data, error } = await this.post<ScuteTokenPayload>(
+      `/challenges/${token}/verify`,
+      { code }
+    );
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    this._pendingMfaChallenge = null;
+    return this.signInWithTokenPayload(data);
+  }
+
+  /**
+   * Get the status of a challenge.
+   * @param token - Challenge token
+   */
+  async getChallengeStatus(token: string) {
+    return this.get<{ challenge: ScuteChallengeResponse }>(
+      `/challenges/${token}`
+    );
+  }
+
+  /**
+   * Resend a challenge delivery (for email_otp, sms_otp, magic_link).
+   * @param token - Challenge token
+   */
+  async resendChallenge(token: string) {
+    return this.post<{ challenge: ScuteChallengeResponse }>(
+      `/challenges/${token}/resend`,
+      {}
+    );
+  }
+
+  /**
+   * Cancel a challenge.
+   * @param token - Challenge token
+   */
+  async cancelChallenge(token: string) {
+    return this.delete(`/challenges/${token}`);
+  }
+
+  /**
+   * Switch MFA method during an MFA flow.
+   * Cancels the current MFA challenge and creates a new one with a different method.
+   * @param currentToken - Current MFA challenge token
+   * @param method - New MFA method (e.g., "totp", "email_otp", "sms_otp", "backup_code")
+   */
+  async switchMfaMethod(currentToken: string, method: string) {
+    // Cancel existing challenge
+    await this.cancelChallenge(currentToken);
+
+    // Create new challenge with the different method
+    const appUserId = this._pendingMfaChallenge?.app_user_id;
+    const { data, error } = await this.post<{ challenge: ScuteChallengeResponse }>(
+      `/challenges`,
+      {
+        purpose: "mfa",
+        method,
+        app_user_id: appUserId,
+      }
+    );
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    // Update pending MFA challenge
+    if (this._pendingMfaChallenge) {
+      this._pendingMfaChallenge = {
+        ...this._pendingMfaChallenge,
+        mfa_challenge: data.challenge,
+      };
+    }
+
+    return { data: data.challenge, error: null };
   }
 
   /**

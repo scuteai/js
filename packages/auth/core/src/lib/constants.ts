@@ -20,6 +20,8 @@ export const AUTH_CHANGE_EVENTS = {
   WEBAUTHN_VERIFY_SUCCESS: "webauthn_verify_success",
   OTP_PENDING: "otp_pending",
   OTP_NEW_DEVICE_PENDING: "otp_new_device_pending",
+  MFA_REQUIRED: "mfa_required",
+  MFA_VERIFIED: "mfa_verified",
 } as const;
 
 export type AuthChangeEvent = ValueOf<typeof AUTH_CHANGE_EVENTS>;
