@@ -1,5 +1,11 @@
 # @scute/js-core
 
+## 0.5.1
+
+### Patch Changes
+
+- Add MFA support and challenge-based authentication flow
+
 ## 0.4.0
 
 ### Minor Changes

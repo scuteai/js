@@ -1,5 +1,13 @@
 # @scute/react
 
+## 0.5.1
+
+### Patch Changes
+
+- Add MFA support and challenge-based authentication flow
+- Updated dependencies
+  - @scute/js-core@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
