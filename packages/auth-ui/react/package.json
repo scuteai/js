@@ -1,6 +1,6 @@
 {
   "name": "@scute/auth-ui-react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "main": "src/index.ts",
   "types": "src/index.ts",
