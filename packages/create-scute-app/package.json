@@ -1,6 +1,6 @@
 {
   "name": "create-scute-app",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Set up Scute auth in your project",
   "bin": {
     "create-scute-app": "src/index.mjs"
