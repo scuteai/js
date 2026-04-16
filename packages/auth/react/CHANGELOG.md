@@ -1,5 +1,16 @@
 # @scute/react
 
+## 0.6.0
+
+### Minor Changes
+
+- Intent verification support, verification modes, and tenant app verify-only mode.
+
+### Patch Changes
+
+- Updated dependencies
+  - @scute/js-core@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes
