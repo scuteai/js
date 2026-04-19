@@ -12,14 +12,33 @@ import { isBrowser } from "./helpers";
 export abstract class ScuteBaseHttp {
   protected wretcher: Wretch;
   protected reportErrors: boolean;
+  protected _isSandbox: boolean = false;
+  protected _environment: string = "production";
 
   constructor(
     reportErrors: boolean = false,
     ...params: Parameters<typeof wretch>
   ) {
     this.reportErrors = reportErrors ?? false;
+
+    // Middleware to capture sandbox header from responses
+    const sandboxDetector = (next: any) => (url: string, opts: any) => {
+      return next(url, opts).then((response: Response) => {
+        const sandboxHeader = response.headers.get("X-Scute-Sandbox");
+        const envHeader = response.headers.get("X-Scute-Environment");
+        if (sandboxHeader === "true") {
+          this._isSandbox = true;
+          this._environment = "sandbox";
+        } else if (envHeader) {
+          this._environment = envHeader;
+        }
+        return response;
+      });
+    };
+
     this.wretcher = wretch(...params)
       .middlewares([
+        sandboxDetector,
         retry({
           delayTimer: 500,
           delayRamp: (delay, nbOfAttempts) => delay * nbOfAttempts,
@@ -32,6 +51,16 @@ export abstract class ScuteBaseHttp {
         }),
       ])
       .errorType("json");
+  }
+
+  /** Whether the connected app is in a sandbox workspace */
+  get isSandbox(): boolean {
+    return this._isSandbox;
+  }
+
+  /** Current environment: "production" or "sandbox" */
+  get environment(): string {
+    return this._environment;
   }
 
   protected async get<T>(url: string, headers?: HeadersInit): BaseResponse<T> {
