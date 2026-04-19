@@ -16,6 +16,9 @@ export type AuthFlowView =
   | "webauthn_verify"
   | "webauthn_register"
   | "webauthn_register_success"
+  | "mfa_verify"
+  | "mfa_enroll"
+  | "mfa_enroll_suggest"
   | "error"
   | "authenticated";
 
@@ -54,10 +57,23 @@ export function useScuteAuthFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [authPayload, setAuthPayload] = useState<any>(null);
   const [magicLinkId, setMagicLinkId] = useState<string | null>(null);
+  const [mfaChallenge, setMfaChallenge] = useState<any>(null);
+  const [mfaAvailableMethods, setMfaAvailableMethods] = useState<string[]>([]);
+  const [mfaGracePeriod, setMfaGracePeriod] = useState(false);
+  const [mfaGraceDaysRemaining, setMfaGraceDaysRemaining] = useState<number | undefined>();
+  const [pendingAuthPayload, setPendingAuthPayload] = useState<any>(null);
 
   const initRef = useRef(false);
   const magicVerifyRef = useRef(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Helper to set all MFA state from a response
+  const handleMfaResponse = useCallback((data: any) => {
+    setMfaChallenge(data.mfaChallenge);
+    setMfaAvailableMethods(data.availableMethods || []);
+    setMfaGracePeriod(!!data.mfaGracePeriod);
+    setMfaGraceDaysRemaining(data.mfaGraceDaysRemaining);
+  }, []);
 
   // ── 1. Initialize SDK + detect magic link in URL ──
   useEffect(() => {
@@ -91,6 +107,18 @@ export function useScuteAuthFlow() {
       if (event === AUTH_CHANGE_EVENTS.OTP_PENDING || event === AUTH_CHANGE_EVENTS.OTP_NEW_DEVICE_PENDING) {
         setView("otp_input");
       }
+      if (event === AUTH_CHANGE_EVENTS.MFA_REQUIRED) {
+        setView("mfa_verify");
+      }
+      if (event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED) {
+        setView("mfa_enroll");
+      }
+      if (event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED) {
+        setView("mfa_enroll_suggest");
+      }
+      if (event === AUTH_CHANGE_EVENTS.MFA_VERIFIED) {
+        setView("authenticated");
+      }
     });
     return () => unsubscribe();
   }, [scuteClient, view]);
@@ -120,10 +148,18 @@ export function useScuteAuthFlow() {
         return;
       }
 
-      // Always offer passkey registration after magic link verify
-      // (same as Scute dashboard behavior)
+      // MFA required after magic link verification
+      if (data && "mfaRequired" in data && data.mfaRequired) {
+        handleMfaResponse(data);
+        // View change handled by event listener
+        return;
+      }
+
+      // Offer passkey registration after magic link verify (if passkeys enabled)
       const shouldSkip = typeof window !== "undefined" && new URL(window.location.href).searchParams.get("sct_sk");
-      if (!shouldSkip && data?.authPayload) {
+      const appData = (await scuteClient.getAppData())?.data;
+      const passkeysEnabled = appData?.passkeys_enabled !== false;
+      if (!shouldSkip && passkeysEnabled && data?.authPayload) {
         setAuthPayload(data.authPayload);
         setView("webauthn_register");
       } else if (data?.authPayload) {
@@ -174,6 +210,9 @@ export function useScuteAuthFlow() {
       }
       if (!data) {
         // WebAuthn succeeded — SIGNED_IN event will fire
+      } else if ("mfaRequired" in data && data.mfaRequired) {
+        handleMfaResponse(data);
+        // View change handled by event listener (MFA_REQUIRED or MFA_ENROLLMENT_REQUIRED)
       } else if ("magic_link" in data) {
         setMagicLinkId(data.magic_link.id);
       }
@@ -188,15 +227,44 @@ export function useScuteAuthFlow() {
     setError(null);
     try {
       const result = await scuteClient.verifyOtp(code, identifier);
-      if (result?.error) setError(result.error.message);
+      if (result?.error) { setError(result.error.message); return; }
+      if (result?.data && "mfaRequired" in result.data && result.data.mfaRequired) {
+        setMfaChallenge(result.data.mfaChallenge);
+        setMfaAvailableMethods(result.data.availableMethods || []);
+        // View change handled by event listener
+        return;
+      }
       if (result?.data?.authPayload) {
-        setAuthPayload(result.data.authPayload);
-        setView("webauthn_register");
+        const appData = (await scuteClient.getAppData())?.data;
+        if (appData?.passkeys_enabled !== false) {
+          setAuthPayload(result.data.authPayload);
+          setView("webauthn_register");
+        } else {
+          await scuteClient.signInWithTokenPayload(result.data.authPayload);
+        }
       }
     } catch (err: any) {
       setError(err?.message || "Invalid code");
     }
   }, [identifier, scuteClient]);
+
+  const skipMfaEnrollment = useCallback(() => {
+    setView("authenticated");
+  }, []);
+
+  const submitMfaCode = useCallback(async (code: string) => {
+    if (!mfaChallenge) return;
+    setError(null);
+    try {
+      const { data, error: mfaError } = await scuteClient.verifyMfaChallenge(mfaChallenge.token, code);
+      if (mfaError) { setError(mfaError.message); return; }
+      if (data?.authPayload) {
+        await scuteClient.signInWithTokenPayload(data.authPayload);
+      }
+    } catch (err: any) {
+      setError(err?.message || "MFA verification failed");
+    }
+  }, [mfaChallenge, scuteClient]);
 
   const registerPasskey = useCallback(async () => {
     setError(null);
@@ -237,10 +305,18 @@ export function useScuteAuthFlow() {
     isLoading,
     user,
 
+    // MFA state
+    mfaChallenge,
+    mfaAvailableMethods,
+    mfaGracePeriod,
+    mfaGraceDaysRemaining,
+
     // Actions
     setIdentifier,
     submitIdentifier,
     submitOtp,
+    submitMfaCode,
+    skipMfaEnrollment,
     registerPasskey,
     skipPasskey,
     retry,

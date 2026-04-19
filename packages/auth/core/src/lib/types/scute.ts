@@ -43,6 +43,7 @@ export type ScuteAppData = {
   default_language: string;
   user_meta_data_schema: ScuteUserMetaDataSchema[];
   oauth_providers?: ScuteOAuthProviderConfig[];
+  passkeys_enabled?: boolean;
   base_url: string;
 };
 
@@ -156,8 +157,11 @@ export type ScuteChallengeResponse = {
 
 export type ScuteMfaRequiredResponse = {
   mfa_required: true;
+  mfa_enrollment_required?: boolean;
+  mfa_grace_period?: boolean;
+  mfa_grace_days_remaining?: number;
   app_user_id: string;
-  mfa_challenge: ScuteChallengeResponse;
+  mfa_challenge?: ScuteChallengeResponse;
   available_methods: string[];
 };
 

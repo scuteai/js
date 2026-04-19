@@ -470,6 +470,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     identifier: ScuteIdentifier,
     options?: ScuteSignInOrUpOptions
   ) {
+    // Ensure app data is loaded before checking email_auth_type
+    await this._initializeAppData();
+
     const { data, error } = await this._identifierExists(identifier);
     if (error) {
       return { data: null, error };
@@ -494,15 +497,17 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   ) {
     if (
       options?.webauthn !== "disabled" &&
+      this.appData?.passkeys_enabled !== false &&
       isWebauthnSupported() &&
       user.webauthn_enabled
     ) {
-      const { error: verifyError } = await this._signInWithVerifyDevice(
+      const verifyResult = await this._signInWithVerifyDevice(
         identifier,
         user.id
       );
 
-      if (verifyError) {
+      if (verifyResult.error) {
+        const verifyError = verifyResult.error;
         this._reportClientError(verifyError, "webauthn");
         if (verifyError instanceof NewDeviceError) {
           if (
@@ -518,6 +523,11 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         }
 
         return { data: null, error: verifyError };
+      }
+
+      // MFA required after WebAuthn — pass through to caller
+      if ("data" in verifyResult && verifyResult.data && "mfaRequired" in verifyResult.data) {
+        return { data: verifyResult.data, error: null };
       }
 
       return { data: null, error: null };
@@ -541,6 +551,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @returns Polling data if magic link is usable.
    */
   async signUp(identifier: ScuteIdentifier, options?: ScuteSignUpOptions) {
+    await this._initializeAppData();
+
     const { data, error } = await this._identifierExists(identifier);
 
     if (error) {
@@ -691,10 +703,24 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     // Check if MFA is required
     if (authPayload && "mfa_required" in authPayload && authPayload.mfa_required) {
-      this._pendingMfaChallenge = authPayload as unknown as ScuteMfaRequiredResponse;
-      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      const mfaPayload = authPayload as unknown as ScuteMfaRequiredResponse;
+      this._pendingMfaChallenge = mfaPayload;
+
+      if (mfaPayload.mfa_enrollment_required) {
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
+      } else {
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      }
+
       return {
-        data: { mfaRequired: true, mfaChallenge: (authPayload as unknown as ScuteMfaRequiredResponse).mfa_challenge, availableMethods: (authPayload as unknown as ScuteMfaRequiredResponse).available_methods },
+        data: {
+          mfaRequired: true,
+          mfaEnrollmentRequired: !!mfaPayload.mfa_enrollment_required,
+          mfaGracePeriod: !!mfaPayload.mfa_grace_period,
+          mfaGraceDaysRemaining: mfaPayload.mfa_grace_days_remaining,
+          mfaChallenge: mfaPayload.mfa_challenge,
+          availableMethods: mfaPayload.available_methods,
+        },
         error: null,
       };
     }
@@ -751,10 +777,24 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     // Check if MFA is required
     if (authPayload && "mfa_required" in authPayload && authPayload.mfa_required) {
-      this._pendingMfaChallenge = authPayload as unknown as ScuteMfaRequiredResponse;
-      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      const mfaPayload = authPayload as unknown as ScuteMfaRequiredResponse;
+      this._pendingMfaChallenge = mfaPayload;
+
+      if (mfaPayload.mfa_enrollment_required) {
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
+      } else {
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      }
+
       return {
-        data: { mfaRequired: true, mfaChallenge: (authPayload as unknown as ScuteMfaRequiredResponse).mfa_challenge, availableMethods: (authPayload as unknown as ScuteMfaRequiredResponse).available_methods },
+        data: {
+          mfaRequired: true,
+          mfaEnrollmentRequired: !!mfaPayload.mfa_enrollment_required,
+          mfaGracePeriod: !!mfaPayload.mfa_grace_period,
+          mfaGraceDaysRemaining: mfaPayload.mfa_grace_days_remaining,
+          mfaChallenge: mfaPayload.mfa_challenge,
+          availableMethods: mfaPayload.available_methods,
+        },
         error: null,
       };
     }
@@ -788,10 +828,17 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   /** Pending MFA challenge data, set when MFA is triggered during login. */
   private _pendingMfaChallenge: ScuteMfaRequiredResponse | null = null;
+  /** Pending MFA enrollment suggestion (grace period). */
+  private _pendingMfaEnrollmentSuggestion: { mfa_grace_days_remaining?: number; available_methods: string[] } | null = null;
 
   /** Get the pending MFA challenge (if any). */
   get pendingMfaChallenge() {
     return this._pendingMfaChallenge;
+  }
+
+  /** Get the pending MFA enrollment suggestion (grace period). */
+  get pendingMfaEnrollmentSuggestion() {
+    return this._pendingMfaEnrollmentSuggestion;
   }
 
   /**
@@ -975,7 +1022,31 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         publicKey: data.options,
       });
 
-    if (finalizeError) return { error: finalizeError };
+    if (finalizeError) return { data: null, error: finalizeError };
+
+    // Check if MFA is required after WebAuthn
+    if (payload && "mfa_required" in payload && (payload as any).mfa_required) {
+      const mfaPayload = payload as unknown as ScuteMfaRequiredResponse;
+      this._pendingMfaChallenge = mfaPayload;
+
+      if (mfaPayload.mfa_enrollment_required) {
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
+      } else {
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      }
+
+      return {
+        data: {
+          mfaRequired: true,
+          mfaEnrollmentRequired: !!mfaPayload.mfa_enrollment_required,
+          mfaGracePeriod: !!mfaPayload.mfa_grace_period,
+          mfaGraceDaysRemaining: mfaPayload.mfa_grace_days_remaining,
+          mfaChallenge: mfaPayload.mfa_challenge,
+          availableMethods: mfaPayload.available_methods,
+        },
+        error: null,
+      };
+    }
 
     return this.signInWithTokenPayload(payload);
   }
@@ -985,6 +1056,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param payload {ScuteTokenPayload} - Scute auth payload
    */
   async signInWithTokenPayload(payload: ScuteTokenPayload) {
+    // Check if server suggested MFA enrollment (grace period) BEFORE sign-in
+    // so the event fires before SIGNED_IN
+    if ((payload as any).mfa_enrollment_suggested) {
+      this._pendingMfaEnrollmentSuggestion = {
+        mfa_grace_days_remaining: (payload as any).mfa_grace_days_remaining,
+        available_methods: (payload as any).available_methods,
+      };
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED);
+    }
+
     const session = (await this.setSession(payload)) as AuthenticatedSession;
     return await this._signInWithCheck(session);
   }
@@ -1299,7 +1380,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: finalizeError };
     }
 
-    const decodedAccess = decodeAccessToken(data.access);
+    // Check if MFA is required after WebAuthn
+    if (data && "mfa_required" in data && (data as any).mfa_required) {
+      return { data: data as any, error: null };
+    }
+
+    const tokenPayload = data as ScuteTokenPayload;
+    const decodedAccess = decodeAccessToken(tokenPayload.access);
     if (!decodedAccess) {
       return { data: null, error: new TechnicalError() };
     }
@@ -1331,7 +1418,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   private async _webauthnFinalizeLoginRequest(
     credential: webauthn.PublicKeyCredentialWithAssertionJSON
   ) {
-    return this.post<ScuteTokenPayload>("/webauthn/login/finalize", credential);
+    return this.post<ScuteTokenPayload | ScuteMfaRequiredResponse>("/webauthn/login/finalize", credential);
   }
 
   /**

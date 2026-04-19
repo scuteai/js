@@ -21,6 +21,8 @@ export const AUTH_CHANGE_EVENTS = {
   OTP_PENDING: "otp_pending",
   OTP_NEW_DEVICE_PENDING: "otp_new_device_pending",
   MFA_REQUIRED: "mfa_required",
+  MFA_ENROLLMENT_REQUIRED: "mfa_enrollment_required",
+  MFA_ENROLLMENT_SUGGESTED: "mfa_enrollment_suggested",
   MFA_VERIFIED: "mfa_verified",
 } as const;
 
