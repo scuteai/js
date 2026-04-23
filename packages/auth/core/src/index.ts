@@ -1,5 +1,6 @@
 import ScuteClient, { createClient } from "./ScuteClient";
 import ScuteAdminApi from "./ScuteAdminApi";
+import ScuteVerifyApi from "./ScuteVerifyApi";
 import ScuteBrowserCookieStorage from "./lib/ScuteBrowserCookieStorage";
 import { ScuteCookieStorage } from "./lib/ScuteStorage";
 
@@ -7,11 +8,21 @@ export * from "./lib/errors";
 
 export {
   ScuteAdminApi,
+  ScuteVerifyApi,
   ScuteClient,
   createClient,
   ScuteCookieStorage,
   ScuteBrowserCookieStorage,
 };
+
+export type {
+  Verification,
+  VerificationStatus,
+  VerificationMethod,
+  VerificationListParams,
+  VerificationRisk,
+  VerificationResult,
+} from "./ScuteVerifyApi";
 
 export {
   ScuteSession,

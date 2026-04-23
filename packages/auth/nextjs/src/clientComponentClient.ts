@@ -45,6 +45,15 @@ export const createClientComponentClient = (
         this: ScuteClient,
         payload: ScuteTokenPayload
       ) {
+        // Check for MFA enrollment suggestion (grace period) before sign-in
+        if ((payload as any).mfa_enrollment_suggested) {
+          (this as any)._pendingMfaEnrollmentSuggestion = {
+            mfa_grace_days_remaining: (payload as any).mfa_grace_days_remaining,
+            available_methods: (payload as any).available_methods,
+          };
+          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED);
+        }
+
         const res = await fetchWithCsrf(
           SIGN_IN_HANDLER,
           {

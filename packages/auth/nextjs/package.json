@@ -1,6 +1,6 @@
 {
   "name": "@scute/nextjs-handlers",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "publishConfig": {},
   "files": [
     "dist"

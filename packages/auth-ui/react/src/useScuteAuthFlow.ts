@@ -276,7 +276,17 @@ export function useScuteAuthFlow() {
       const { error: addError } = await scuteClient.addDevice();
       if (addError) { setError(addError.message); return; }
       setView("webauthn_register_success");
-      setTimeout(() => setView("authenticated"), 800);
+      const suggestion = scuteClient.pendingMfaEnrollmentSuggestion;
+      setTimeout(() => {
+        if (suggestion) {
+          setMfaAvailableMethods(suggestion.available_methods || []);
+          setMfaGracePeriod(true);
+          setMfaGraceDaysRemaining(suggestion.mfa_grace_days_remaining);
+          setView("mfa_enroll_suggest");
+        } else {
+          setView("authenticated");
+        }
+      }, 800);
     } catch (err: any) {
       setError(err?.message || "Failed to register passkey");
     }
@@ -284,7 +294,10 @@ export function useScuteAuthFlow() {
 
   const skipPasskey = useCallback(async () => {
     try {
-      if (authPayload) await scuteClient.signInWithTokenPayload(authPayload);
+      if (authPayload) {
+        await scuteClient.signInWithTokenPayload(authPayload);
+        return;
+      }
     } catch {}
     setView("authenticated");
   }, [authPayload, scuteClient]);

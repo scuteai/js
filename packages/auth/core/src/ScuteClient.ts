@@ -1,6 +1,7 @@
 import mitt, { type Emitter, type Handler } from "mitt";
 
 import ScuteAdminApi from "./ScuteAdminApi";
+import ScuteVerifyApi from "./ScuteVerifyApi";
 import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
 import { ScuteSession, sessionUnAuthenticatedState } from "./lib/ScuteSession";
 import {
@@ -105,6 +106,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   readonly baseUrl: string;
 
   readonly admin: ScuteAdminApi;
+  readonly verifications: ScuteVerifyApi;
 
   protected readonly scuteStorage: ScuteStorage | ScuteCookieStorage;
   protected readonly emitter: Emitter<InternalEvent>;
@@ -185,6 +187,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       baseUrl,
       secretKey: config.secretKey,
       errorReporting,
+    });
+
+    this.verifications = new ScuteVerifyApi({
+      appId,
+      baseUrl,
+      errorReporting,
+      getAccessToken: async () => {
+        const { data } = await this.getAuthToken();
+        return data?.access ?? null;
+      },
     });
 
     this.baseOAuthURL = `${baseUrl}${endpointPrefix}/oauth/authorize?provider=`;
