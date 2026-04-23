@@ -38,10 +38,10 @@ importers:
   packages/auth-ui/react:
     dependencies:
       '@scute/js-core':
-        specifier: 0.5.2
+        specifier: 0.6.1
         version: link:../../auth/core
       '@scute/react-hooks':
-        specifier: 0.5.2
+        specifier: 0.6.1
         version: link:../../auth/react
       react:
         specifier: '>=18'
