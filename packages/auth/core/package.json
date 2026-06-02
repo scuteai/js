@@ -16,25 +16,28 @@
     "tsup-build": "tsup src/index.ts --format cjs,esm --dts",
     "build": "genversion src/lib/version.ts --es6 && pnpm tsup-build --dts-resolve",
     "dev": "pnpm tsup-build --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
+    "@fingerprintjs/fingerprintjs": "^5.0.1",
     "@github/webauthn-json": "^2.1.1",
-    "mitt": "^3.0.0",
     "js-cookie": "^3.0.5",
     "jwt-decode": "^3.1.2",
+    "mitt": "^3.0.0",
     "ts-mixer": "^6.0.3",
-    "wretch": "^2.6.0",
-    "@fingerprintjs/fingerprintjs": "^5.0.1"
+    "wretch": "^2.6.0"
   },
   "devDependencies": {
     "@scute/tsconfig": "workspace:*",
-    "@types/node": "^18",
-    "@types/lodash.throttle": "^4.1.7",
     "@types/js-cookie": "^3.0.3",
+    "@types/lodash.throttle": "^4.1.7",
+    "@types/node": "^18.0.0",
     "genversion": "^3.1.1",
-    "typescript": "4.9.5",
+    "tsup": "^8.1.0",
     "type-fest": "^3.12.0",
-    "tsup": "^8.1.0"
+    "typescript": "4.9.5",
+    "vitest": "^4.1.8"
   }
 }

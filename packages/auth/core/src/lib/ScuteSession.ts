@@ -1,11 +1,11 @@
 import type ScuteClient from "../ScuteClient";
+import { AUTH_CHANGE_EVENTS } from "./constants";
 import {
-  AUTH_CHANGE_EVENTS,
-  SCUTE_ACCESS_STORAGE_KEY,
-  SCUTE_CRED_STORAGE_KEY,
-  SCUTE_LAST_LOGIN_STORAGE_KEY,
-  SCUTE_REFRESH_STORAGE_KEY,
-} from "./constants";
+  scopedKey,
+  legacyKey,
+  type StorageKeyKind,
+} from "./storage-keys";
+import type { CookieAttributes } from "./types/general";
 import { InvalidAuthTokenError, ScuteError } from "./errors";
 import {
   decodeAccessToken,
@@ -33,6 +33,102 @@ export abstract class ScuteSession {
   protected abstract scuteStorage: ScuteClient["scuteStorage"];
   /** @internal */
   protected abstract admin: ScuteClient["admin"];
+  /** @internal — needed for per-app storage key namespacing. */
+  protected abstract appId: ScuteClient["appId"];
+
+  // ───────────────────────────────────────────────────────────
+  // Per-app storage helpers
+  //
+  // Every session-relevant key is suffixed with `:<appId>` so two Scute apps
+  // on the same browser origin don't overwrite each other's session. v0.7
+  // still falls back to the legacy unsuffixed key on read and forward-
+  // migrates the value into the namespaced slot, so live users don't get
+  // signed out across the upgrade. v0.8 will drop the fallback.
+  //
+  // See tickets/25-sdk-change-multi-app-session-isolation.md.
+  // ───────────────────────────────────────────────────────────
+
+  /** @internal */
+  protected _scopedKey(kind: StorageKeyKind): string {
+    return scopedKey(kind, this.appId);
+  }
+
+  /**
+   * Read a session-relevant key with legacy-fallback semantics.
+   * Returns the namespaced value if present; otherwise reads the legacy
+   * unsuffixed key and forward-migrates into the namespaced slot (best
+   * effort — failures are swallowed so a read can never block sign-in).
+   * @internal
+   */
+  protected async _readNamespaced(
+    kind: StorageKeyKind,
+    cookieOptions?: CookieAttributes,
+  ): Promise<string | null> {
+    const namespaced = await this.scuteStorage.getItem(this._scopedKey(kind));
+    if (namespaced) return namespaced;
+
+    const legacy = await this.scuteStorage.getItem(legacyKey(kind));
+    if (!legacy) return null;
+
+    // Forward-migrate to the namespaced slot. Best-effort: any error here is
+    // logged via the storage adapter but does not break the read.
+    try {
+      await this.scuteStorage.setItem(
+        this._scopedKey(kind),
+        legacy,
+        cookieOptions as any,
+      );
+    } catch {
+      /* swallow — migration is opportunistic */
+    }
+    return legacy;
+  }
+
+  /** @internal */
+  protected async _writeNamespaced(
+    kind: StorageKeyKind,
+    value: string,
+    cookieOptions?: CookieAttributes,
+  ): Promise<void> {
+    await this.scuteStorage.setItem(
+      this._scopedKey(kind),
+      value,
+      cookieOptions as any,
+    );
+  }
+
+  /**
+   * Remove both the namespaced key and the legacy unsuffixed key for the
+   * given kind. Removes the legacy entry so a sign-out actually signs the
+   * user out — otherwise a stale legacy value could resurrect a session on
+   * the next legacy-fallback read.
+   * @internal
+   */
+  protected async _removeNamespaced(
+    kind: StorageKeyKind,
+    cookieOptions?: CookieAttributes,
+  ): Promise<void> {
+    await this.scuteStorage.removeItem(
+      this._scopedKey(kind),
+      cookieOptions as any,
+    );
+    try {
+      await this.scuteStorage.removeItem(
+        legacyKey(kind),
+        cookieOptions as any,
+      );
+    } catch {
+      /* legacy key may not exist; harmless */
+    }
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        window.localStorage.removeItem(this._scopedKey(kind));
+        window.localStorage.removeItem(legacyKey(kind));
+      } catch {
+        /* private-mode quirks */
+      }
+    }
+  }
 
   /** @internal */
   protected abstract getCurrentUser(
@@ -182,9 +278,17 @@ export abstract class ScuteSession {
    * @internal
    */
   protected async initialSessionState(): Promise<Session> {
-    const access = await this.scuteStorage.getItem(SCUTE_ACCESS_STORAGE_KEY);
+    const access = await this._readNamespaced("access", {
+      sameSite: "lax",
+      httpOnly: false,
+      path: "/",
+    });
     const refresh =
-      (await this.scuteStorage.getItem(SCUTE_REFRESH_STORAGE_KEY)) ?? undefined;
+      (await this._readNamespaced("refresh", {
+        sameSite: "lax",
+        httpOnly: !isBrowser() ? true : false,
+        path: "/",
+      })) ?? undefined;
 
     const decodedAccess = access ? decodeAccessToken(access) : undefined;
     const decodedRefresh = refresh ? decodeRefreshToken(refresh) : undefined;
@@ -330,7 +434,7 @@ export abstract class ScuteSession {
     const { access, accessExpiresAt, refresh, refreshExpiresAt } = state;
 
     if (access) {
-      await this.scuteStorage.setItem(SCUTE_ACCESS_STORAGE_KEY, access, {
+      await this._writeNamespaced("access", access, {
         expires: accessExpiresAt,
         sameSite: "lax",
         httpOnly: false,
@@ -339,7 +443,7 @@ export abstract class ScuteSession {
     }
 
     if (refresh) {
-      await this.scuteStorage.setItem(SCUTE_REFRESH_STORAGE_KEY, refresh, {
+      await this._writeNamespaced("refresh", refresh, {
         expires: refreshExpiresAt,
         sameSite: "lax",
         httpOnly: !browser ? true : false,
@@ -354,18 +458,13 @@ export abstract class ScuteSession {
   protected async removeSession(): Promise<void> {
     const browser = isBrowser();
 
-    if (typeof window !== "undefined" && window.localStorage) {
-      window.localStorage.removeItem(SCUTE_ACCESS_STORAGE_KEY);
-      window.localStorage.removeItem(SCUTE_REFRESH_STORAGE_KEY);
-    }
-
-    await this.scuteStorage.removeItem(SCUTE_ACCESS_STORAGE_KEY, {
+    await this._removeNamespaced("access", {
       httpOnly: false,
       sameSite: "lax",
       path: "/",
     });
 
-    await this.scuteStorage.removeItem(SCUTE_REFRESH_STORAGE_KEY, {
+    await this._removeNamespaced("refresh", {
       httpOnly: !browser ? true : false,
       sameSite: "lax",
       path: "/",
@@ -729,22 +828,17 @@ export abstract class ScuteSession {
    * Get remembered (last logged) identifier.
    */
   async getRememberedIdentifier(): Promise<ScuteIdentifier | null> {
-    const identifier = await this.scuteStorage.getItem(
-      SCUTE_LAST_LOGIN_STORAGE_KEY
-    );
-
-    return identifier;
+    return this._readNamespaced("lastLogin", {
+      sameSite: "strict",
+      path: "/",
+    });
   }
 
   /**
    * Clear remembered (last logged) identifier.
    */
   async clearRememberedIdentifier(): Promise<void> {
-    if (typeof window !== "undefined" && window.localStorage) {
-      window.localStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY);
-    }
-
-    await this.scuteStorage.removeItem(SCUTE_LAST_LOGIN_STORAGE_KEY, {
+    await this._removeNamespaced("lastLogin", {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
       path: "/",
@@ -758,7 +852,7 @@ export abstract class ScuteSession {
   protected async setRememberedIdentifier(
     identifier: ScuteIdentifier
   ): Promise<void> {
-    await this.scuteStorage.setItem(SCUTE_LAST_LOGIN_STORAGE_KEY, identifier, {
+    await this._writeNamespaced("lastLogin", identifier, {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
       path: "/",
@@ -772,11 +866,18 @@ export abstract class ScuteSession {
   private async _getCredentialStore(): Promise<
     Record<UniqueIdentifier, string[]>
   > {
-    let credData = await this.scuteStorage.getItem(SCUTE_CRED_STORAGE_KEY);
+    // Namespaced read first (preferred); legacy read-through via the helper.
+    let credData = await this._readNamespaced("cred", {
+      sameSite: "strict",
+      path: "/",
+    });
 
     if (!credData && typeof window !== "undefined" && window.localStorage) {
-      // fallback method
-      credData = window.localStorage.getItem(SCUTE_CRED_STORAGE_KEY);
+      // localStorage direct read: try namespaced, then legacy (for cookieless
+      // storage adapters that don't see localStorage at all).
+      credData =
+        window.localStorage.getItem(this._scopedKey("cred")) ??
+        window.localStorage.getItem(legacyKey("cred"));
     }
 
     try {
@@ -793,11 +894,11 @@ export abstract class ScuteSession {
    */
   private async _saveCredentialStore(value: string): Promise<void> {
     if (typeof window !== "undefined" && window.localStorage) {
-      // fallback method
-      window.localStorage.setItem(SCUTE_CRED_STORAGE_KEY, value);
+      // localStorage fallback path — always namespaced.
+      window.localStorage.setItem(this._scopedKey("cred"), value);
     }
 
-    await this.scuteStorage.setItem(SCUTE_CRED_STORAGE_KEY, value, {
+    await this._writeNamespaced("cred", value, {
       expires: new Date(new Date().getTime() + 400 * 24 * 60 * 60 * 1000), // 400 days (max) from now
       sameSite: "strict",
       path: "/",

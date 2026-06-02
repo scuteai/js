@@ -8,6 +8,15 @@ export type { AuthFlowView } from "./useScuteAuthFlow";
 export { useUserProfile } from "./useUserProfile";
 export type { UseUserProfileResult, UpdateMetaResult } from "./useUserProfile";
 
+// Active sessions (list / revoke / current-device detection)
+export { useSessions } from "./useSessions";
+export type {
+  UseSessionsResult,
+  SessionsResult,
+  SessionsErrorCode,
+  RevokeResult as RevokeSessionResult,
+} from "./useSessions";
+
 // Alternate phone numbers (verified destinations for SMS)
 export { useAlternatePhones } from "./useAlternatePhones";
 export type {

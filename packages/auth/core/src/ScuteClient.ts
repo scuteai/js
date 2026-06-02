@@ -15,11 +15,11 @@ import {
   AUTH_CHANGE_EVENTS,
   type InternalEvent,
   INTERNAL_EVENTS,
-  SCUTE_BROADCAST_CHANNEL,
   SCUTE_MAGIC_PARAM,
   SCUTE_SKIP_PARAM,
   SCUTE_OAUTH_PKCE_PARAM,
 } from "./lib/constants";
+import { scopedChannel } from "./lib/storage-keys";
 
 import {
   accessTokenHeader,
@@ -112,7 +112,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   protected readonly emitter: Emitter<InternalEvent>;
   protected readonly channel: BroadcastChannel | null = null;
 
-  private static nextInstanceID = 0;
+  // Per-appId instance counting. Two clients with DIFFERENT appIds is the
+  // legitimate multi-app coexistence case — no warning. Two clients with the
+  // SAME appId is the bug we still want to surface (HMR aside).
+  private static instancesPerApp = new Map<string, number>();
   private instanceID = 0;
   protected logDebugMessages = false;
 
@@ -143,12 +146,15 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     this.baseUrl = baseUrl;
 
     if (browser) {
-      this.instanceID = ScuteClient.nextInstanceID;
-      ScuteClient.nextInstanceID += 1;
+      // String-keyed so number-typed UniqueIdentifiers coalesce cleanly.
+      const appIdKey = String(appId);
+      const priorCount = ScuteClient.instancesPerApp.get(appIdKey) ?? 0;
+      this.instanceID = priorCount;
+      ScuteClient.instancesPerApp.set(appIdKey, priorCount + 1);
 
       if (this.instanceID > 0) {
         console.warn(
-          "Multiple ScuteClient instances detected in the same browser context. Although it is not an error, but this should be avoided as it may produce undefined behavior."
+          `Multiple ScuteClient instances detected for appId "${appIdKey}" in the same browser context. This is usually a hot-reload artefact or a duplicated provider; it can produce inconsistent session state and is worth avoiding.`
         );
       }
     }
@@ -204,7 +210,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     this.emitter = mitt<InternalEvent>();
 
     if (browser) {
-      this.channel = new BroadcastChannel(SCUTE_BROADCAST_CHANNEL);
+      this.channel = new BroadcastChannel(scopedChannel(appId));
       const fingerprinting =
         config.preferences?.fingerprinting ??
         DEFAULT_PREFERENCES.fingerprinting;
@@ -1740,9 +1746,24 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   /**
    * Verify the SMS OTP challenge returned by addAlternatePhone. On success
    * the phone is appended to the user's alternate_phones list.
+   *
+   * Uses the current-user-scoped verify endpoint rather than the generic
+   * /challenges/:token/verify (which requires an API key). The end user's
+   * access token is sufficient here — the server checks the challenge
+   * belongs to the caller AND was created with the register_alternate_phone
+   * intent before accepting the code.
    */
   async verifyAlternatePhoneChallenge(challengeToken: string, code: string) {
-    return this.post(`/challenges/${challengeToken}/verify`, { code });
+    const { data, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "verify_alternate_phone");
+      return { data: null, error };
+    }
+    return this.post(
+      "/current_user/alternate_phones/verify",
+      { challenge_token: challengeToken, code },
+      accessTokenHeader(data.access)
+    );
   }
 
   /**
