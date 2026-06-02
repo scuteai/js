@@ -1699,6 +1699,69 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /**
+   * List the current user's verified alternate phone numbers.
+   */
+  async listAlternatePhones() {
+    const { data, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "list_alternate_phones");
+      return { data: null, error };
+    }
+    return this.get<{
+      alternate_phones: Array<{
+        phone: string;
+        label?: string | null;
+        verified_at?: string | null;
+        usable_for_login?: boolean;
+      }>;
+    }>("/current_user/alternate_phones", accessTokenHeader(data.access));
+  }
+
+  /**
+   * Start registering an alternate phone. Server sends an SMS OTP to the
+   * supplied phone; the phone only lands on the user row after verify with
+   * the returned challenge token.
+   * @param phone - phone number (E.164 preferred; 10-digit US accepted)
+   * @param label - optional friendly label ("work", "family", ...)
+   */
+  async addAlternatePhone(phone: string, label?: string) {
+    const { data, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "add_alternate_phone");
+      return { data: null, error };
+    }
+    return this.post<{ challenge_token: string; phone: string; label?: string }>(
+      "/current_user/alternate_phones",
+      { phone, label },
+      accessTokenHeader(data.access)
+    );
+  }
+
+  /**
+   * Verify the SMS OTP challenge returned by addAlternatePhone. On success
+   * the phone is appended to the user's alternate_phones list.
+   */
+  async verifyAlternatePhoneChallenge(challengeToken: string, code: string) {
+    return this.post(`/challenges/${challengeToken}/verify`, { code });
+  }
+
+  /**
+   * Remove an alternate phone (no re-verification required).
+   * @param phone - E.164 phone string
+   */
+  async removeAlternatePhone(phone: string) {
+    const { data, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "remove_alternate_phone");
+      return { data: null, error };
+    }
+    return this.delete(
+      `/current_user/alternate_phones/${encodeURIComponent(phone)}`,
+      accessTokenHeader(data.access)
+    );
+  }
+
+  /**
    * Update user meta.
    * @param meta {UserMeta} - Meta fields
    * @param accessToken - Access Token
