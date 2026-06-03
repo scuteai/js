@@ -10,6 +10,8 @@ import { getHandlerPath } from "./handlerHelpers";
 import {
   CSRF_HANDLER,
   CSRF_TOKEN_KEY,
+  CSRF_TOKEN_KEY_LEGACY,
+  csrfCookieKey,
   REFRESH_HANDLER,
   SIGN_IN_HANDLER,
   SIGN_OUT_HANDLER,
@@ -35,9 +37,13 @@ const internalHandler = async (
     cookies: Record<string, string>;
     headers: Headers;
   }
-): Promise<Response> => {  
+): Promise<Response> => {
+  // The scute client knows its appId — needed to pick the right namespaced
+  // CSRF cookie. See csrf.ts + constants.ts.
+  const appId = scute.appId as string;
+
   if (isSignInRequest(url, method)) {
-    if (!isCsrfTokenValid({ cookies, headers })) {
+    if (!isCsrfTokenValid({ cookies, headers, appId })) {
       const response = getCsrfErrorResponse();
       return response;
     }
@@ -71,7 +77,7 @@ const internalHandler = async (
       status: 200,
     });
   } else if (isSignOutRequest(url, method)) {
-    if (!isCsrfTokenValid({ cookies, headers })) {
+    if (!isCsrfTokenValid({ cookies, headers, appId })) {
       const response = getCsrfErrorResponse();
       return response;
     }
@@ -80,25 +86,29 @@ const internalHandler = async (
       status: 200,
     });
 
-    deleteCsrfToken(response);
+    deleteCsrfToken(response, appId);
 
     await scute.signOut();
 
     return response;
   } else if (isCsrfRequest(url, method)) {
-    const token = cookies[CSRF_TOKEN_KEY]
-      ? cookies[CSRF_TOKEN_KEY]
-      : createCsrfToken();
+    // Prefer the namespaced cookie; fall through to the legacy unsuffixed
+    // one so a mid-migration tab keeps its token instead of being forced
+    // through a fresh round-trip on first read.
+    const token =
+      cookies[csrfCookieKey(appId)] ??
+      cookies[CSRF_TOKEN_KEY_LEGACY] ??
+      createCsrfToken();
 
     const response = new Response(token, {
       status: 200,
     });
 
-    setCsrfToken(token, response);
+    setCsrfToken(token, response, appId);
 
     return response;
   } else if (isRefreshRequest(url, method)) {
-    if (!isCsrfTokenValid({ cookies, headers })) {
+    if (!isCsrfTokenValid({ cookies, headers, appId })) {
       const response = getCsrfErrorResponse();
       return response;
     }

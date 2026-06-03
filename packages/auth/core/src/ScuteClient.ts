@@ -92,7 +92,11 @@ const DEFAULT_PREFERENCES = {
 } as const satisfies ScuteClientPreferences;
 
 class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
-  protected readonly appId: ScuteClientConfig["appId"];
+  // Made public so the @scute/nextjs-handlers layer can suffix CSRF cookies
+  // with the appId — see csrfCookieKey() in constants.ts. Two Scute apps on
+  // the same host used to share a single `X-CSRF-Token` cookie, which is the
+  // same cross-app collision the session storage already avoids via scopedKey.
+  public readonly appId: ScuteClientConfig["appId"];
   protected appData!: ScuteAppData;
 
   protected readonly config: {
@@ -941,6 +945,162 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
 
     return { data: data.challenge, error: null };
+  }
+
+  // -----------------------------------------------------------------------
+  // MFA enrollment & management
+  //
+  // These wrap the /mfa/* surface on the API. They exist as first-class
+  // client methods (instead of letting consumers reach into `post`/`get`)
+  // for two reasons:
+  //   1. The HTTP methods are `protected`; consumers can't call them from
+  //      outside the class without ts-ignore tricks.
+  //   2. Centralising the URLs here means a kitchen-sink page can't drift
+  //      out of sync with the API (the original kitchen-sink had three
+  //      wrong URLs that 404'd silently).
+  // The React hooks in `@scute/auth-react` (useEnrollMfa, useFactorList,
+  // useBackupCodes) are thin wrappers around these.
+  // -----------------------------------------------------------------------
+
+  /** List the current user's enrolled MFA methods. */
+  async listMfaMethods() {
+    const { data: tok, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "list_mfa_methods");
+      return { data: null, error };
+    }
+    return this.get<{
+      methods: Array<{
+        id: string;
+        method: string;
+        name: string | null;
+        verified: boolean;
+        is_default: boolean;
+        last_used_at: string | null;
+        created_at: string;
+      }>;
+      backup_codes_available: number;
+      mfa_enabled: boolean;
+    }>("/mfa/methods", accessTokenHeader(tok.access));
+  }
+
+  /**
+   * Check the MFA status of a user. With `identifier` (email or phone) this
+   * works pre-auth; without it the server reads from the current session
+   * (auth required in that case).
+   */
+  async getMfaStatus(identifier?: string) {
+    const qs = identifier
+      ? `?identifier=${encodeURIComponent(identifier)}`
+      : "";
+    let headers: HeadersInit | undefined;
+    if (!identifier) {
+      const { data: tok, error } = await this.getAuthToken();
+      if (error) {
+        this._reportClientError(error, "get_mfa_status");
+        return { data: null, error };
+      }
+      headers = accessTokenHeader(tok.access);
+    }
+    return this.get<{
+      mfa_required: boolean;
+      mfa_enabled: boolean;
+      available_methods: string[];
+      in_grace_period?: boolean;
+    }>(`/mfa/status${qs}`, headers);
+  }
+
+  /**
+   * Start enrolling a new MFA method. For `totp`, the response carries the
+   * `otpauth://` provisioning URI (for QR rendering) and the base32 secret
+   * (for manual entry). Both are one-shot — they aren't returned again.
+   */
+  async enrollMfa(params: {
+    method: "totp" | "sms" | "email";
+    secret_data?: string;
+    name?: string;
+  }) {
+    const { data: tok, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "enroll_mfa");
+      return { data: null, error };
+    }
+    return this.post<{
+      enrollment: {
+        id: string;
+        method: string;
+        name: string | null;
+        verified: boolean;
+        is_default: boolean;
+        last_used_at: string | null;
+        created_at: string;
+      };
+      provisioning_uri?: string;
+      secret?: string;
+    }>("/mfa/enroll", params, accessTokenHeader(tok.access));
+  }
+
+  /** Verify a pending MFA enrollment with the user-supplied code. */
+  async verifyMfaEnrollment(enrollmentId: string, code: string) {
+    const { data: tok, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "verify_mfa_enrollment");
+      return { data: null, error };
+    }
+    return this.post<{
+      enrollment: {
+        id: string;
+        method: string;
+        verified: boolean;
+        is_default: boolean;
+      };
+    }>(
+      "/mfa/enroll/verify",
+      { enrollment_id: enrollmentId, code },
+      accessTokenHeader(tok.access)
+    );
+  }
+
+  /** Remove an enrolled MFA method by id. */
+  async removeMfaMethod(id: string) {
+    const { data: tok, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "remove_mfa_method");
+      return { data: null, error };
+    }
+    return this.delete(`/mfa/methods/${id}`, accessTokenHeader(tok.access));
+  }
+
+  /** Promote a verified MFA method to the user's default factor. */
+  async setDefaultMfaMethod(id: string) {
+    const { data: tok, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "set_default_mfa_method");
+      return { data: null, error };
+    }
+    return this.patch(
+      `/mfa/methods/${id}/default`,
+      {},
+      accessTokenHeader(tok.access)
+    );
+  }
+
+  /**
+   * Generate a fresh batch of backup codes. The plaintext codes are returned
+   * exactly once — store + display them, then forget. Existing unused codes
+   * are invalidated by this call.
+   */
+  async generateBackupCodes() {
+    const { data: tok, error } = await this.getAuthToken();
+    if (error) {
+      this._reportClientError(error, "generate_backup_codes");
+      return { data: null, error };
+    }
+    return this.post<{ backup_codes: string[]; message?: string }>(
+      "/mfa/backup-codes",
+      {},
+      accessTokenHeader(tok.access)
+    );
   }
 
   /**

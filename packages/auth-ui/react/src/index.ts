@@ -29,6 +29,16 @@ export type {
   UseAlternatePhonesResult,
 } from "./useAlternatePhones";
 
+// Secure-your-account headless screen — list MFA methods + drive enrollment
+export { useSecureAccount } from "./useSecureAccount";
+export type {
+  SecureMethodKey,
+  SecureMethod,
+  EnrollPhase,
+  SecureAccountError,
+  UseSecureAccountResult,
+} from "./useSecureAccount";
+
 // Pre-built gate component — drop-in auth
 export { ScuteAuthGate } from "./ScuteAuthGate";
 export type { ScuteAuthGateProps } from "./ScuteAuthGate";
