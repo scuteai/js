@@ -1,5 +1,11 @@
 # @scute/js-core
 
+## 0.7.0
+
+### Minor Changes
+
+- MFA management methods, per-app CSRF cookie namespacing, per-app instance tracking and session management improvements, alternate phone management functions and hooks
+
 ## 0.6.1
 
 ### Patch Changes
