@@ -116,6 +116,16 @@ const internalHandler = async (
     const { data, error } = await scute.refreshSession();
 
     if (error) {
+      // A backend-rejected refresh means the stored refresh token is dead:
+      // a stale `sc-refresh-token__<appId>` cookie force-migrated from a
+      // pre-0.7 legacy slot, a revoked/cleaned-up session, or a flushed token
+      // store. Clear the session (namespaced and legacy cookies) so the SDK
+      // stops looping on the dead token and the user lands on a clean login
+      // instead of an infinite refresh / 401 loop. signOut is best-effort: a
+      // failed server call must not block the local cookie clear.
+      try {
+        await scute.signOut();
+      } catch {}
       return new Response(null, {
         status: 401,
         headers: {
