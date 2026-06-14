@@ -3,9 +3,29 @@ export type Decision =
   | "allowed"
   | "blocked_rbac"
   | "blocked_no_rule"
+  | "blocked_policy"
   | "needs_challenge"
   | "approval_required"
   | "allowed_downstream_error";
+
+/** Context passed to a guardrail layer (rung) when an action is being gated. */
+export interface LayerContext {
+  identity: Identity;
+  action: string;
+  args: any;
+}
+
+export interface LayerResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * A guardrail rung beyond existence (RBAC): args constraints, velocity limits,
+ * semantic checks. Evaluated in order after RBAC passes; the first failure
+ * blocks the action (decision "blocked_policy") with its reason on the span.
+ */
+export type Layer = (ctx: LayerContext) => LayerResult | Promise<LayerResult>;
 
 /** The actor on whose behalf the agent is acting. */
 export interface Identity {
@@ -131,6 +151,8 @@ export interface ToolDefinition<A = any, R = any> {
   name: string;
   /** required permission slug; if omitted, fail-closed treats the action as blocked */
   permission?: string;
+  /** guardrail rungs evaluated (in order) after RBAC passes, before the tool runs */
+  layers?: Layer[];
   run: (args: A, ctx: ToolContext) => Promise<R> | R;
 }
 

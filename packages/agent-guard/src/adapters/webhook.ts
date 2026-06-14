@@ -70,6 +70,8 @@ export function toToolResponse(result: GuardResult): ToolResponse {
       return { ok: false, decision: result.decision, message: "You are not permitted to do that." };
     case "blocked_no_rule":
       return { ok: false, decision: result.decision, message: "That action is not available." };
+    case "blocked_policy":
+      return { ok: false, decision: result.decision, message: result.span.error || "That action is blocked by policy." };
     default:
       return { ok: false, decision: result.decision };
   }

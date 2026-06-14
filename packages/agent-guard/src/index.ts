@@ -15,6 +15,14 @@ export {
   guardedLiveKitTool,
 } from "./adapters/livekit";
 export type { LiveKitToolDef } from "./adapters/livekit";
+export {
+  maxAmount,
+  argAllowlist,
+  requireArgs,
+  velocity,
+  MemoryVelocityStore,
+} from "./layers";
+export type { VelocityStore, VelocityOptions } from "./layers";
 export { ANONYMOUS } from "./types";
 export type {
   Decision,
@@ -31,4 +39,7 @@ export type {
   VerificationMeta,
   AuthorizeDecision,
   VerifierAdapter,
+  Layer,
+  LayerContext,
+  LayerResult,
 } from "./types";

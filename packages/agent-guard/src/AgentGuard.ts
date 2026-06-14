@@ -98,7 +98,7 @@ export class AgentGuard {
     // 1. no rule -> fail closed (or allow if explicitly opened)
     if (!requiredPermission) {
       if (this.failClosed) return this.deny(span, "blocked_no_rule", startedAt);
-      return this.allow(span, def, input.args, identity, startedAt);
+      return this.allowWithLayers(span, def, input.args, identity, startedAt);
     }
 
     // Authoritative fast-path: if the verifier can decide in one call and we have
@@ -111,7 +111,7 @@ export class AgentGuard {
         if (d.requiresVerification && identity.kind === "m2m") {
           return this.deny(span, "approval_required", startedAt);
         }
-        return this.allow(span, def, input.args, identity, startedAt);
+        return this.allowWithLayers(span, def, input.args, identity, startedAt);
       }
       if (d.requiresVerification) {
         if (identity.kind === "m2m") return this.deny(span, "approval_required", startedAt);
@@ -148,7 +148,7 @@ export class AgentGuard {
     }
 
     // 4. allowed -> execute the registered tool if present
-    return this.allow(span, def, input.args, identity, startedAt);
+    return this.allowWithLayers(span, def, input.args, identity, startedAt);
   }
 
   /** Wrap any async unit of work as a traced `function` span. */
@@ -294,6 +294,26 @@ export class AgentGuard {
     span.durationMs = this.now() - startedAt;
     await this.emit(span);
     return { decision, allowed: false, span };
+  }
+
+  // Evaluate guardrail rungs (args/velocity/...) after RBAC has passed; the
+  // first failing rung blocks the action with decision "blocked_policy".
+  private async allowWithLayers(
+    span: GuardSpan,
+    def: ToolDefinition | undefined,
+    args: unknown,
+    identity: Identity,
+    startedAt: number
+  ): Promise<GuardResult> {
+    const layers = def?.layers || [];
+    for (const layer of layers) {
+      const r = await layer({ identity, action: span.action, args });
+      if (!r.ok) {
+        span.error = r.reason;
+        return this.deny(span, "blocked_policy", startedAt);
+      }
+    }
+    return this.allow(span, def, args, identity, startedAt);
   }
 
   private async allow(
