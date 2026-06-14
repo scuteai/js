@@ -1,0 +1,24 @@
+{
+  "name": "scute-agent-livekit-worker",
+  "private": true,
+  "type": "module",
+  "description": "Turnkey LiveKit voice agent guarded by Scute (ticket A10). You run it; see README.",
+  "scripts": {
+    "token-server": "tsx src/token-server.ts",
+    "agent": "tsx src/agent.ts dev"
+  },
+  "dependencies": {
+    "@livekit/agents": "^0.7.0",
+    "@livekit/agents-plugin-silero": "^0.7.0",
+    "livekit-server-sdk": "^2.9.0",
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0"
+  }
+}
