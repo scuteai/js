@@ -8,6 +8,8 @@ export { ScuteVerifier } from "./adapters/ScuteVerifier";
 export type { ScuteVerifierOptions, FetchLike } from "./adapters/ScuteVerifier";
 export { MemorySink } from "./sinks/MemorySink";
 export { ConsoleSink } from "./sinks/ConsoleSink";
+export { loadAgentConfig, callManagedTool } from "./managed";
+export type { ManagedAgentConfig, ManagedClientOptions, ManagedToolResult } from "./managed";
 export { handleToolCall, toToolResponse } from "./adapters/webhook";
 export type { ToolCall, HandleOptions, ToolResponse } from "./adapters/webhook";
 export {
