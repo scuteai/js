@@ -11,83 +11,65 @@ import {
 } from "@livekit/agents";
 import * as silero from "@livekit/agents-plugin-silero";
 import { z } from "zod";
-// Monorepo dev: import the SDK source directly so this runs under tsx with no
-// build step. A real consumer would: import { ... } from "@scute/agent-guard".
+// Monorepo dev: import the SDK source so this runs under tsx with no build.
+// A real consumer would: import { ... } from "@scute/agent-guard".
 import {
-  AgentGuard,
-  ScuteVerifier,
-  guardedLiveKitTool,
-  maxAmount,
-  type Identity,
+  loadAgentConfig,
+  callManagedTool,
+  type ManagedClientOptions,
 } from "../../../packages/agent-guard/src/index";
-import { createOrderDb } from "./tools.js";
 
-// NOTE: written to the @livekit/agents v0.x Node API (voice pipeline +
-// llm.tool). If your installed version differs, the voice-pipeline boilerplate
-// (AgentSession/Agent/tool registration) may need small tweaks — the Scute
-// guard wiring below stays the same.
+// M05: a GENERIC, config-driven managed worker. It serves ANY agent — at startup
+// it fetches the agent's config from Scute (M03) using the agent's own M2M token,
+// builds its tools from that config, and routes every tool call through the
+// HOSTED guard endpoint (Scute gates + forwards server-side). Deploy ONE of these
+// to LiveKit Cloud Agents; Scute's launch dispatches it per agent.
+//
+// Env: SCUTE_API_URL, SCUTE_APP_ID, SCUTE_AGENT_ID, SCUTE_AGENT_TOKEN (the agent's
+// M2M token, from launch). NOTE: written to the @livekit/agents v0.x API; the
+// voice-pipeline boilerplate may need tweaks per your version — the Scute wiring
+// (loadAgentConfig + callManagedTool) does not.
 export default defineAgent({
   entry: async (ctx: JobContext) => {
     await ctx.connect();
-    const participant = await ctx.waitForParticipant();
-    const attrs = (participant.attributes || {}) as Record<string, string>;
 
-    const guard = new AgentGuard({
-      verifier: new ScuteVerifier({
-        baseUrl: process.env.SCUTE_API_URL!,
-        appId: process.env.SCUTE_APP_ID!,
-      }),
-    });
-    const db = createOrderDb();
+    const client: ManagedClientOptions = {
+      baseUrl: process.env.SCUTE_API_URL!,
+      appId: process.env.SCUTE_APP_ID!,
+      agentId: process.env.SCUTE_AGENT_ID!,
+      token: process.env.SCUTE_AGENT_TOKEN!,
+    };
 
-    // Authorize as the user's Scute token (live resolution). Phone/anon callers
-    // would start anonymous and bind via a verify_caller tool.
-    const actor: string | Identity =
-      attrs.scute_token || { kind: "anonymous", roles: [] };
+    const config = await loadAgentConfig(client);
+    if (!config) throw new Error("could not load agent config from Scute");
 
-    const lookup = guardedLiveKitTool(guard, actor, {
-      name: "lookup_order",
-      permission: "orders:read",
-      run: (a: { id: number }) => db[a.id] ?? null,
-    });
-    const refund = guardedLiveKitTool(guard, actor, {
-      name: "refund_order",
-      permission: "orders:refund",
-      layers: [maxAmount("amount", 500)],
-      run: (a: { id: number }) => {
-        db[a.id].status = "refunded";
-        return { id: a.id, status: "refunded" };
-      },
-    });
+    // Build the agent's tools from config; each routes through the hosted guard.
+    const tools: Record<string, any> = {};
+    for (const t of config.tools) {
+      tools[t.name] = llm.tool({
+        description: `Tool ${t.name}`,
+        parameters: z.object({}).passthrough(),
+        execute: async (args: Record<string, unknown>) => {
+          const r = await callManagedTool(client, t.name, args);
+          return r.ok ? JSON.stringify(r.output ?? {}) : r.message || "You are not permitted to do that.";
+        },
+      });
+    }
 
     const agent = new voice.Agent({
-      instructions:
-        "You are a friendly support agent for an online store. Use lookup_order and refund_order to help. If a tool result says the caller is not permitted or needs verification, tell them plainly and do not retry.",
-      tools: {
-        lookup_order: llm.tool({
-          description: "Look up an order by its id",
-          parameters: z.object({ id: z.number() }),
-          execute: async ({ id }) => JSON.stringify(await lookup({ id })),
-        }),
-        refund_order: llm.tool({
-          description: "Refund an order by its id (optionally an amount)",
-          parameters: z.object({ id: z.number(), amount: z.number().optional() }),
-          execute: async ({ id, amount }) => JSON.stringify(await refund({ id, amount })),
-        }),
-      },
+      instructions: config.system_prompt || "You are a helpful assistant.",
+      tools,
     });
 
     const session = new voice.AgentSession({
       stt: new inference.STT({ model: "deepgram/nova-3", language: "multi" }),
-      llm: new inference.LLM({ model: "openai/gpt-4.1-mini" }),
+      llm: new inference.LLM({ model: config.model || "openai/gpt-4.1-mini" }),
       tts: new inference.TTS({ model: "cartesia/sonic-2" }),
       vad: await silero.VAD.load(),
     });
 
     await session.start({ agent, room: ctx.room });
-    await session.generateReply({
-      instructions: "Greet the caller and offer to help with their order.",
-    });
+    await session.generateReply({ instructions: "Greet the caller and offer to help." });
   },
 });
 
