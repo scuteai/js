@@ -101,6 +101,27 @@ export class AgentGuard {
       return this.allow(span, def, input.args, identity, startedAt);
     }
 
+    // Authoritative fast-path: if the verifier can decide in one call and we have
+    // the raw token, use it (covers RBAC + verification gate + M2M escalation).
+    const rawToken = typeof input.actor === "string" ? input.actor : undefined;
+    if (rawToken && this.verifier.authorize) {
+      const d = await this.verifier.authorize(rawToken, requiredPermission);
+      if (d.allowed) {
+        // Gated + M2M -> escalate to human approval rather than allowing.
+        if (d.requiresVerification && identity.kind === "m2m") {
+          return this.deny(span, "approval_required", startedAt);
+        }
+        return this.allow(span, def, input.args, identity, startedAt);
+      }
+      if (d.requiresVerification) {
+        if (identity.kind === "m2m") return this.deny(span, "approval_required", startedAt);
+        const res = await this.deny(span, "needs_challenge", startedAt);
+        res.challenge = { method: d.verificationMethod };
+        return res;
+      }
+      return this.deny(span, "blocked_rbac", startedAt);
+    }
+
     // 2. RBAC
     if (!(await this.verifier.can(identity, requiredPermission))) {
       return this.deny(span, "blocked_rbac", startedAt);

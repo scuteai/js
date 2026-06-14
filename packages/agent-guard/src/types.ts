@@ -86,6 +86,17 @@ export interface VerificationMeta {
 }
 
 /**
+ * Authoritative one-call decision from a backend (the Scute /authorize endpoint).
+ * `requiresVerification` is reported even when allowed, so the guard can escalate
+ * an M2M actor on a gated permission to human approval instead of allowing it.
+ */
+export interface AuthorizeDecision {
+  allowed: boolean;
+  requiresVerification?: boolean;
+  verificationMethod?: string;
+}
+
+/**
  * Bridges the gate to Scute RBAC (#18). In production this is backed by the
  * Scute verify/authorize endpoints (ticket A02). In tests, use StubVerifier.
  * Permissions are read LIVE (not from a stale JWT claim) so revocation is instant.
@@ -99,6 +110,12 @@ export interface VerifierAdapter {
   ): Promise<VerificationMeta | null>;
   /** whether a USER has already satisfied step-up for this permission */
   isVerified?(identity: Identity, permission: string): Promise<boolean>;
+  /**
+   * Optional authoritative decision in one call (token + permission). When a
+   * verifier provides this AND the actor was passed as a token string, the gate
+   * uses it instead of can()/permissionMeta()/isVerified().
+   */
+  authorize?(token: string, permission: string): Promise<AuthorizeDecision>;
 }
 
 /** Where trace spans go (console | memory | scute | braintrust | otel | posthog). */
