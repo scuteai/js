@@ -8,6 +8,13 @@ export { ScuteVerifier } from "./adapters/ScuteVerifier";
 export type { ScuteVerifierOptions, FetchLike } from "./adapters/ScuteVerifier";
 export { MemorySink } from "./sinks/MemorySink";
 export { ConsoleSink } from "./sinks/ConsoleSink";
+export { handleToolCall, toToolResponse } from "./adapters/webhook";
+export type { ToolCall, HandleOptions, ToolResponse } from "./adapters/webhook";
+export {
+  identityFromLiveKitAttributes,
+  guardedLiveKitTool,
+} from "./adapters/livekit";
+export type { LiveKitToolDef } from "./adapters/livekit";
 export { ANONYMOUS } from "./types";
 export type {
   Decision,
