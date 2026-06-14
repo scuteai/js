@@ -1,5 +1,5 @@
 import { AgentGuard } from "../AgentGuard";
-import { Identity, ToolContext } from "../types";
+import { Identity, Layer, ToolContext } from "../types";
 import { ToolResponse, toToolResponse } from "./webhook";
 
 /**
@@ -25,6 +25,8 @@ export function identityFromLiveKitAttributes(
 export interface LiveKitToolDef<A = any, R = any> {
   name: string;
   permission: string;
+  /** guardrail rungs (args/velocity/...) layered on top of RBAC */
+  layers?: Layer[];
   run: (args: A, ctx: ToolContext) => Promise<R> | R;
 }
 
@@ -34,11 +36,15 @@ export interface LiveKitToolDef<A = any, R = any> {
  * runs the underlying tool only when allowed and returns a ToolResponse whose
  * `message` the agent surfaces to the caller on a block/challenge.
  */
+// `actor` should be the participant's Scute token when available (the gate then
+// resolves permissions LIVE via /authorize, so a mid-call grant takes effect
+// immediately). An Identity also works but is authorized against its own
+// resolved permissions only.
 export function guardedLiveKitTool<A = any, R = any>(
   guard: AgentGuard,
-  identity: Identity,
+  actor: string | Identity,
   def: LiveKitToolDef<A, R>
 ): (args: A) => Promise<ToolResponse> {
   const runner = guard.tool(def);
-  return async (args: A) => toToolResponse(await runner(args, { actor: identity }));
+  return async (args: A) => toToolResponse(await runner(args, { actor }));
 }
