@@ -1,0 +1,29 @@
+{
+  "name": "@scute/agent-guard",
+  "version": "0.0.0",
+  "description": "Identity-native guardrails and tracing for AI agent tool calls (Scute).",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "exports": {
+    "require": "./dist/index.js",
+    "import": "./dist/index.mjs"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "tsup-build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "pnpm tsup-build",
+    "dev": "pnpm tsup-build --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@scute/tsconfig": "workspace:*",
+    "@types/node": "^18.0.0",
+    "tsup": "^8.1.0",
+    "typescript": "4.9.5",
+    "vitest": "^4.1.8"
+  }
+}
