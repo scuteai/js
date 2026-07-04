@@ -81,6 +81,7 @@ import type {
   ScuteOtpResponse,
   ScuteChallengeResponse,
   ScuteMfaRequiredResponse,
+  ScuteSsoDiscovery,
 } from "./lib/types/scute";
 
 const DEFAULT_PREFERENCES = {
@@ -107,6 +108,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   };
 
   protected readonly baseOAuthURL: string;
+  protected readonly baseSamlLoginURL: string;
   readonly baseUrl: string;
 
   readonly admin: ScuteAdminApi;
@@ -210,6 +212,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     });
 
     this.baseOAuthURL = `${baseUrl}${endpointPrefix}/oauth/authorize?provider=`;
+
+    // SP-initiated SAML login. Server 302s to the IdP with a signed
+    // AuthnRequest; no assertion is ever handled client-side.
+    this.baseSamlLoginURL = `${baseUrl}${endpointPrefix}/saml/login`;
 
     this.emitter = mitt<InternalEvent>();
 
@@ -359,6 +365,44 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   getOAuthUrl(provider: string) {
     return `${this.baseOAuthURL}${provider}`;
+  }
+
+  /**
+   * Start SP-initiated SAML login by redirecting the browser to the
+   * workspace SP-initiate endpoint. Login completes via the existing
+   * magic-link status poll (same handoff as signInWithOAuthProvider).
+   * @param relayState - Optional opaque value round-tripped back after ACS.
+   */
+  signInWithSAML(relayState?: string) {
+    window.location.href = this.getSamlLoginUrl(relayState);
+  }
+
+  /**
+   * Build the SP-initiated SAML login URL for this app.
+   * @param relayState - Optional opaque value round-tripped back after ACS.
+   */
+  getSamlLoginUrl(relayState?: string) {
+    const url = new URL(this.baseSamlLoginURL);
+    if (relayState) url.searchParams.set("relay_state", relayState);
+    return url.toString();
+  }
+
+  /**
+   * Home-realm discovery for an email domain (SAML SSO). Resolves whether
+   * SSO is available/enforced for the email's domain and the app-scoped
+   * SP-initiate URL to redirect to. The discovery endpoint is public and
+   * returns a uniform miss for unknown, unverified, or disabled domains, so
+   * any non-200 resolves to null rather than throwing.
+   * @param email - email address to resolve
+   */
+  async discoverSSO(email: string): Promise<ScuteSsoDiscovery | null> {
+    const { data, error } = await this.admin.discoverSSO(email);
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data;
   }
 
   /**

@@ -17,6 +17,17 @@ export type ScuteOAuthProviderConfig = {
   color?: string;
 };
 
+/**
+ * Home-realm discovery result for a SAML SSO email domain. Returned by
+ * GET /v1/auth/saml/discover when the email's domain maps to a verified,
+ * enabled workspace SAML config.
+ */
+export type ScuteSsoDiscovery = {
+  workspace_id: UniqueIdentifier;
+  saml_login_url: string;
+  enforce_sso: boolean;
+};
+
 export type ScuteAppData = {
   id: UniqueIdentifier;
   name: string;
