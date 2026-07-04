@@ -131,13 +131,28 @@ export function useScuteAuthFlow() {
     const magicToken = scuteClient.getMagicLinkToken();
     if (!magicToken) { setView("login"); return; }
 
+    // Scrub the magic link token from the URL synchronously on detection,
+    // before any await, so it cannot linger if verification fails (SEC-36)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("sct_magic");
+      window.history.replaceState({}, "", url.toString());
+    }
+
     (async () => {
-      const { data, error: verifyError } = await scuteClient.verifyMagicLinkToken(magicToken);
+      let verifyResult;
+      try {
+        verifyResult = await scuteClient.verifyMagicLinkToken(magicToken);
+      } catch (err: any) {
+        setError(err?.message || "Invalid or expired link");
+        setView("error");
+        return;
+      }
+      const { data, error: verifyError } = verifyResult;
 
       // Clean URL
       if (typeof window !== "undefined") {
         const url = new URL(window.location.href);
-        url.searchParams.delete("sct_magic");
         url.searchParams.delete("sct_sk");
         window.history.replaceState({}, "", url.toString());
       }
