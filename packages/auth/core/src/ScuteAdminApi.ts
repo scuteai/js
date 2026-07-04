@@ -6,6 +6,7 @@ import type {
   ScuteAppData,
   ScuteIdentifier,
   ScutePaginationMeta,
+  ScuteSsoDiscovery,
   ScuteUser,
   ScuteUserData,
   ScuteUserSession,
@@ -122,6 +123,19 @@ class ScuteAdminApi extends ScuteBaseHttp {
   async getUserByUserId(userId: UniqueIdentifier) {
     return this.get<{ user: ScuteUser | null }>(
       `${this._authPath}/users?user_id=${userId}`
+    );
+  }
+
+  /**
+   * Home-realm discovery for a SAML SSO email domain. The endpoint is not
+   * app-scoped: it resolves the email's domain to its workspace SAML config,
+   * so it lives at /v1/auth/saml/discover (not under an app id).
+   * * Unauthenticated
+   * @param email {string}
+   */
+  async discoverSSO(email: string) {
+    return this.get<ScuteSsoDiscovery>(
+      `/v1/auth/saml/discover?email=${encodeURIComponent(email)}`
     );
   }
 
