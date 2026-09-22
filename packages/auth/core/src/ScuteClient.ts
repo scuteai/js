@@ -991,6 +991,50 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     return { data: data.challenge, error: null };
   }
 
+  /**
+   * Start a "Sign in with Microsoft Authenticator" (Entra push / number-match)
+   * login for an already-enabled user.
+   *
+   * The server sends a push to the user's Microsoft Authenticator app and
+   * returns a *pending* challenge. Poll {@link getChallengeStatus} to surface
+   * the number-match digits (`challenge.metadata.number`) and watch for
+   * completion, then call {@link claimMsAuthenticatorSession} to finish sign-in.
+   *
+   * Only works for users whose workspace has Microsoft Authenticator enabled and
+   * who have the Authenticator registered; otherwise the server responds 400.
+   *
+   * @param identifier - The user's email (or phone) to look up the Entra link.
+   */
+  async startMsAuthenticatorLogin(identifier: string) {
+    return this.post<{ challenge: ScuteChallengeResponse }>(`/challenges`, {
+      purpose: "authenticate",
+      method: "entra_push",
+      identifier,
+    });
+  }
+
+  /**
+   * Exchange a completed Microsoft Authenticator (entra_push) challenge for a
+   * session and sign the user in. Call this once {@link getChallengeStatus}
+   * reports `status === "completed"`.
+   *
+   * Single-use on the server: a second call for the same challenge returns 409.
+   *
+   * @param token - The challenge token returned by {@link startMsAuthenticatorLogin}.
+   */
+  async claimMsAuthenticatorSession(token: string) {
+    const { data, error } = await this.post<ScuteTokenPayload>(
+      `/challenges/${token}/session`,
+      {}
+    );
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this.signInWithTokenPayload(data);
+  }
+
   // -----------------------------------------------------------------------
   // MFA enrollment & management
   //
