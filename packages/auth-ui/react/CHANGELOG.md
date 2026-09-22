@@ -1,5 +1,15 @@
 # @scute/auth-ui-react
 
+## 0.3.1
+
+### Patch Changes
+
+- Scrub the magic link token from the URL before verification starts, so
+  the one-time token never survives into browser history or referrers.
+- Updated dependencies
+  - @scute/js-core@0.9.0
+  - @scute/react-hooks@0.8.1
+
 ## 0.3.0
 
 ### Minor Changes

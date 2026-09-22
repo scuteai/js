@@ -1,6 +1,6 @@
 {
   "name": "@scute/js-core",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publishConfig": {},
   "files": [
     "dist"
@@ -23,7 +23,7 @@
   "dependencies": {
     "@fingerprintjs/fingerprintjs": "^5.0.1",
     "@github/webauthn-json": "^2.1.1",
-    "js-cookie": "^3.0.5",
+    "js-cookie": "^3.0.7",
     "jwt-decode": "^3.1.2",
     "mitt": "^3.0.0",
     "ts-mixer": "^6.0.3",

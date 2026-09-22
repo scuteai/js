@@ -1,5 +1,14 @@
 # @scute/js-core
 
+## 0.9.0
+
+### Minor Changes
+
+- SAML SSO sign-in with home-realm discovery, and Microsoft Authenticator
+  (entra_push) sign-in: `startMsAuthenticatorLogin` fires the number-match
+  push, `claimMsAuthenticatorSession` exchanges the completed challenge
+  for a session.
+
 ## 0.8.0
 
 ### Minor Changes
