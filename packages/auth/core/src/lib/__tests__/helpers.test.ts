@@ -71,10 +71,8 @@ describe("decodeAccessToken", () => {
     expect(decoded?.userId).toBe(42);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): a non-numeric `exp` is accepted and
-  // produces an Invalid Date. Every expiry comparison against NaN is false,
-  // so ScuteSession never considers such a token expired (fail-open on
-  // expiry). Server-issued tokens always carry numeric exp, so impact is low.
+  // Known limitation, tracked separately: a non-numeric `exp` is accepted
+  // and produces an Invalid Date.
   it("accepts a non-numeric exp and yields an Invalid Date", () => {
     const decoded = decodeAccessToken(makeJwt({ uuid: "u", exp: "tomorrow" }));
     expect(decoded).not.toBeNull();
@@ -175,9 +173,8 @@ describe("isMaybePhoneNumber", () => {
     expect(isMaybePhoneNumber("")).toBe("");
   });
 
-  // CURRENT BEHAVIOR (suspected bug): no digit is required, so punctuation
-  // or whitespace only identifiers count as phone numbers and get routed to
-  // the SMS OTP flow instead of being rejected.
+  // Known limitation, tracked separately: no digit is required, so
+  // punctuation-only or whitespace-only strings count as phone numbers.
   it("treats punctuation-only and whitespace-only strings as phone numbers", () => {
     expect(isMaybePhoneNumber("()-")).toBe(true);
     expect(isMaybePhoneNumber("   ")).toBe(true);

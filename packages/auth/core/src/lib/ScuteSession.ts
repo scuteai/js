@@ -6,11 +6,12 @@ import {
   type StorageKeyKind,
 } from "./storage-keys";
 import type { CookieAttributes } from "./types/general";
-import { InvalidAuthTokenError, ScuteError } from "./errors";
+import { BaseHttpError, InvalidAuthTokenError, ScuteError } from "./errors";
 import {
   decodeAccessToken,
   decodeRefreshToken,
   Deferred,
+  getLocalStorage,
   isBrowser,
 } from "./helpers";
 import { UniqueIdentifier } from "./types/general";
@@ -120,10 +121,11 @@ export abstract class ScuteSession {
     } catch {
       /* legacy key may not exist; harmless */
     }
-    if (typeof window !== "undefined" && window.localStorage) {
+    const localStorage = getLocalStorage();
+    if (localStorage) {
       try {
-        window.localStorage.removeItem(this._scopedKey(kind));
-        window.localStorage.removeItem(legacyKey(kind));
+        localStorage.removeItem(this._scopedKey(kind));
+        localStorage.removeItem(legacyKey(kind));
       } catch {
         /* private-mode quirks */
       }
@@ -194,12 +196,14 @@ export abstract class ScuteSession {
       return this._getSessionDeferred.promise;
     }
 
-    this._getSessionDeferred = new Deferred();
-    const result = await this.__getSession(...params);
-    this._getSessionDeferred.resolve(result);
-    this._getSessionDeferred = null;
-
-    return result;
+    const deferred = (this._getSessionDeferred = new Deferred());
+    return settleSingleFlight(
+      deferred,
+      () => this.__getSession(...params),
+      () => {
+        this._getSessionDeferred = null;
+      }
+    );
   }
 
   /**
@@ -237,6 +241,16 @@ export abstract class ScuteSession {
           if (refreshError) {
             this.debug("#_getSession", "refreshError");
             await this._handleRefreshError(refreshError);
+
+            if (!isSessionRejected(refreshError)) {
+              // Transient failure (network, 5xx): the stored session is kept
+              // for a later refresh, but it cannot be confirmed right now.
+              return {
+                data: { session: unAuthenticatedState(), user: null },
+                error: refreshError,
+              };
+            }
+
             session = unAuthenticatedState();
           } else {
             if (refreshedSession.access) {
@@ -480,20 +494,24 @@ export abstract class ScuteSession {
       return this._expireSessionDeferred.promise;
     }
 
-    this._expireSessionDeferred = new Deferred();
+    const deferred = (this._expireSessionDeferred = new Deferred());
+    return settleSingleFlight(
+      deferred,
+      async () => {
+        const unauthenticatedSession = unAuthenticatedState();
+        this.emitAuthChangeEvent(
+          AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
+          unauthenticatedSession
+        );
 
-    const unauthenticatedSession = unAuthenticatedState();
-    this.emitAuthChangeEvent(
-      AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
-      unauthenticatedSession
+        await this.removeSession();
+
+        return unauthenticatedSession;
+      },
+      () => {
+        this._expireSessionDeferred = null;
+      }
     );
-
-    await this.removeSession();
-
-    this._expireSessionDeferred.resolve(unauthenticatedSession);
-    this._expireSessionDeferred = null;
-
-    return unauthenticatedSession;
   }
 
   /**
@@ -656,12 +674,14 @@ export abstract class ScuteSession {
       return this._refreshDeferred.promise;
     }
 
-    this._refreshDeferred = new Deferred();
-    const response = await this.__refresh(...params);
-    this._refreshDeferred.resolve(response);
-    this._refreshDeferred = null;
-
-    return response;
+    const deferred = (this._refreshDeferred = new Deferred());
+    return settleSingleFlight(
+      deferred,
+      () => this.__refresh(...params),
+      () => {
+        this._refreshDeferred = null;
+      }
+    );
   }
 
   /**
@@ -723,7 +743,11 @@ export abstract class ScuteSession {
    * @internal
    */
   private async _handleGetCurrentUserError(error: ScuteError) {
-    const session = await this._expireSession();
+    // Only a rejected token ends the session; a transient failure keeps the
+    // stored tokens and just reports the error.
+    const session = isSessionRejected(error)
+      ? await this._expireSession()
+      : unAuthenticatedState();
 
     return {
       data: { session, user: null },
@@ -736,7 +760,11 @@ export abstract class ScuteSession {
    * @internal
    */
   private async _handleRefreshError(error: ScuteError) {
-    await this._expireSession();
+    // Only a rejected refresh ends the session. Network errors and 5xx keep
+    // the stored tokens so the next refresh (or tick) can recover.
+    if (isSessionRejected(error)) {
+      await this._expireSession();
+    }
 
     return {
       data: null,
@@ -872,12 +900,13 @@ export abstract class ScuteSession {
       path: "/",
     });
 
-    if (!credData && typeof window !== "undefined" && window.localStorage) {
+    const localStorage = getLocalStorage();
+    if (!credData && localStorage) {
       // localStorage direct read: try namespaced, then legacy (for cookieless
       // storage adapters that don't see localStorage at all).
       credData =
-        window.localStorage.getItem(this._scopedKey("cred")) ??
-        window.localStorage.getItem(legacyKey("cred"));
+        localStorage.getItem(this._scopedKey("cred")) ??
+        localStorage.getItem(legacyKey("cred"));
     }
 
     try {
@@ -893,9 +922,10 @@ export abstract class ScuteSession {
    * @internal
    */
   private async _saveCredentialStore(value: string): Promise<void> {
-    if (typeof window !== "undefined" && window.localStorage) {
+    const localStorage = getLocalStorage();
+    if (localStorage) {
       // localStorage fallback path — always namespaced.
-      window.localStorage.setItem(this._scopedKey("cred"), value);
+      localStorage.setItem(this._scopedKey("cred"), value);
     }
 
     await this._writeNamespaced("cred", value, {
@@ -988,6 +1018,43 @@ export abstract class ScuteSession {
     return this._saveCredentialStore(value);
   }
 }
+
+/**
+ * Whether the server definitively rejected the session's token: 401 (the
+ * token is invalid, expired or revoked; `getCurrentUser` maps it to
+ * InvalidAuthTokenError) or 403 (the token is not allowed for this app).
+ * Network errors (no status), 5xx and other statuses are treated as
+ * transient and never clear the stored session.
+ */
+const isSessionRejected = (error: unknown) =>
+  error instanceof InvalidAuthTokenError ||
+  (error instanceof BaseHttpError &&
+    (error.code === 401 || error.code === 403));
+
+/**
+ * Runs `task` for a single-flight guard: settles `deferred` with the outcome
+ * (so callers that joined the in-flight call get the same result or error)
+ * and always runs `release`, so a throw cannot leave the guard set.
+ */
+const settleSingleFlight = async <T>(
+  deferred: Deferred<T>,
+  task: () => Promise<T>,
+  release: () => void
+): Promise<T> => {
+  // Joiners observe a rejection through `deferred.promise`; this handler only
+  // keeps an unjoined rejection from being reported as unhandled.
+  deferred.promise.catch(() => {});
+  try {
+    const result = await task();
+    deferred.resolve(result);
+    return result;
+  } catch (error) {
+    deferred.reject(error as Error);
+    throw error;
+  } finally {
+    release();
+  }
+};
 
 const unAuthenticatedState = (): Session => {
   return {

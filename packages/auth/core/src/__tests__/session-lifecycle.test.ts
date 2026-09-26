@@ -106,10 +106,8 @@ describe("getSession: initial state", () => {
   });
 
   it("an app data failure at construction is sticky: getSession keeps returning it after the API recovers", async () => {
-    // CURRENT BEHAVIOR (suspected bug): _initialize() memoizes its first
-    // result, including an error. One failed /v1/apps request during page
-    // load leaves getSession() returning that error until a full reload,
-    // even after getAppData(true) succeeds.
+    // Known limitation, tracked separately: _initialize() memoizes its first
+    // result, including an app data error, until the client is recreated.
     server.on("GET", `/v1/apps/${APP_ID}`, { status: 500, body: { error: "down" } });
     seedSession(storage, { access: accessToken() });
     const client = newClient();
@@ -304,33 +302,30 @@ describe("refresh: failures", () => {
     expect(storage.snapshot()).toEqual({});
   });
 
-  // CURRENT BEHAVIOR (suspected bug): a transient network failure while
-  // refreshing is handled exactly like a revoked token. After the retries
-  // the session is expired and the refresh token deleted, so briefly going
-  // offline near access-token expiry signs the user out.
-  it("a network failure is retried 3 times and then wipes the session", async () => {
+  // Transient failures (network, 5xx) are not a verdict on the session: the
+  // stored tokens are kept, the error is returned, and nothing is emitted.
+  it("a network failure is not retried and keeps the stored session", async () => {
     vi.useFakeTimers();
     server.on("POST", REFRESH, new TypeError("fetch failed"));
-    seedSession(storage, { access: accessToken({ expiresIn: 5 }), refresh: refreshToken() });
+    const tokens = { access: accessToken({ expiresIn: 5 }), refresh: refreshToken() };
+    seedSession(storage, tokens);
     const client = newClient();
     const rec = recordEvents(client);
 
     const pending = client.refreshSession();
     await vi.advanceTimersByTimeAsync(3000);
-    const { error } = await pending;
+    const { data, error } = await pending;
 
-    expect(server.callsTo("POST", REFRESH)).toHaveLength(4);
+    expect(server.callsTo("POST", REFRESH)).toHaveLength(1);
+    expect(data).toBeNull();
     expect(error).toBeInstanceOf(BaseHttpError);
     expect(error!.code).toBeUndefined();
-    expect(storage.snapshot()).toEqual({});
-    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SESSION_EXPIRED]);
+    expect(storage.map.get(KEYS.access)).toBe(tokens.access);
+    expect(storage.map.get(KEYS.refresh)).toBe(tokens.refresh);
+    expect(rec.names()).toEqual([]);
   });
 
-  // CURRENT BEHAVIOR (suspected risk): the generic retry middleware also
-  // replays POST /tokens/refresh on 502/503/504. If the first attempt was
-  // processed upstream and the refresh token rotated, the replays present
-  // an already-used refresh token (reuse detection could revoke the family).
-  it("a 503 on refresh is replayed 3 more times with the same refresh token", async () => {
+  it("a 503 on refresh is sent once (never replayed) and keeps the stored session", async () => {
     vi.useFakeTimers();
     server.on("POST", REFRESH, { status: 503, body: {} });
     const refresh = refreshToken();
@@ -338,19 +333,73 @@ describe("refresh: failures", () => {
 
     const pending = newClient().refreshSession();
     await vi.advanceTimersByTimeAsync(3000);
-    await pending;
+    const { error } = await pending;
 
-    const calls = server.callsTo("POST", REFRESH);
-    expect(calls).toHaveLength(4);
-    expect(new Set(calls.map((c) => c.headers["x-refresh-token"]))).toEqual(new Set([refresh]));
+    expect(server.callsTo("POST", REFRESH)).toHaveLength(1);
+    expect(error!.code).toBe(503);
+    expect(storage.map.get(KEYS.refresh)).toBe(refresh);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): any getCurrentUser failure during a
-  // session refetch (including a transient 500) expires the session and
-  // deletes the tokens, not only a 401.
-  it("a 500 from /current_user during getSession wipes the session", async () => {
+  it("a 5xx on refresh during getSession returns that error, keeps storage and recovers on the next call", async () => {
+    server.on("POST", REFRESH, { status: 500, body: {} });
+    const tokens = { access: accessToken({ expiresIn: 5 }), refresh: refreshToken() };
+    seedSession(storage, tokens);
+    const client = newClient();
+    const rec = recordEvents(client);
+
+    const first = await client.getSession();
+    expect(first.error).toBeInstanceOf(BaseHttpError);
+    expect(first.error!.code).toBe(500);
+    expect(first.data).toEqual({
+      session: expect.objectContaining({ access: null, status: "unauthenticated" }),
+      user: null,
+    });
+    expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(0);
+    expect(storage.map.get(KEYS.refresh)).toBe(tokens.refresh);
+    expect(rec.names()).toEqual([]);
+
+    const issued = issueTokens();
+    const second = await client.getSession();
+    expect(second.error).toBeNull();
+    expect(second.data.session).toMatchObject({ access: issued[0].access, status: "authenticated" });
+    expect(second.data.user).toEqual(userFixture());
+  });
+
+  it("the auto refresh tick keeps the session through a network failure and refreshes once back online", async () => {
+    vi.useFakeTimers();
+    server.on("POST", REFRESH, new TypeError("fetch failed"));
+    const tokens = { access: accessToken({ expiresIn: 30 }), refresh: refreshToken() };
+    seedSession(storage, tokens);
+    const client = newClient();
+    await ready(client);
+    const rec = recordEvents(client);
+
+    await internals(client)._autoRefreshTokenTick();
+    expect(storage.map.get(KEYS.refresh)).toBe(tokens.refresh);
+    expect(rec.names()).toEqual([]);
+
+    const issued = issueTokens();
+    await internals(client)._autoRefreshTokenTick();
+    expect(storage.map.get(KEYS.access)).toBe(issued[0].access);
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.TOKEN_REFRESHED]);
+  });
+
+  it("a 403 on refresh is terminal like a 401: storage wiped, SESSION_EXPIRED", async () => {
+    server.on("POST", REFRESH, { status: 403, body: { error: "app_not_in_scope" } });
+    seedSession(storage, { access: accessToken({ expiresIn: 5 }), refresh: refreshToken() });
+    const client = newClient();
+    const rec = recordEvents(client);
+
+    const { error } = await client.refreshSession();
+    expect(error!.code).toBe(403);
+    expect(storage.snapshot()).toEqual({});
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SESSION_EXPIRED]);
+  });
+
+  it("a 500 from /current_user during getSession keeps the session and returns the error", async () => {
     server.on("GET", CURRENT_USER, { status: 500, body: { error: "db" } });
-    seedSession(storage, { access: accessToken(), refresh: refreshToken() });
+    const tokens = { access: accessToken(), refresh: refreshToken() };
+    seedSession(storage, tokens);
     const client = newClient();
     const rec = recordEvents(client);
 
@@ -358,6 +407,25 @@ describe("refresh: failures", () => {
     expect(error).toBeInstanceOf(BaseHttpError);
     expect(error!.code).toBe(500);
     expect(data.session!.status).toBe("unauthenticated");
+    expect(data.user).toBeNull();
+    expect(storage.map.get(KEYS.access)).toBe(tokens.access);
+    expect(storage.map.get(KEYS.refresh)).toBe(tokens.refresh);
+    expect(rec.names()).toEqual([]);
+
+    server.on("GET", CURRENT_USER, { body: { user: userFixture() } });
+    const again = await client.getSession();
+    expect(again.error).toBeNull();
+    expect(again.data.user).toEqual(userFixture());
+  });
+
+  it("a 403 from /current_user wipes the session", async () => {
+    server.on("GET", CURRENT_USER, { status: 403, body: { error: "app_not_in_scope" } });
+    seedSession(storage, { access: accessToken(), refresh: refreshToken() });
+    const client = newClient();
+    const rec = recordEvents(client);
+
+    const { error } = await client.getSession();
+    expect(error!.code).toBe(403);
     expect(storage.snapshot()).toEqual({});
     expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SESSION_EXPIRED]);
   });
@@ -421,14 +489,10 @@ describe("single-flight guards", () => {
     expect(server.callsTo("POST", REFRESH)).toHaveLength(2);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): _refresh() only clears its Deferred
-  // after __refresh() returns normally. If anything inside throws (here the
-  // storage adapter refusing a write, e.g. quota exceeded), the Deferred is
-  // left set and never settled, so every later refresh (and any getSession
-  // that needs one) hangs forever. _getSession and getCurrentUser use the
-  // same pattern.
-  it("a throw inside refresh wedges the guard: later refreshes never settle", async () => {
-    issueTokens();
+  // A throw inside a guarded call (here the storage adapter refusing a
+  // write) releases the guard, and callers that joined it get the same error.
+  it("a throw inside refresh releases the guard: joiners reject too and later refreshes work", async () => {
+    const issued = issueTokens();
     seedSession(storage, { access: accessToken({ expiresIn: 5 }), refresh: refreshToken() });
     const client = newClient();
     await ready(client);
@@ -437,21 +501,74 @@ describe("single-flight guards", () => {
     storage.setItem = async () => {
       throw new Error("QuotaExceededError");
     };
-    await expect(client.refreshSession()).rejects.toThrow("QuotaExceededError");
+    const first = client.refreshSession();
+    const joined = client.refreshSession();
+    await expect(first).rejects.toThrow("QuotaExceededError");
+    await expect(joined).rejects.toThrow("QuotaExceededError");
+    expect(server.callsTo("POST", REFRESH)).toHaveLength(1);
 
     storage.setItem = realSet;
-    expect(await settledWithin(client.refreshSession())).toBe("pending");
-    expect(server.callsTo("POST", REFRESH)).toHaveLength(1);
+    const later = client.refreshSession();
+    expect(await settledWithin(later)).toBe("settled");
+    expect((await later).data).toMatchObject({ access: issued[1].access });
+    expect(server.callsTo("POST", REFRESH)).toHaveLength(2);
+  });
+
+  it("a throw inside getSession releases its guard", async () => {
+    seedSession(storage, { access: accessToken(), refresh: refreshToken() });
+    const client = newClient();
+    await ready(client);
+
+    const realGet = storage.getItem.bind(storage);
+    storage.getItem = async () => {
+      throw new Error("storage unavailable");
+    };
+    await expect(client.getSession()).rejects.toThrow("storage unavailable");
+
+    storage.getItem = realGet;
+    const later = client.getSession();
+    expect(await settledWithin(later)).toBe("settled");
+    expect((await later).data.user).toEqual(userFixture());
+  });
+
+  it("a throw inside getCurrentUser releases its guard", async () => {
+    const access = accessToken();
+    const client = newClient();
+    await ready(client);
+
+    internals(client)._getCurrentUserRequest = async () => {
+      throw new Error("unexpected");
+    };
+    await expect(client.getUser(access)).rejects.toThrow("unexpected");
+
+    delete internals(client)._getCurrentUserRequest;
+    const later = client.getUser(access);
+    expect(await settledWithin(later)).toBe("settled");
+    expect((await later).data.user).toEqual(userFixture());
+  });
+
+  it("a throw inside session expiry releases its guard", async () => {
+    server.on("POST", REFRESH, { status: 401, body: {} });
+    seedSession(storage, { access: accessToken({ expiresIn: 5 }), refresh: refreshToken() });
+    const client = newClient();
+    await ready(client);
+
+    const realRemove = storage.removeItem.bind(storage);
+    storage.removeItem = async () => {
+      throw new Error("storage unavailable");
+    };
+    await expect(client.refreshSession()).rejects.toThrow("storage unavailable");
+
+    storage.removeItem = realRemove;
+    const later = client.refreshSession();
+    expect(await settledWithin(later)).toBe("settled");
+    expect(storage.snapshot()).toEqual({});
   });
 });
 
 describe("autoRefreshToken disabled", () => {
-  // CURRENT BEHAVIOR (suspected bug): with autoRefreshToken off, an expired
-  // access token triggers _expireSession() (event + storage wipe) but the
-  // local `session` variable is not reset. getSession then still calls
-  // /current_user with the expired token, and if the server accepts it
-  // (clock skew, grace window) reports an authenticated session even though
-  // storage was just wiped.
+  // Known limitation, tracked separately: with autoRefreshToken off, getSession
+  // wipes an expired session but still checks and reports the stale token.
   it("expires storage but still reports the stale session when /current_user accepts it", async () => {
     const stale = accessToken({ expiresIn: -5 });
     seedSession(storage, { access: stale, refresh: refreshToken() });
@@ -487,9 +604,8 @@ describe("autoRefreshToken disabled", () => {
 });
 
 describe("getAuthToken", () => {
-  // CURRENT BEHAVIOR (suspected bug): getAuthToken() reads storage only; it
-  // neither checks expiry nor refreshes. Every authenticated helper (MFA,
-  // alternate phones, sessions, ScuteVerifyApi) can send an expired token.
+  // Known limitation, tracked separately: getAuthToken() returns the stored
+  // access token without checking expiry or refreshing.
   it("returns an expired access token as-is, without refreshing", async () => {
     issueTokens();
     const expired = accessToken({ expiresIn: -600 });
@@ -747,12 +863,9 @@ describe("browser session paths", () => {
     expect(proxy).toHaveBeenCalledTimes(1);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): in a browser, an expiring access token
-  // with no readable refresh token and no proxy callback makes __refresh()
-  // call _signOut(): storage is wiped and DELETE /current_user revokes the
-  // session server-side, but no SIGNED_OUT event is emitted and the caller
-  // keeps the stale session object. This is the state an httpOnly refresh
-  // cookie (invisible to JS) produces.
+  // Known limitation, tracked separately: in a browser, an expiring access
+  // token with no refresh token or proxy callback is signed out without a
+  // SIGNED_OUT event, and the caller keeps the stale session object.
   it("an expiring access token without a refresh token silently signs the user out server-side", async () => {
     const { localStorage } = installBrowser();
     const stale = accessToken({ expiresIn: 5 });

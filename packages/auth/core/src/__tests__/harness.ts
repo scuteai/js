@@ -388,8 +388,8 @@ export const deferred = <T = void>() => {
 
 /**
  * Runs `fn` while capturing unhandled promise rejections instead of letting
- * vitest fail the run on them. Used to pin code paths that currently leak a
- * rejection (see ScuteBaseHttp.delete). Real timers only.
+ * vitest fail the run on them. Used to assert that a code path does not leak
+ * a rejection (see ScuteBaseHttp.delete). Real timers only.
  */
 export async function captureUnhandledRejections(
   fn: () => Promise<unknown>,

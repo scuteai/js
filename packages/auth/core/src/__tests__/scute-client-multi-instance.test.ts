@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { createServer } from "./harness";
 
 // Polyfill enough of the browser surface to make `isBrowser()` return true
 // and let `new BroadcastChannel(name)` work. We do this BEFORE importing
@@ -20,6 +21,8 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 // tests by forcing a fresh module load.
 beforeEach(() => {
   vi.resetModules();
+  // Stubbed fetch keeps the suite offline (the app data request gets a 404).
+  createServer({ appData: null });
   (globalThis as any).window = globalThis;
   (globalThis as any).document = { createElement: () => ({}) };
   (globalThis as any).localStorage = new Map<string, string>();
@@ -46,6 +49,7 @@ afterEach(() => {
   delete (globalThis as any).document;
   delete (globalThis as any).localStorage;
   delete (globalThis as any).BroadcastChannel;
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 

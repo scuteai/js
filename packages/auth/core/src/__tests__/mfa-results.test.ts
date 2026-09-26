@@ -222,9 +222,8 @@ describe("verifyMagicLinkToken", () => {
     expect((error as BaseHttpError).code).toBe(404);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): on the sct_sk fast path the result of
-  // signInWithTokenPayload is ignored, so a failed sign in (here
-  // /current_user answering 500) still returns a success result.
+  // Known limitation, tracked separately: on the sct_sk path the sign-in
+  // result is ignored, so a failed sign in still returns success.
   it("reports success on the sct_sk path even when the sign in itself failed", async () => {
     const { client, rec } = await setup({ href: "https://app.test/cb?sct_sk=true" });
     server.on("PATCH", AUTHENTICATE, { body: tokenPair() });
@@ -237,9 +236,8 @@ describe("verifyMagicLinkToken", () => {
     expect(rec.names()).not.toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): verifyMagicLink(url) takes the token
-  // from `url` but decides sct_sk/sct_oauth from window.location, not from
-  // the same URL.
+  // Known limitation, tracked separately: verifyMagicLink(url) reads the
+  // token from `url` but sct_sk/sct_oauth from window.location.
   it("verifyMagicLink(url) reads sct_sk from window.location, not from the given url", async () => {
     const { client, rec } = await setup({ href: "https://app.test/elsewhere" });
     server.on("PATCH", AUTHENTICATE, { body: tokenPair() });
@@ -285,9 +283,8 @@ describe("signInWithMagicLinkToken", () => {
     expect(result.error).toBeInstanceOf(InvalidMagicLinkError);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): with sct_sk=true in the URL the
-  // verify step already signs in, then signInWithMagicLinkToken signs in a
-  // second time: two token writes, two /current_user calls, two SIGNED_IN.
+  // Known limitation, tracked separately: with sct_sk=true in the URL,
+  // signInWithMagicLinkToken signs in twice (two SIGNED_IN events).
   it("signs in twice when the URL carries sct_sk=true", async () => {
     const { client, rec } = await setup({ href: "https://app.test/cb?sct_sk=true" });
     server.on("PATCH", AUTHENTICATE, { body: tokenPair() });
@@ -486,15 +483,15 @@ describe("WebAuthn sign in (signInWithVerifyDevice / signIn)", () => {
     expect(server.callsTo("POST", WEBAUTHN_INIT)).toHaveLength(0);
   });
 
-  // CURRENT BEHAVIOR (fail-open flag): passkeys are gated with
-  // `appData.passkeys_enabled !== false`, so an app payload that omits the
-  // field (older API, partial response) is treated as passkeys ENABLED.
-  it("treats a missing passkeys_enabled field as enabled", async () => {
+  // Passkeys are only used when the app data says `passkeys_enabled: true`;
+  // a payload without the field is treated as disabled.
+  it("treats a missing passkeys_enabled field as disabled", async () => {
     const appData = appDataFixture();
     delete (appData as any).passkeys_enabled;
     const { client } = await setupWebauthn(tokenPair(), { appData });
     await client.signIn("ada@example.com");
-    expect(server.callsTo("POST", WEBAUTHN_INIT)).toHaveLength(1);
+    expect(server.callsTo("POST", WEBAUTHN_INIT)).toHaveLength(0);
+    expect(server.callsTo("POST", `${AUTH_PREFIX}/magic_links/login`)).toHaveLength(1);
   });
 });
 

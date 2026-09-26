@@ -1,4 +1,4 @@
-import { isValidDomain } from "./helpers";
+import { httpUrlOrUndefined, isValidDomain } from "./helpers";
 import type webauthn from "./webauthn";
 
 export const getMeaningfulError = (error: ScuteError | Error) => {
@@ -111,7 +111,7 @@ export class BaseHttpError extends ScuteError {
  * or call `signInWithSAML()`.
  */
 export class SsoRequiredError extends BaseHttpError {
-  /** The SP-initiated SAML login URL for this app. */
+  /** The SP-initiated SAML login URL for this app (http or https only, else undefined). */
   ssoLoginUrl?: string;
   /** The email domain that requires SSO. */
   domain?: string;
@@ -127,7 +127,8 @@ export class SsoRequiredError extends BaseHttpError {
   }) {
     super({ message, cause, json, code: 403 });
     this.slug = "sso_required";
-    this.ssoLoginUrl = json?.details?.sso_login_url;
+    // Only http(s) URLs are kept, so the value is safe to navigate to.
+    this.ssoLoginUrl = httpUrlOrUndefined(json?.details?.sso_login_url);
     this.domain = json?.details?.domain;
     Object.setPrototypeOf(this, SsoRequiredError.prototype);
   }
@@ -177,14 +178,9 @@ export class WebAuthnError extends ScuteError {
     cause: Error;
     name?: string;
   }) {
-    /**
-     * `cause` is supported in evergreen browsers, but not IE10, so this ts-ignore is to
-     * help Rollup complete the ES5 build.
-     */
-    // @ts-ignore
-    super(message, { cause });
-    this.name = name ?? cause.name;
+    super({ message, cause, name: name ?? cause?.name });
     this.code = code;
+    Object.setPrototypeOf(this, WebAuthnError.prototype);
   }
 }
 

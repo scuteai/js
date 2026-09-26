@@ -132,7 +132,7 @@ class ScuteVerifyApi extends ScuteBaseHttp {
    */
   async getById(id: UniqueIdentifier) {
     return this.get<VerificationResult>(
-      `/v1/verify/${this.appId}/verifications/${id}`,
+      `/v1/verify/${this.appId}/verifications/${encodeURIComponent(id)}`,
       await this.authHeaders()
     );
   }
@@ -142,7 +142,9 @@ class ScuteVerifyApi extends ScuteBaseHttp {
    */
   async approve(id: UniqueIdentifier) {
     return this.post<VerificationResult>(
-      `/v1/verify/${this.appId}/verifications/${id}/approve`,
+      `/v1/verify/${this.appId}/verifications/${encodeURIComponent(
+        id
+      )}/approve`,
       null,
       await this.authHeaders()
     );
@@ -153,7 +155,7 @@ class ScuteVerifyApi extends ScuteBaseHttp {
    */
   async deny(id: UniqueIdentifier, reason?: string) {
     return this.post<VerificationResult>(
-      `/v1/verify/${this.appId}/verifications/${id}/deny`,
+      `/v1/verify/${this.appId}/verifications/${encodeURIComponent(id)}/deny`,
       { reason },
       await this.authHeaders()
     );
@@ -164,7 +166,7 @@ class ScuteVerifyApi extends ScuteBaseHttp {
    */
   async resend(id: UniqueIdentifier) {
     return this.post<VerificationResult>(
-      `/v1/verify/${this.appId}/verifications/${id}/resend`,
+      `/v1/verify/${this.appId}/verifications/${encodeURIComponent(id)}/resend`,
       null,
       await this.authHeaders()
     );
@@ -175,7 +177,7 @@ class ScuteVerifyApi extends ScuteBaseHttp {
    */
   async cancel(id: UniqueIdentifier) {
     return this.delete(
-      `/v1/verify/${this.appId}/verifications/${id}`,
+      `/v1/verify/${this.appId}/verifications/${encodeURIComponent(id)}`,
       await this.authHeaders()
     );
   }
@@ -185,7 +187,7 @@ class ScuteVerifyApi extends ScuteBaseHttp {
    */
   async verifyCode(id: UniqueIdentifier, code: string) {
     return this.post<VerificationResult>(
-      `/v1/verify/${this.appId}/verifications/${id}/verify`,
+      `/v1/verify/${this.appId}/verifications/${encodeURIComponent(id)}/verify`,
       { code },
       await this.authHeaders()
     );

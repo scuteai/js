@@ -118,10 +118,8 @@ describe("cookies written on sign in (server side / node)", () => {
     ).toBeLessThan(5000);
   });
 
-  // CURRENT BEHAVIOR (suspected weakness): ScuteSession never sets `secure`
-  // (or `domain`) on any cookie. Transport security depends entirely on
-  // the adapter's defaultCookieOptions (the Next.js adapters pass
-  // secure: NODE_ENV === "production"; a custom adapter gets none).
+  // Known limitation, tracked separately: ScuteSession never sets `secure`
+  // or `domain`; those come only from the adapter's defaultCookieOptions.
   it("never sets secure or domain itself", async () => {
     const storage = new RecordingCookieStorage();
     const client = newClient(storage);

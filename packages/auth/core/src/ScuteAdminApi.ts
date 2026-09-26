@@ -99,7 +99,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async getUser(id: UniqueIdentifier) {
     return this.get<{ user: ScuteUserData | null }>(
-      `${this._v1Path}/users/${id}`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}`,
       this._authorizationHeader
     );
   }
@@ -122,7 +122,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async getUserByUserId(userId: UniqueIdentifier) {
     return this.get<{ user: ScuteUser | null }>(
-      `${this._authPath}/users?user_id=${userId}`
+      `${this._authPath}/users?user_id=${encodeURIComponent(userId)}`
     );
   }
 
@@ -162,7 +162,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async updateUser(id: UniqueIdentifier, data: any) {
     return this.patch<{ user: ScuteUserData }>(
-      `${this._v1Path}/users/${id}`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}`,
       data,
       this._authorizationHeader
     );
@@ -174,7 +174,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async activateUser(id: UniqueIdentifier) {
     return this.post<{ user: ScuteUserData }>(
-      `${this._v1Path}/users/${id}/activate`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}/activate`,
       null,
       this._authorizationHeader
     );
@@ -186,7 +186,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async deactivateUser(id: UniqueIdentifier) {
     return this.post<{ user: ScuteUserData }>(
-      `${this._v1Path}/users/${id}/deactivate`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}/deactivate`,
       null,
       this._authorizationHeader
     );
@@ -215,7 +215,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async deleteUser(id: UniqueIdentifier) {
-    return this.delete(`${this._v1Path}/users/${id}`, {
+    return this.delete(`${this._v1Path}/users/${encodeURIComponent(id)}`, {
       ...this._authorizationHeader,
     });
   }
@@ -268,7 +268,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async listUserSessions(id: UniqueIdentifier) {
     return this.get<ScuteUserSession[]>(
-      `${this._appsPath}/users/${id}/sessions`,
+      `${this._appsPath}/users/${encodeURIComponent(id)}/sessions`,
       {
         ...this._authorizationHeader,
       }
@@ -285,7 +285,9 @@ class ScuteAdminApi extends ScuteBaseHttp {
     sessionId: UniqueIdentifier
   ) {
     return this.delete(
-      `${this._v1Path}/users/${userId}/sessions/${sessionId}`,
+      `${this._v1Path}/users/${encodeURIComponent(
+        userId
+      )}/sessions/${encodeURIComponent(sessionId)}`,
       {
         ...this._authorizationHeader,
       }

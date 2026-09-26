@@ -244,19 +244,30 @@ describe("storage selection", () => {
     expect(storage.map.has(KEYS.access)).toBe(true);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): when window.localStorage throws on
-  // access (Safari with storage blocked, sandboxed iframes, some privacy
-  // modes) the constructor throws instead of falling back to memory.
-  it("throws from the constructor when window.localStorage is inaccessible", () => {
+  // When window.localStorage throws on access (storage blocked by the
+  // browser, sandboxed iframes, some privacy modes) the client falls back to
+  // its own in-memory store.
+  it("falls back to per-client memory when window.localStorage is inaccessible", async () => {
     const { win } = installBrowser();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     Object.defineProperty(win, "localStorage", {
       get() {
         throw new Error("SecurityError: access denied");
       },
     });
-    expect(() =>
-      createClient({ appId: APP_ID, baseUrl: BASE_URL, preferences: quietPreferences })
-    ).toThrow("SecurityError");
+    server.on("DELETE", `${AUTH_PREFIX}/current_user`, { status: 200, body: {} });
+
+    const client = createClient({ appId: APP_ID, baseUrl: BASE_URL, preferences: quietPreferences });
+    const other = createClient({ appId: APP_ID, baseUrl: BASE_URL, preferences: quietPreferences });
+    await ready(client);
+
+    const access = accessToken();
+    expect(await client.signInWithTokenPayload({ access } as any)).toEqual({ error: null });
+    expect((await client.getAuthToken()).data?.access).toBe(access);
+    expect((await other.getAuthToken()).data).toBeNull();
+
+    expect(await client.signOut()).toBe(true);
+    expect((await client.getAuthToken()).data).toBeNull();
   });
 });
 
@@ -369,10 +380,8 @@ describe("authenticated endpoint table", () => {
     expect(call.body).toBeUndefined();
   });
 
-  // CURRENT BEHAVIOR (suspected bug): when /devices/register answers 200
-  // without `options` and the browser API then fails, identifyRegistrationError
-  // throws ("options was missing required publicKey property") and addDevice
-  // rejects instead of returning { error }.
+  // Known limitation, tracked separately: a /devices/register response
+  // without `options` makes addDevice reject instead of returning { error }.
   it("addDevice rejects when the register response has no options", async () => {
     seedSession(storage, { access: ACCESS });
     server.on("POST", `${AUTH_PREFIX}/devices/register`, { body: {} });
@@ -541,10 +550,8 @@ describe("sign in / sign up routing", () => {
     expect(sent()).toEqual(["/otps/login"]);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): signIn does not ensure app data is
-  // loaded (signUp and signInOrUp do). If the constructor's app data
-  // request failed, `this.appData.email_auth_type` throws a TypeError out
-  // of signIn instead of returning { error }.
+  // Known limitation, tracked separately: signIn does not load app data
+  // itself, so it rejects with a TypeError when app data failed to load.
   it("signIn rejects with a TypeError when app data failed to load", async () => {
     server.on("GET", `/v1/apps/${APP_ID}`, { status: 500, body: {} });
     lookup(userFixture());

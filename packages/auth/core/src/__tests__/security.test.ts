@@ -1,19 +1,19 @@
 /**
  * Security-focused characterization of @scute/js-core. Each test pins what
- * the SDK does TODAY. Where that looks like a weakness the test is still
- * written to pass and carries a CURRENT BEHAVIOR comment explaining the
- * concern, so a refactor can change it deliberately rather than by accident.
+ * the SDK does today. Behavior that is a known limitation still passes and
+ * carries a short "Known limitation" note, so a refactor can change it
+ * deliberately rather than by accident.
  *
  * Related pins elsewhere: refresh single-flight, 401/network/5xx refresh
  * handling (session-lifecycle.test.ts), cookie attributes
- * (lib/__tests__/session-cookies.test.ts), passkeys fail-open
- * (mfa-results.test.ts), delete() swallowing errors (lib/__tests__/base-http.test.ts).
+ * (lib/__tests__/session-cookies.test.ts), passkeys gating
+ * (mfa-results.test.ts), delete() error mapping (lib/__tests__/base-http.test.ts).
  */
 import { inspect } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "../ScuteClient";
 import { AUTH_CHANGE_EVENTS } from "../lib/constants";
-import { InvalidMagicLinkError, SsoRequiredError } from "../lib/errors";
+import { BaseHttpError, InvalidMagicLinkError, SsoRequiredError } from "../lib/errors";
 import {
   accessToken,
   APP_ID,
@@ -33,6 +33,7 @@ import {
   recordEvents,
   refreshToken,
   seedSession,
+  settledWithin,
   userFixture,
   type TestServer,
 } from "./harness";
@@ -71,12 +72,8 @@ afterEach(() => {
 });
 
 describe("where tokens are stored (plain, non-Next path)", () => {
-  // CURRENT BEHAVIOR (security weakness): with no adapter, a browser client
-  // stores BOTH the access token and the long-lived refresh token in
-  // window.localStorage, readable by any script on the origin (one XSS
-  // exfiltrates a refresh token valid for weeks). The cookie attributes
-  // (httpOnly, sameSite, expires) are passed to localStorage.setItem and
-  // silently ignored.
+  // Known limitation, tracked separately: without an adapter a browser client
+  // keeps both tokens in window.localStorage (cookie attributes do not apply).
   it("a browser client keeps the refresh token in window.localStorage", async () => {
     const { localStorage } = installBrowser();
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -101,12 +98,9 @@ describe("where tokens are stored (plain, non-Next path)", () => {
     expect(localStorage.getItem(KEYS.access)).toBeNull();
   });
 
-  // CURRENT BEHAVIOR (security weakness): outside a browser without an
-  // adapter (and with persistSession: false anywhere) the fallback storage
-  // is ONE module-level Map shared by every ScuteClient in the process. On
-  // a server that builds a client per request without an adapter, user A's
-  // tokens are visible to the client serving user B (same appId).
-  it("the non-browser fallback storage is shared by every client in the process", async () => {
+  // Outside a browser without an adapter (and with persistSession: false
+  // anywhere) each client gets its own in-memory store.
+  it("the in-memory fallback storage is per client, never shared across clients", async () => {
     const appId = "app_shared_memory";
     server = createServer({ appId });
     server.on("GET", `/v1/auth/${appId}/current_user`, { body: { user: userFixture() } });
@@ -119,22 +113,26 @@ describe("where tokens are stored (plain, non-Next path)", () => {
     await requestForA.signInWithTokenPayload({ access: tokenA } as any);
 
     const requestForB = make();
-    expect((await requestForB.getAuthToken()).data?.access).toBe(tokenA);
+    expect((await requestForB.getAuthToken()).data).toBeNull();
 
     const ephemeral = make({ persistSession: false });
-    expect((await ephemeral.getAuthToken()).data?.access).toBe(tokenA);
+    expect((await ephemeral.getAuthToken()).data).toBeNull();
+    const tokenE = accessToken({ uuid: "user_E" });
+    await ephemeral.signInWithTokenPayload({ access: tokenE } as any);
+
+    expect((await requestForA.getAuthToken()).data?.access).toBe(tokenA);
+    expect((await ephemeral.getAuthToken()).data?.access).toBe(tokenE);
+    expect((await requestForB.getAuthToken()).data).toBeNull();
 
     await requestForA.signOut();
+    expect((await requestForA.getAuthToken()).data).toBeNull();
+    expect((await ephemeral.getAuthToken()).data?.access).toBe(tokenE);
   });
 });
 
 describe("cross-user data in shared clients", () => {
-  // CURRENT BEHAVIOR (suspected bug): getCurrentUser() de-duplicates
-  // in-flight calls WITHOUT looking at the token argument. Two concurrent
-  // getUser(token) calls for different users on one client (e.g. a shared
-  // server-side client verifying request tokens) both receive the first
-  // user's record, and only one request is made.
-  it("concurrent getUser() calls with different tokens both get the first user", async () => {
+  // getCurrentUser() de-duplicates in-flight calls per access token.
+  it("concurrent getUser() calls with different tokens each get their own user", async () => {
     const tokenA = accessToken({ uuid: "user_A" });
     const tokenB = accessToken({ uuid: "user_B" });
     const gate = deferred();
@@ -148,13 +146,40 @@ describe("cross-user data in shared clients", () => {
 
     const a = client.getUser(tokenA);
     const b = client.getUser(tokenB);
-    await vi.waitFor(() => expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(1));
+    await vi.waitFor(() => expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(2));
     gate.resolve();
     const [ra, rb] = await Promise.all([a, b]);
 
     expect(ra.data.user!.id).toBe("user_A");
-    expect(rb.data.user!.id).toBe("user_A");
+    expect(rb.data.user!.id).toBe("user_B");
+    expect(server.callsTo("GET", CURRENT_USER).map((c) => c.headers["x-authorization"])).toEqual([
+      tokenA,
+      tokenB,
+    ]);
+  });
+
+  it("concurrent getUser() calls with the same token still share one request", async () => {
+    const token = accessToken({ uuid: "user_A" });
+    const gate = deferred();
+    server.on("GET", CURRENT_USER, async () => {
+      await gate.promise;
+      return { body: { user: userFixture({ id: "user_A" }) } };
+    });
+    const client = nodeClient();
+    await ready(client);
+
+    const a = client.getUser(token);
+    const b = client.getUser(token);
+    await vi.waitFor(() => expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(1));
+    gate.resolve();
+    const [ra, rb] = await Promise.all([a, b]);
+
+    expect(ra).toBe(rb);
     expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(1);
+
+    // the in-flight entry is released once settled
+    await client.getUser(token);
+    expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(2);
   });
 });
 
@@ -194,13 +219,10 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     }
   });
 
-  // CURRENT BEHAVIOR (security weakness): error reports include
-  // `location: window.location.toString()`. When a 5xx happens while the
-  // magic link is being verified, the report sent to /errors carries the
-  // still-valid one-time sct_magic token from the address bar.
-  it("a 5xx during magic link verification reports the URL including the sct_magic token", async () => {
+  // Error reports carry the page location with Scute's sign-in params removed.
+  it("a 5xx during magic link verification reports the URL without the sct_magic token", async () => {
     const token = magicLinkToken();
-    installBrowser({ href: `https://app.test/cb?sct_magic=${token}` });
+    installBrowser({ href: `https://app.test/cb?next=%2Fhome&sct_magic=${token}` });
     vi.spyOn(console, "warn").mockImplementation(() => {});
     server.on("PATCH", `${AUTH_PREFIX}/magic_links/authenticate`, { status: 500, body: {} });
     server.on("POST", `${AUTH_PREFIX}/errors`, { body: {} });
@@ -211,14 +233,13 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     await vi.waitFor(() => expect(server.callsTo("POST", `${AUTH_PREFIX}/errors`)).toHaveLength(1));
 
     const report = server.callsTo("POST", `${AUTH_PREFIX}/errors`)[0];
-    expect(report.body.payload.error.location).toContain(`sct_magic=${token}`);
+    expect(report.body.payload.error.location).toBe("https://app.test/cb?next=%2Fhome");
+    expect(JSON.stringify(report.body)).not.toContain(token);
     expect(report.credentials).toBe("include");
   });
 
-  // CURRENT BEHAVIOR (security weakness): SIGNED_IN events carry the whole
-  // session, refresh token included. Every onAuthStateChange subscriber
-  // receives it and, with persistSession, it is posted over the per-app
-  // BroadcastChannel to every other tab of the origin.
+  // Known limitation, tracked separately: SIGNED_IN events carry the full
+  // session, refresh token included, and are posted on the per-app channel.
   it("SIGNED_IN hands the refresh token to listeners and broadcasts it to other tabs", async () => {
     installBrowser();
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -240,11 +261,9 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     expect(posted.payload.user).toEqual(userFixture());
   });
 
-  // CURRENT BEHAVIOR (low severity): inbound BroadcastChannel messages are
-  // trusted. A message that carries both session and user is handed to
-  // onAuthStateChange callbacks as-is, without re-reading storage or
-  // calling /current_user. Only same-origin code can post to the channel.
-  it("a forged cross-tab SIGNED_IN with session and user reaches callbacks unverified", async () => {
+  // Known limitation, tracked separately: an inbound channel message with a
+  // session and user is passed to callbacks as-is, without a server check.
+  it("an inbound cross-tab SIGNED_IN with session and user reaches callbacks without a server check", async () => {
     installBrowser();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const client = browserClient();
@@ -255,19 +274,19 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     await vi.waitFor(() => expect(cb).toHaveBeenCalledTimes(1));
     const userCalls = server.callsTo("GET", CURRENT_USER).length;
 
-    const forgedUser = { id: "admin", email: "root@example.com" };
-    const forgedSession = { access: "forged", status: "authenticated" };
+    const remoteUser = { id: "admin", email: "root@example.com" };
+    const remoteSession = { access: "remote_access", status: "authenticated" };
     channel.deliver({
       type: "authStateChanged",
-      payload: { event: AUTH_CHANGE_EVENTS.SIGNED_IN, session: forgedSession, user: forgedUser },
+      payload: { event: AUTH_CHANGE_EVENTS.SIGNED_IN, session: remoteSession, user: remoteUser },
     });
     await vi.waitFor(() => expect(cb).toHaveBeenCalledTimes(2));
 
-    expect(cb.mock.calls[1]).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN, forgedSession, forgedUser]);
+    expect(cb.mock.calls[1]).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN, remoteSession, remoteUser]);
     expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(userCalls);
   });
 
-  // CURRENT BEHAVIOR (reading note): the core never removes sct_magic /
+  // By design: the core never removes sct_magic /
   // sct_oauth from the address bar. scrubAuthTokensFromUrl is exported but
   // it is the caller's job to use it.
   it("signing in from the magic link URL leaves the token in window.location", async () => {
@@ -285,58 +304,89 @@ describe("token leakage: URLs, logs, error reports, events", () => {
 });
 
 describe("server-provided URLs and URL building", () => {
-  // CURRENT BEHAVIOR (reading note): the core never navigates to a URL the
-  // server supplies, but it exposes them verbatim with no scheme/origin
-  // check. The SsoRequiredError docs tell apps to
-  // window.location.assign(e.ssoLoginUrl), so a hostile or compromised API
-  // response decides where the browser goes (javascript: included).
-  it("SsoRequiredError.ssoLoginUrl and discoverSSO results are passed through unvalidated", async () => {
+  // The core never navigates itself, but the URLs it hands back are meant to
+  // be navigated to (the SsoRequiredError docs suggest location.assign), so
+  // only absolute http: and https: URLs are passed through.
+  const ssoRequired = (ssoLoginUrl: string) =>
     server.on("GET", `${AUTH_PREFIX}/users`, {
       status: 403,
       body: {
         error_code: "sso_required",
-        details: { sso_login_url: "javascript:alert(document.domain)", domain: "acme.com" },
+        details: { sso_login_url: ssoLoginUrl, domain: "acme.com" },
       },
     });
+  const discovery = (samlLoginUrl: string) =>
     server.on("GET", "/v1/auth/saml/discover", {
-      body: { saml_login_url: "https://evil.example/login", enforce_sso: true },
+      body: { workspace_id: "ws_1", saml_login_url: samlLoginUrl, enforce_sso: true },
     });
+
+  it.each([
+    ["javascript:", "javascript:alert(1)"],
+    ["data:", "data:text/html,hi"],
+    ["relative", "/v1/auth/app_test/saml/login"],
+  ])("a %s login URL is dropped (ssoLoginUrl undefined, discoverSSO null)", async (_label, value) => {
+    ssoRequired(value);
+    discovery(value);
     const client = nodeClient();
 
     const { error } = await client.admin.getUserByIdentifier("a@acme.com");
     expect(error).toBeInstanceOf(SsoRequiredError);
-    expect((error as SsoRequiredError).ssoLoginUrl).toBe("javascript:alert(document.domain)");
+    expect((error as SsoRequiredError).ssoLoginUrl).toBeUndefined();
+    expect((error as SsoRequiredError).domain).toBe("acme.com");
+
+    expect(await client.discoverSSO("a@acme.com")).toBeNull();
+  });
+
+  it("an https login URL is passed through unchanged", async () => {
+    const loginUrl = `${BASE_URL}${AUTH_PREFIX}/saml/login`;
+    ssoRequired(loginUrl);
+    discovery(loginUrl);
+    const client = nodeClient();
+
+    const { error } = await client.admin.getUserByIdentifier("a@acme.com");
+    expect((error as SsoRequiredError).ssoLoginUrl).toBe(loginUrl);
 
     expect(await client.discoverSSO("a@acme.com")).toEqual({
-      saml_login_url: "https://evil.example/login",
+      workspace_id: "ws_1",
+      saml_login_url: loginUrl,
       enforce_sso: true,
     });
   });
 
-  // CURRENT BEHAVIOR (suspected bug): the OAuth provider is concatenated
-  // into the query string without encoding, so a provider value can inject
-  // extra authorize parameters.
-  it("getOAuthUrl does not encode the provider (query parameter injection)", () => {
-    const url = new URL(nodeClient().getOAuthUrl("google&redirect_uri=https://evil.example"));
-    expect(url.searchParams.get("provider")).toBe("google");
-    expect(url.searchParams.get("redirect_uri")).toBe("https://evil.example");
+  it("getOAuthUrl encodes the provider, so it cannot add query parameters", () => {
+    const url = new URL(nodeClient().getOAuthUrl("google&redirect_uri=https://other.example"));
+    expect(url.searchParams.get("provider")).toBe("google&redirect_uri=https://other.example");
+    expect(url.searchParams.has("redirect_uri")).toBe(false);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): path parameters (challenge tokens,
-  // MFA method ids, session ids) are interpolated without encoding, so a
-  // value containing ../ addresses a different API path.
-  it("challenge tokens are not path-encoded (../ reaches another endpoint)", async () => {
+  it("challenge tokens are path-encoded and stay inside /challenges/", async () => {
     const client = nodeClient();
     await ready(client);
     await client.getChallengeStatus(`../../../apps/${APP_ID}`);
     const last = server.calls.at(-1)!;
-    expect(last.url).toContain("/challenges/../../../apps/");
-    expect(last.path).toBe(`/v1/apps/${APP_ID}`);
+    expect(last.path).toBe(`${AUTH_PREFIX}/challenges/..%2F..%2F..%2Fapps%2F${APP_ID}`);
+  });
+
+  it("other id path parameters are encoded too", async () => {
+    seedSession(storage, { access: accessToken() });
+    const client = nodeClient();
+    await ready(client);
+
+    await client.removeMfaMethod("m/1");
+    await client.revokeSession("s/1", "cred_1");
+    await client.removeDeviceCredential("d?1");
+
+    const paths = server.calls.filter((c) => c.method === "DELETE").map((c) => c.path);
+    expect(paths).toEqual([
+      `${AUTH_PREFIX}/mfa/methods/m%2F1`,
+      `${AUTH_PREFIX}/sessions/s%2F1`,
+      `${AUTH_PREFIX}/devices/d%3F1`,
+    ]);
   });
 });
 
 describe("CSRF and credentials", () => {
-  // CURRENT BEHAVIOR (reading note): the core sends no CSRF token header on
+  // By design: the core sends no CSRF token header on
   // any state-changing request and always uses credentials: "include"
   // (client and admin). CSRF protection lives only in the Next.js handler
   // layer; plain-core integrations rely on the API's own checks.
@@ -361,10 +411,8 @@ describe("CSRF and credentials", () => {
 });
 
 describe("fail-open server flags", () => {
-  // CURRENT BEHAVIOR (fail-open flag): in a browser, after app data loads,
-  // config.autoRefreshToken is overwritten with `appData.auto_refresh !==
-  // false`. A missing field turns auto refresh ON even when the integrator
-  // passed autoRefreshToken: false, and the server value always wins.
+  // Known limitation, tracked separately: in a browser, autoRefreshToken is
+  // replaced by `appData.auto_refresh !== false` once app data loads.
   it("a missing auto_refresh field overrides autoRefreshToken: false and refreshes", async () => {
     const appData = appDataFixture();
     delete (appData as any).auto_refresh;
@@ -396,10 +444,8 @@ describe("fail-open server flags", () => {
 });
 
 describe("secret key handling", () => {
-  // CURRENT BEHAVIOR (security weakness): a secretKey given to a browser
-  // client only triggers a console warning. The key is then attached as
-  // Authorization: Bearer to every admin request, including the public app
-  // data fetch and the end user's sign out.
+  // Known limitation, tracked separately: a secretKey given to a browser
+  // client only logs a warning and is then sent on every admin request.
   it("a secretKey in the browser is warned about but still sent on admin requests", async () => {
     installBrowser();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -430,41 +476,82 @@ describe("secret key handling", () => {
 });
 
 describe("revocation results", () => {
-  // CURRENT BEHAVIOR (security weakness): because ScuteBaseHttp.delete()
-  // never awaits the response, sign out and session revocation report
-  // success even when the API refused them, and they resolve before the
-  // request has finished (a navigation right after signOut() can cancel
-  // the revocation). The failure leaks as an unhandled rejection.
-  it("signOut() returns true although the server failed to revoke the session", async () => {
+  // Sign out and session revocation wait for the server and report its
+  // answer. Sign out still clears the local session when the server fails.
+  it("signOut() clears the local session but returns false when the server fails to revoke it", async () => {
     seedSession(storage, { access: accessToken(), refresh: refreshToken() });
     server.on("DELETE", CURRENT_USER, { status: 500, body: { error: "not revoked" } });
     const client = nodeClient();
     await ready(client);
+    const rec = recordEvents(client);
 
     let result: boolean | undefined;
     const leaked = await captureUnhandledRejections(async () => {
       result = await client.signOut();
     });
 
-    expect(result).toBe(true);
+    expect(result).toBe(false);
     expect(storage.snapshot()).toEqual({});
-    expect(leaked).toHaveLength(1);
-    expect((leaked[0] as any).status).toBe(500);
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SIGNED_OUT]);
+    expect(server.callsTo("DELETE", CURRENT_USER)).toHaveLength(1);
+    expect(leaked).toHaveLength(0);
   });
 
-  it("revokeSession() reports no error although the server answered 403", async () => {
+  it("signOut() resolves only after the revocation request has completed", async () => {
+    seedSession(storage, { access: accessToken() });
+    const gate = deferred();
+    server.on("DELETE", CURRENT_USER, async () => {
+      await gate.promise;
+      return { status: 200, body: {} };
+    });
+    const client = nodeClient();
+    await ready(client);
+
+    const pending = client.signOut();
+    await vi.waitFor(() => expect(server.callsTo("DELETE", CURRENT_USER)).toHaveLength(1));
+    expect(storage.snapshot()).toEqual({});
+    expect(await settledWithin(pending)).toBe("pending");
+
+    gate.resolve();
+    expect(await pending).toBe(true);
+  });
+
+  it("revokeSession() returns the server's 403 as an error", async () => {
     seedSession(storage, { access: accessToken() });
     server.on("DELETE", `${AUTH_PREFIX}/sessions/s_other`, { status: 403, body: { error: "forbidden" } });
     const client = nodeClient();
     await ready(client);
 
-    let result: unknown;
+    let result: any;
     const leaked = await captureUnhandledRejections(async () => {
       result = await client.revokeSession("s_other", "cred_x");
     });
 
-    expect(result).toEqual({ data: null, error: null });
-    expect((leaked[0] as any).status).toBe(403);
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(BaseHttpError);
+    expect(result.error.code).toBe(403);
+    expect(result.error.json).toEqual({ error: "forbidden" });
+    expect(leaked).toHaveLength(0);
+  });
+
+  it.each([
+    ["removeMfaMethod", (c: any) => c.removeMfaMethod("m_1"), `${AUTH_PREFIX}/mfa/methods/m_1`],
+    ["cancelChallenge", (c: any) => c.cancelChallenge("ch_1"), `${AUTH_PREFIX}/challenges/ch_1`],
+    ["removeDeviceCredential", (c: any) => c.removeDeviceCredential("d_1"), `${AUTH_PREFIX}/devices/d_1`],
+    ["removeAlternatePhone", (c: any) => c.removeAlternatePhone("+15551234567"), `${AUTH_PREFIX}/current_user/alternate_phones/%2B15551234567`],
+    ["admin.deleteUser", (c: any) => c.admin.deleteUser("u_1"), `/v1/${APP_ID}/users/u_1`],
+    ["admin.revokeUserSession", (c: any) => c.admin.revokeUserSession("u_1", "s_1"), `/v1/${APP_ID}/users/u_1/sessions/s_1`],
+  ])("%s returns a failed DELETE as an error", async (_name, invoke, path) => {
+    seedSession(storage, { access: accessToken() });
+    server.on("DELETE", path, { status: 422, body: { error: "nope" } });
+    const client = nodeClient({ secretKey: "sk_server" });
+    await ready(client);
+
+    const result = await invoke(client);
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(BaseHttpError);
+    expect(result.error.code).toBe(422);
+    expect(server.callsTo("DELETE", path)).toHaveLength(1);
   });
 });
 
@@ -489,26 +576,26 @@ describe("refresh loop safety with a subscriber", () => {
 });
 
 describe("side effects of client-side error handling", () => {
-  // CURRENT BEHAVIOR (suspected bug): _reportClientError() calls
-  // getSession() BEFORE checking whether error reporting is enabled. So a
-  // purely local error (here: verifyMagicLink on a URL without a token)
-  // fetches /current_user, and if that fetch fails the session is wiped.
-  it("a local validation error can sign the user out via the reporting path, even with reporting off", async () => {
-    seedSession(storage, { access: accessToken(), refresh: refreshToken() });
-    server.on("GET", CURRENT_USER, { status: 500, body: {} });
+  // With error reporting off, a local error never reaches the session.
+  it("a local validation error with reporting off makes no request and leaves the session alone", async () => {
+    const tokens = { access: accessToken(), refresh: refreshToken() };
+    seedSession(storage, tokens);
+    server.on("GET", CURRENT_USER, { status: 401, body: {} });
     const client = nodeClient();
     await ready(client);
+    const before = server.calls.length;
 
     const { error } = await client.verifyMagicLink("https://app.test/cb?no_token=1");
     expect(error).toBeInstanceOf(InvalidMagicLinkError);
 
-    await vi.waitFor(() => expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(1));
-    await vi.waitFor(() => expect(storage.snapshot()).toEqual({}));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(server.calls.length).toBe(before);
+    expect(storage.map.get(KEYS.access)).toBe(tokens.access);
+    expect(storage.map.get(KEYS.refresh)).toBe(tokens.refresh);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): verifyMagicLinkToken always reads
-  // window.location (for sct_sk), so it throws a ReferenceError in any
-  // non-browser runtime, even when given the token directly.
+  // Known limitation, tracked separately: verifyMagicLinkToken reads
+  // window.location for sct_sk, so it throws outside a browser.
   it("verifyMagicLinkToken throws outside a browser", async () => {
     const client = nodeClient();
     await expect(client.verifyMagicLinkToken(magicLinkToken())).rejects.toThrow(ReferenceError);

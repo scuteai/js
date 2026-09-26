@@ -11,7 +11,9 @@ import { BaseHttpError, InvalidAuthTokenError, SsoRequiredError, TechnicalError 
 import {
   captureUnhandledRejections,
   createServer,
+  deferred,
   installBrowser,
+  settledWithin,
   type TestServer,
 } from "../../__tests__/harness";
 
@@ -70,22 +72,28 @@ describe("successful requests", () => {
     expect(await http.doDelete("/thing")).toEqual({ data: null, error: null });
   });
 
-  // CURRENT BEHAVIOR (suspected bug): delete() awaits wretch's response chain
-  // object, which is not a promise, so it resolves as soon as the request is
-  // dispatched. Callers (signOut, revokeSession, removeMfaMethod, ...) get
-  // "success" before the server has answered.
-  it("delete resolves before the HTTP request has completed (fire and forget)", async () => {
-    let release!: () => void;
-    const gate = new Promise<void>((r) => (release = r));
+  it("delete treats a 204 No Content as success", async () => {
+    server.on("DELETE", "/v1/auth/app_x/thing", { status: 204 });
+    expect(await http.doDelete("/thing")).toEqual({ data: null, error: null });
+  });
+
+  // Callers (signOut, revokeSession, removeMfaMethod, ...) only see a result
+  // once the server has answered.
+  it("delete resolves only after the HTTP response arrives", async () => {
+    const gate = deferred();
     server.on("DELETE", "/v1/auth/app_x/thing", async () => {
-      await gate;
+      await gate.promise;
       return { status: 200, body: {} };
     });
 
-    const result = await http.doDelete("/thing");
-    expect(result).toEqual({ data: null, error: null });
-    expect(server.callsTo("DELETE", "/v1/auth/app_x/thing")).toHaveLength(1);
-    release();
+    const pending = http.doDelete("/thing");
+    await vi.waitFor(() =>
+      expect(server.callsTo("DELETE", "/v1/auth/app_x/thing")).toHaveLength(1)
+    );
+    expect(await settledWithin(pending)).toBe("pending");
+
+    gate.resolve();
+    expect(await pending).toEqual({ data: null, error: null });
   });
 
   it("appends the path to the base URL, JSON-encodes bodies and merges headers", async () => {
@@ -243,10 +251,8 @@ describe("HTTP error mapping", () => {
     expect(error!.cause).toBeInstanceOf(SyntaxError);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): get/post/put/patch always call
-  // .json(), so a 204 No Content success is reported as an error with an
-  // undefined code. Any endpoint that answers 204 to a POST/PATCH looks
-  // failed to the caller.
+  // Known limitation, tracked separately: get/post/put/patch always parse
+  // JSON, so a 204 No Content success comes back as an error with no code.
   it("a 204 No Content on post is reported as an error", async () => {
     server.on("POST", "/v1/auth/app_x/thing", { status: 204 });
     const { data, error } = await http.doPost("/thing", {});
@@ -274,27 +280,67 @@ describe("HTTP error mapping", () => {
     expect(error!.json).toBeUndefined();
   });
 
-  // CURRENT BEHAVIOR (suspected bug): because delete() never awaits the
-  // response, an error status is NOT mapped: the call reports success and
-  // the WretchError escapes as an unhandled promise rejection. Every DELETE
-  // in the SDK (sign out, session revoke, MFA method removal, admin
-  // deleteUser, ...) therefore reports success when the server refused it.
   it.each([401, 404, 500])(
-    "delete reports success for a %i and leaks the error as an unhandled rejection",
+    "delete maps a %i to a BaseHttpError like the other verbs, with no unhandled rejection",
     async (status) => {
       server.on("DELETE", "/v1/auth/app_x/thing", { status, body: { error: "refused" } });
 
-      let result: unknown;
+      let result: any;
       const leaked = await captureUnhandledRejections(async () => {
         result = await http.doDelete("/thing");
       });
 
-      expect(result).toEqual({ data: null, error: null });
-      expect(leaked).toHaveLength(1);
-      expect((leaked[0] as any).status).toBe(status);
-      expect((leaked[0] as any).json).toEqual({ error: "refused" });
+      expect(leaked).toHaveLength(0);
+      expect(result.data).toBeNull();
+      expect(result.error).toBeInstanceOf(BaseHttpError);
+      expect(result.error.code).toBe(status);
+      expect(result.error.json).toEqual({ error: "refused" });
+      expect(server.callsTo("DELETE", "/v1/auth/app_x/thing")).toHaveLength(1);
     }
   );
+
+  it("delete maps a network failure (after retries) to a BaseHttpError", async () => {
+    vi.useFakeTimers();
+    server.on("DELETE", "/v1/auth/app_x/thing", new TypeError("fetch failed"));
+
+    const pending = http.doDelete("/thing");
+    await vi.advanceTimersByTimeAsync(3000);
+    const { error } = await pending;
+
+    expect(server.callsTo("DELETE", "/v1/auth/app_x/thing")).toHaveLength(4);
+    expect(error).toBeInstanceOf(BaseHttpError);
+    expect(error!.code).toBeUndefined();
+  });
+});
+
+describe("requests that carry a refresh token", () => {
+  const REFRESH_PATH = "/v1/auth/app_x/tokens/refresh";
+
+  it.each([
+    ["a 503", { status: 503, body: {} }],
+    ["a network failure", new TypeError("fetch failed")],
+  ])("are not retried after %s", async (_label, reply) => {
+    vi.useFakeTimers();
+    server.on("POST", REFRESH_PATH, reply as any);
+
+    const pending = http.doPost("/tokens/refresh", null, { "X-Refresh-Token": "r1" });
+    await vi.advanceTimersByTimeAsync(3000);
+    const { error } = await pending;
+
+    expect(error).toBeInstanceOf(BaseHttpError);
+    expect(server.callsTo("POST", REFRESH_PATH)).toHaveLength(1);
+  });
+
+  it("other POSTs keep the retry policy", async () => {
+    vi.useFakeTimers();
+    server.on("POST", "/v1/auth/app_x/thing", { status: 503, body: {} });
+
+    const pending = http.doPost("/thing", {}, { "X-Authorization": "a1" });
+    await vi.advanceTimersByTimeAsync(3000);
+    await pending;
+
+    expect(server.callsTo("POST", "/v1/auth/app_x/thing")).toHaveLength(4);
+  });
 });
 
 describe("sandbox detection", () => {
@@ -358,6 +404,17 @@ describe("error reporting (_reportError)", () => {
     await new TestHttp(true, BASE).doGet("/fail404");
     await new Promise((r) => setTimeout(r, 0));
     expect(reportCalls()).toHaveLength(0);
+  });
+
+  it("strips sct_magic, sct_oauth and sct_sk from the reported location", async () => {
+    installBrowser({ href: "https://app.test/cb?sct_magic=m1&tab=2&sct_oauth=o1&sct_sk=true" });
+    const reporting = new TestHttp(true, BASE);
+    server.on("GET", "/v1/auth/app_x/thing", { status: 500, body: {} });
+    server.on("POST", "/v1/auth/app_x/errors", { body: {} });
+
+    await reporting.doGet("/thing");
+    await vi.waitFor(() => expect(reportCalls()).toHaveLength(1));
+    expect(reportCalls()[0].body.payload.error.location).toBe("https://app.test/cb?tab=2");
   });
 
   it("reports a 5xx in the browser to <base>/errors with location, code and label", async () => {

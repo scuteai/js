@@ -1,7 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createServer } from "./harness";
 
 beforeEach(() => {
   vi.resetModules();
+  // Stubbed fetch keeps the suite offline (the app data request gets a 404).
+  createServer({ appData: null });
   (globalThis as any).window = globalThis;
   (globalThis as any).document = { createElement: () => ({}) };
   (globalThis as any).localStorage = new Map<string, string>();
@@ -11,6 +14,11 @@ beforeEach(() => {
     postMessage() {}
     close() {}
   };
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const client = async () => {

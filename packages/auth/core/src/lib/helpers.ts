@@ -14,6 +14,20 @@ export const isBrowser = () =>
   typeof window.document !== "undefined" &&
   typeof window.document.createElement !== "undefined";
 
+/**
+ * `window.localStorage`, or null when there is none or when reading it throws
+ * (storage blocked by the browser, sandboxed iframes, some privacy modes).
+ */
+export const getLocalStorage = (): Storage | null => {
+  try {
+    return typeof window !== "undefined" && window.localStorage
+      ? window.localStorage
+      : null;
+  } catch {
+    return null;
+  }
+};
+
 export const isMaybePhoneNumber = (phone: string) => {
   const phoneRegex = /^\+?[\d\s()-]*$/;
   return phone && phoneRegex.test(phone.replace(/\s+/g, ""));
@@ -136,6 +150,20 @@ export const refreshTokenHeaders = (jwt: string | null): HeadersInit => {
   return {
     [_SCUTE_REFRESH_HEADER]: jwt,
   };
+};
+
+/**
+ * Returns `value` when it is an absolute http: or https: URL, otherwise
+ * undefined. Used for URLs the server hands back for the app to navigate to.
+ */
+export const httpUrlOrUndefined = (value: unknown): string | undefined => {
+  if (typeof value !== "string" || !value) return undefined;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:" ? value : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 /**

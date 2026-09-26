@@ -104,13 +104,7 @@ describe("custom client errors", () => {
 });
 
 describe("WebAuthnError", () => {
-  // CURRENT BEHAVIOR (suspected bug): WebAuthnError calls
-  // `super(message, { cause })` but ScuteError's constructor takes a single
-  // options object. The string is destructured as an object, so the message
-  // and cause are lost: every WebAuthnError has message "" and cause
-  // undefined. ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY therefore points at a
-  // cause that is never there, and the UI falls back to a generic message.
-  it("loses its message and cause (only name and code survive)", () => {
+  it("keeps its message, cause, name and code", () => {
     const inner = namedError("NotAllowedError", "The user cancelled");
     const err = new WebAuthnError({
       message: "The user cancelled",
@@ -118,10 +112,21 @@ describe("WebAuthnError", () => {
       cause: inner,
     });
     expect(err).toBeInstanceOf(WebAuthnError);
+    expect(err).toBeInstanceOf(ScuteError);
     expect(err.name).toBe("NotAllowedError");
     expect(err.code).toBe("ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY");
-    expect(err.message).toBe("");
-    expect(err.cause).toBeUndefined();
+    expect(err.message).toBe("The user cancelled");
+    expect(err.cause).toBe(inner);
+  });
+
+  it("an explicit name wins over the cause's name", () => {
+    const err = new WebAuthnError({
+      message: "m",
+      code: "ERROR_INVALID_RP_ID",
+      cause: namedError("SecurityError"),
+      name: "CustomName",
+    });
+    expect(err.name).toBe("CustomName");
   });
 });
 
@@ -277,9 +282,8 @@ describe("getMeaningfulError (what the UI shows)", () => {
     });
   });
 
-  // CURRENT BEHAVIOR (suspected bug): an HTTP error without a JSON `error`
-  // field (HTML error page, network failure) yields message undefined, so
-  // the UI renders an empty error.
+  // Known limitation, tracked separately: an HTTP error without a JSON
+  // `error` field yields an undefined message.
   it("an HTTP error without json.error yields an undefined message", () => {
     const noJson = new BaseHttpError({ message: "Bad Gateway", code: 502 });
     expect(getMeaningfulError(noJson)).toEqual({ isFatal: true, message: undefined });
@@ -306,10 +310,9 @@ describe("getMeaningfulError (what the UI shows)", () => {
       code: "ERROR_INVALID_RP_ID",
       cause: namedError("SecurityError"),
     });
-    // message is the generic fallback because WebAuthnError drops its message
     expect(getMeaningfulError(aborted)).toEqual({
       isFatal: false,
-      message: "Something went wrong.",
+      message: "x",
     });
     expect(getMeaningfulError(rp).isFatal).toBe(true);
   });
