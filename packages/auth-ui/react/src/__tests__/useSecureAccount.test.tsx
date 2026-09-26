@@ -160,8 +160,7 @@ describe("loading", () => {
     await act(async () => {
       await r.result.current.sa.refresh();
     });
-    // CURRENT BEHAVIOR (suspected bug): only thrown errors are reported; a
-    // returned { error } leaves `error` null and the old rows in place.
+    // Known limitation, tracked separately: only thrown errors are reported; a returned { error } leaves `error` null and the old rows in place.
     expect(r.result.current.sa.error).toBeNull();
     expect(row(r, "totp").enrolled).toBe(true);
   });
@@ -193,31 +192,26 @@ describe("allow-list", () => {
     expect(row(r, "passkey").allowed).toBe(false);
   });
 
-  it("allows passkeys when passkeys_enabled is missing", async () => {
+  it("disallows passkeys when passkeys_enabled is missing (fails closed, SEC-40)", async () => {
     const r = await signedIn({
       getAppData: vi.fn(async () => ({ data: { mfa_methods_allowed: [] }, error: null })),
     });
-    // CURRENT BEHAVIOR (suspected bug): `passkeys_enabled !== false` fails
-    // open, unlike mfa_methods_allowed which fails closed (SEC-40).
-    expect(row(r, "passkey").allowed).toBe(true);
+    expect(row(r, "passkey").allowed).toBe(false);
   });
 
-  it("allows passkeys, with no error, when app config fails to load", async () => {
+  it("disallows passkeys when app config fails to load (fails closed, SEC-40)", async () => {
     const r = await signedIn({
       getAppData: vi.fn(async () => ({ data: null, error: { message: "503" } })),
     });
-    // CURRENT BEHAVIOR (suspected bug): appData stays null, so the passkey
-    // row is allowed and nothing reports the config failure (SEC-40).
-    expect(row(r, "passkey").allowed).toBe(true);
+    expect(row(r, "passkey").allowed).toBe(false);
     expect(row(r, "totp").allowed).toBe(false);
+    // Known limitation, tracked separately: a returned { error } from getAppData is not reported in `error`.
     expect(r.result.current.sa.error).toBeNull();
   });
 
   it("never marks the passkey row as enrolled from real app data", async () => {
     const r = await signedIn();
-    // CURRENT BEHAVIOR (suspected bug): enrollment is read from
-    // appData._currentUserHasPasskey, which nothing in the SDK or API sets,
-    // so the row always reads "not set up" even for passkey users.
+    // Known limitation, tracked separately: passkey enrollment is read from appData._currentUserHasPasskey, which the SDK and API do not set.
     expect(row(r, "passkey").enrolled).toBe(false);
   });
 
@@ -408,17 +402,19 @@ describe("passkey and backup codes", () => {
     expect(r.result.current.sa.phase).toBe("error");
   });
 
-  it("starts passkey enrollment when app config failed to load", async () => {
+  it("refuses passkey enrollment when app config failed to load", async () => {
     const r = await signedIn({
       getAppData: vi.fn(async () => ({ data: null, error: { message: "503" } })),
     });
     await act(async () => {
       await r.result.current.sa.startEnroll("passkey");
     });
-    // CURRENT BEHAVIOR (suspected bug): the client-side allow check fails
-    // open, so a passkey registration is attempted even if the app has
-    // passkeys disabled (server enforcement not verified here).
-    expect(r.client.addDevice).toHaveBeenCalledTimes(1);
+    expect(r.client.addDevice).not.toHaveBeenCalled();
+    expect(r.result.current.sa.error).toEqual({
+      code: "method_not_allowed",
+      message: "Passkeys is not enabled on this app.",
+    });
+    expect(r.result.current.sa.activeMethod).toBeNull();
   });
 
   it("startEnroll(backup_codes) generates codes, exposes them once and clearBackupCodes drops them", async () => {
@@ -446,14 +442,17 @@ describe("passkey and backup codes", () => {
     expect(r.result.current.sa.phase).toBe("error");
   });
 
-  it("cancelEnroll does not clear backup codes", async () => {
+  it("cancelEnroll clears backup codes too", async () => {
     const r = await signedIn();
     r.client.generateBackupCodes.mockResolvedValue({ data: { backup_codes: ["x-1"] }, error: null });
     await act(async () => {
       await r.result.current.sa.startEnroll("backup_codes");
     });
-    act(() => r.result.current.sa.cancelEnroll());
     expect(r.result.current.sa.backupCodes).toEqual(["x-1"]);
+    act(() => r.result.current.sa.cancelEnroll());
+    expect(r.result.current.sa.backupCodes).toBeNull();
+    expect(r.result.current.sa.activeMethod).toBeNull();
+    expect(r.result.current.sa.phase).toBe("idle");
   });
 });
 
@@ -509,33 +508,41 @@ describe("removeMethod", () => {
 });
 
 describe("security", () => {
-  it("keeps the TOTP secret and enroll state after sign-out", async () => {
+  const endSession: Array<[string, (c: any) => Promise<unknown> | void]> = [
+    ["sign-out", (c) => c.signOut()],
+    ["session expiry", (c) => c.emit(AUTH_CHANGE_EVENTS.SESSION_EXPIRED)],
+  ];
+
+  it.each(endSession)("drops the TOTP secret and enroll state on %s", async (_label, end) => {
     const r = await signedIn();
     await startTotp(r);
+    expect(r.result.current.sa.secret).toBe(TOTP_SECRET);
     await act(async () => {
-      await r.client.signOut();
+      await end(r.client);
     });
     await waitFor(() => expect(r.result.current.sa.isAuthenticated).toBe(false));
-    // CURRENT BEHAVIOR (suspected bug): the refresh on sign-out clears the
-    // enrollment list but not the inline enroll state, so the TOTP seed and
-    // otpauth URI stay renderable after sign-out.
-    expect(r.result.current.sa.secret).toBe(TOTP_SECRET);
-    expect(r.result.current.sa.provisioningUri).toBe(TOTP_URI);
-    expect(r.result.current.sa.activeMethod).toBe("totp");
-    expect(r.result.current.sa.phase).toBe("pending_verify");
+    expect(r.result.current.sa.secret).toBeNull();
+    expect(r.result.current.sa.provisioningUri).toBeNull();
+    expect(r.result.current.sa.activeMethod).toBeNull();
+    expect(r.result.current.sa.phase).toBe("idle");
+    // The pending enrollment id is gone too.
+    await act(async () => {
+      await r.result.current.sa.submitCode("123456");
+    });
+    expect(r.client.verifyMfaEnrollment).not.toHaveBeenCalled();
   });
 
-  it("keeps plaintext backup codes after sign-out", async () => {
+  it.each(endSession)("drops plaintext backup codes on %s", async (_label, end) => {
     const r = await signedIn();
     r.client.generateBackupCodes.mockResolvedValue({ data: { backup_codes: ["code-1", "code-2"] }, error: null });
     await act(async () => {
       await r.result.current.sa.startEnroll("backup_codes");
     });
+    expect(r.result.current.sa.backupCodes).toEqual(["code-1", "code-2"]);
     await act(async () => {
-      await r.client.signOut();
+      await end(r.client);
     });
     await waitFor(() => expect(r.result.current.sa.isAuthenticated).toBe(false));
-    // CURRENT BEHAVIOR (suspected bug): recovery codes survive sign-out.
-    expect(r.result.current.sa.backupCodes).toEqual(["code-1", "code-2"]);
+    expect(r.result.current.sa.backupCodes).toBeNull();
   });
 });

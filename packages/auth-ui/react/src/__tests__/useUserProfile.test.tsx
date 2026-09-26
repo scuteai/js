@@ -83,7 +83,7 @@ describe("updateMeta", () => {
     expect(client.getUser).toHaveBeenCalledWith();
   });
 
-  it("does not update the user in context after a successful update", async () => {
+  it("shows the refetched user after a successful update", async () => {
     const updated = { ...USER, meta: { plan: "enterprise" } };
     const { client, result } = signedIn({
       updateUserMeta: vi.fn(async () => ({ data: {}, error: null })),
@@ -94,10 +94,47 @@ describe("updateMeta", () => {
       await result.current.updateMeta({ plan: "enterprise" });
     });
     expect(client.getUser).toHaveBeenCalled();
-    // CURRENT BEHAVIOR (suspected bug): refetch() says it re-emits the
-    // session so the provider re-renders, but client.getUser() emits
-    // nothing, so `user` stays stale until the next auth event.
-    expect(result.current.user).toEqual(USER);
+    expect(result.current.user).toEqual(updated);
+  });
+
+  it("falls back to the user from the update response when the refetch fails", async () => {
+    const updated = { ...USER, meta: { plan: "team" } };
+    const { result } = signedIn({
+      updateUserMeta: vi.fn(async () => ({ data: { user: updated }, error: null })),
+      getUser: vi.fn(async () => ({ data: { user: null }, error: { message: "offline" } })),
+    });
+    await act(async () => {
+      await result.current.updateMeta({ plan: "team" });
+    });
+    expect(result.current.user).toEqual(updated);
+  });
+
+  it("drops the refreshed user on sign-out", async () => {
+    const updated = { ...USER, meta: { plan: "enterprise" } };
+    const { client, result } = signedIn({
+      updateUserMeta: vi.fn(async () => ({ data: { user: updated }, error: null })),
+      getUser: vi.fn(async () => ({ data: { user: updated }, error: null })),
+    });
+    await act(async () => {
+      await result.current.updateMeta({ plan: "enterprise" });
+    });
+    expect(result.current.user).toEqual(updated);
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_OUT));
+    expect(result.current.user).toBeNull();
+  });
+
+  it("prefers a newer user from the auth context over the refreshed one", async () => {
+    const updated = { ...USER, meta: { plan: "enterprise" } };
+    const { client, result } = signedIn({
+      updateUserMeta: vi.fn(async () => ({ data: {}, error: null })),
+      getUser: vi.fn(async () => ({ data: { user: updated }, error: null })),
+    });
+    await act(async () => {
+      await result.current.updateMeta({ plan: "enterprise" });
+    });
+    const newer = { ...USER, meta: { plan: "newest" } };
+    act(() => client.emitSignedIn(newer));
+    expect(result.current.user).toBe(newer);
   });
 
   it("maps per-field validation errors into fieldErrors", async () => {
@@ -190,6 +227,33 @@ describe("refetch", () => {
       await result.current.refetch();
     });
     expect(client.getUser).toHaveBeenCalledWith();
+  });
+
+  it("applies the fetched user", async () => {
+    const updated = { ...USER, email: "ada@new.example.com" };
+    const { result } = signedIn({
+      getUser: vi.fn(async () => ({ data: { user: updated }, error: null })),
+    });
+    await act(async () => {
+      await result.current.refetch();
+    });
+    expect(result.current.user).toEqual(updated);
+  });
+
+  it("ignores a fetched user when nobody is signed in, or it is a different user", async () => {
+    const other = { ...USER, id: "usr_2" };
+    const { client, result } = setup({
+      getUser: vi.fn(async () => ({ data: { user: other }, error: null })),
+    });
+    await act(async () => {
+      await result.current.refetch();
+    });
+    expect(result.current.user).toBeNull();
+    act(() => client.emitSignedIn());
+    await act(async () => {
+      await result.current.refetch();
+    });
+    expect(result.current.user).toEqual(USER);
   });
 
   it("is a no-op when the client has no getUser", async () => {

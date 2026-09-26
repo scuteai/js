@@ -181,7 +181,7 @@ describe("default views", () => {
     await waitFor(() => expect(screen.getByText(PROTECTED)).toBeTruthy(), { timeout: 3000 });
   });
 
-  it("stays on the registration offer after Skip for now", async () => {
+  it("shows the app after Skip for now", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const { client } = renderGate();
     await screen.findByRole("heading", { name: "Register a passkey" });
@@ -189,11 +189,27 @@ describe("default views", () => {
       fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
     });
     expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
-    // CURRENT BEHAVIOR (suspected bug): the user is now signed in, but the
-    // gate keeps showing "Register a passkey" and never renders the app
-    // (see the skipPasskey case in useScuteAuthFlow.test.ts).
-    expect(screen.getByRole("heading", { name: "Register a passkey" })).toBeTruthy();
+    expect(client.addDevice).not.toHaveBeenCalled();
+    expect(screen.getByText(PROTECTED)).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Register a passkey" })).toBeNull();
+  });
+
+  it("shows the addDevice error on the offer, then the app after Skip for now", async () => {
+    setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
+    const client = createFakeClient({
+      addDevice: vi.fn(async () => ({ data: null, error: { message: "The operation was cancelled" } })),
+    });
+    const { container } = renderGate(client);
+    await screen.findByRole("heading", { name: "Register a passkey" });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Register passkey" }));
+    });
+    expect(container.querySelector("[data-scute-error]")?.textContent).toBe("The operation was cancelled");
     expect(screen.queryByText(PROTECTED)).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+    });
+    expect(screen.getByText(PROTECTED)).toBeTruthy();
   });
 
   it("shows verification errors with a Try again button back to login", async () => {
@@ -222,9 +238,7 @@ describe("default views", () => {
   ])("renders an empty container for %s", async (event) => {
     const { client, container } = await renderAtLogin();
     act(() => client.emit(event));
-    // CURRENT BEHAVIOR (suspected bug): there is no default UI for the MFA
-    // views, so the drop-in gate renders an empty box with no way forward
-    // unless the integrator supplies renderView.
+    // Known limitation, tracked separately: the gate has no default UI for the MFA views, so it renders an empty container unless renderView handles them.
     const box = container.querySelector("[data-scute-auth-container]");
     expect(box).not.toBeNull();
     expect(box!.children).toHaveLength(0);
@@ -269,7 +283,7 @@ describe("customization", () => {
     expect(container.querySelector("[data-scute-auth-logo]")).toBeNull();
   });
 
-  it("applies theme, accent and logo from appearance but ignores className", async () => {
+  it("applies theme, accent, logo and className from appearance", async () => {
     const { container } = await renderAtLogin(createFakeClient(), {
       appearance: {
         theme: "dark",
@@ -282,9 +296,7 @@ describe("customization", () => {
     expect(root.getAttribute("data-scute-theme")).toBe("dark");
     expect(root.style.getPropertyValue("--scute-accent")).toBe("#ff0066");
     expect(screen.getByAltText("Acme logo").closest("[data-scute-auth-logo]")).not.toBeNull();
-    // CURRENT BEHAVIOR (suspected bug): appearance.className is declared in
-    // the props type but never applied to any element.
-    expect(container.querySelector(".my-auth-gate")).toBeNull();
+    expect(container.querySelector(".my-auth-gate")).toBe(root);
   });
 });
 
@@ -297,21 +309,58 @@ describe("onAuthenticated", () => {
     expect(onAuthenticated).toHaveBeenCalledWith(USER);
   });
 
-  it("fires on every render while authenticated, not once", async () => {
+  it("fires once per sign-in, not on every render", async () => {
     const onAuthenticated = vi.fn();
     const { client, rerenderGate } = await renderAtLogin(createFakeClient(), { onAuthenticated });
     act(() => client.emitSignedIn());
-    const afterSignIn = onAuthenticated.mock.calls.length;
-    expect(afterSignIn).toBeGreaterThanOrEqual(1);
+    expect(onAuthenticated).toHaveBeenCalledTimes(1);
     rerenderGate({ onAuthenticated });
+    rerenderGate({ onAuthenticated: onAuthenticated.bind(null) });
     act(() => client.emit(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, authenticatedSession("ACCESS.jwt.rotated"), USER));
-    // CURRENT BEHAVIOR (suspected bug): the callback runs as a render side
-    // effect, so it repeats on every re-render (token refresh, parent
-    // re-render, StrictMode) instead of once per sign-in.
-    expect(onAuthenticated.mock.calls.length).toBeGreaterThanOrEqual(afterSignIn + 2);
+    expect(onAuthenticated).toHaveBeenCalledTimes(1);
+
+    // A new sign-in after a sign-out fires it again.
+    await act(async () => {
+      await client.signOut();
+    });
+    await screen.findByRole("heading", { name: "Sign in" });
+    act(() => client.emitSignedIn());
+    expect(onAuthenticated).toHaveBeenCalledTimes(2);
   });
 
-  it("setting parent state from onAuthenticated triggers React's update-during-render warning", async () => {
+  it("fires once under StrictMode", async () => {
+    const onAuthenticated = vi.fn();
+    const client = createFakeClient();
+    const Wrapper = makeWrapper(client, { strict: true });
+    render(
+      <Wrapper>
+        <ScuteAuthGate onAuthenticated={onAuthenticated}>
+          <p>{PROTECTED}</p>
+        </ScuteAuthGate>
+      </Wrapper>
+    );
+    await screen.findByRole("heading", { name: "Sign in" });
+    act(() => client.emitSignedIn());
+    expect(screen.getByText(PROTECTED)).toBeTruthy();
+    expect(onAuthenticated).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not called while the passkey offer is showing, only once the app is shown", async () => {
+    setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
+    const onAuthenticated = vi.fn();
+    const { client } = renderGate(createFakeClient(), { onAuthenticated });
+    await screen.findByRole("heading", { name: "Register a passkey" });
+    act(() => client.emitSignedIn());
+    expect(onAuthenticated).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+    });
+    expect(screen.getByText(PROTECTED)).toBeTruthy();
+    expect(onAuthenticated).toHaveBeenCalledTimes(1);
+    expect(onAuthenticated).toHaveBeenCalledWith(USER);
+  });
+
+  it("lets onAuthenticated set parent state without a render-phase update warning", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const client = createFakeClient();
     const Wrapper = makeWrapper(client);
@@ -332,10 +381,8 @@ describe("onAuthenticated", () => {
     await screen.findByRole("heading", { name: "Sign in" });
     act(() => client.emitSignedIn());
     expect(screen.getByText("hello ada@example.com")).toBeTruthy();
-    // CURRENT BEHAVIOR (suspected bug): the natural usage pattern updates a
-    // parent during ScuteAuthGate's render.
     const messages = errorSpy.mock.calls.map((c) => String(c[0]));
-    expect(messages.some((m) => m.includes("Cannot update a component"))).toBe(true);
+    expect(messages.some((m) => m.includes("Cannot update a component"))).toBe(false);
   });
 });
 
@@ -360,7 +407,7 @@ describe("security", () => {
     expect(screen.queryByText(PROTECTED)).toBeNull();
   });
 
-  it("keeps rendering children after the user signs out", async () => {
+  it("stops rendering children and shows the login form after the user signs out", async () => {
     const client = createFakeClient();
     const Wrapper = makeWrapper(client);
     let auth: ReturnType<typeof useAuth> | undefined;
@@ -383,14 +430,28 @@ describe("security", () => {
       await client.signOut();
     });
     expect(auth!.isAuthenticated).toBe(false);
-    // CURRENT BEHAVIOR (suspected bug): the flow never leaves
-    // "authenticated" on SIGNED_OUT / SESSION_EXPIRED, so the gate keeps the
-    // protected tree mounted after sign-out.
-    expect(screen.getByText(PROTECTED)).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Sign in" })).toBeNull();
+    expect(screen.queryByText(PROTECTED)).toBeNull();
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
   });
 
-  it("renders children with no session when renderView calls skipMfaEnrollment during required enrollment", async () => {
+  it("stops rendering children when the session expires", async () => {
+    const { client } = await renderAtLogin();
+    act(() => client.emitSignedIn());
+    expect(screen.getByText(PROTECTED)).toBeTruthy();
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_EXPIRED));
+    expect(screen.queryByText(PROTECTED)).toBeNull();
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
+  });
+
+  it("keeps rendering children for a signed-in user through events that carry no session", async () => {
+    const { client } = await renderAtLogin();
+    act(() => client.emitSignedIn());
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MAGIC_VERIFIED));
+    act(() => client.emit(AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_SUCCESS));
+    expect(screen.getByText(PROTECTED)).toBeTruthy();
+  });
+
+  it("does not render children when renderView calls skipMfaEnrollment during required enrollment", async () => {
     const client = createFakeClient();
     const renderView = (v: string, auth: any) =>
       v === "mfa_enroll" ? (
@@ -399,9 +460,8 @@ describe("security", () => {
     await renderAtLogin(client, { renderView });
     act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED));
     fireEvent.click(screen.getByRole("button", { name: "Maybe later" }));
-    // CURRENT BEHAVIOR (suspected bug): mandatory MFA enrollment can be
-    // skipped client-side and the gate opens without any session.
-    expect(screen.getByText(PROTECTED)).toBeTruthy();
+    expect(screen.queryByText(PROTECTED)).toBeNull();
+    expect(screen.getByRole("button", { name: "Maybe later" })).toBeTruthy();
     expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
   });
 

@@ -5,6 +5,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { AUTH_CHANGE_EVENTS, useScuteClient, useAuth } from "@scute/react-hooks";
 import { scrubAuthTokensFromUrl } from "@scute/js-core";
 
+// Magic link status polling: one request at a time, every 2s, for at most 10
+// minutes. The API does not return the link's expiry, so this is a fixed cap.
+const MAGIC_LINK_POLL_INTERVAL_MS = 2000;
+const MAGIC_LINK_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const MAGIC_LINK_TIMEOUT_MESSAGE = "The sign-in link timed out. Please try again.";
+
 /**
  * Auth flow views — represents the current step in the auth lifecycle.
  */
@@ -66,7 +72,21 @@ export function useScuteAuthFlow() {
 
   const initRef = useRef(false);
   const magicVerifyRef = useRef(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // A ref, not the `submitting` state, so two submits in the same tick send one request.
+  const submittingRef = useRef(false);
+  // The auth payload already exchanged for a session, so a retry or a skip
+  // after registerPasskey signed in does not sign in with it again.
+  const exchangedPayloadRef = useRef<any>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAuthenticatedRef = useRef(isAuthenticated);
+
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  useEffect(() => () => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+  }, []);
 
   // Helper to set all MFA state from a response
   const handleMfaResponse = useCallback((data: any) => {
@@ -74,6 +94,25 @@ export function useScuteAuthFlow() {
     setMfaAvailableMethods(data.availableMethods || []);
     setMfaGracePeriod(!!data.mfaGracePeriod);
     setMfaGraceDaysRemaining(data.mfaGraceDaysRemaining);
+  }, []);
+
+  // The session ended: forget everything tied to it and start over at login.
+  const resetAfterSignOut = useCallback(() => {
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+    exchangedPayloadRef.current = null;
+    setAuthPayload(null);
+    setPendingAuthPayload(null);
+    setMagicLinkId(null);
+    setMfaChallenge(null);
+    setMfaAvailableMethods([]);
+    setMfaGracePeriod(false);
+    setMfaGraceDaysRemaining(undefined);
+    setError(null);
+    setIdentifier("");
+    setView("login");
   }, []);
 
   // ── 1. Initialize SDK + detect magic link in URL ──
@@ -96,6 +135,16 @@ export function useScuteAuthFlow() {
   // ── 2. Listen to SDK auth events ──
   useEffect(() => {
     const unsubscribe = scuteClient.onAuthStateChange((event: string) => {
+      if (event === AUTH_CHANGE_EVENTS.SIGNED_OUT || event === AUTH_CHANGE_EVENTS.SESSION_EXPIRED) {
+        // While the SDK initializes or a link is being verified, that step
+        // picks the next view. An expiry while this flow had no session is a
+        // stale session from an earlier visit and must not drop a sign-in in
+        // progress; a sign-out always resets.
+        if (view === "loading" || view === "magic_verifying") return;
+        if (event === AUTH_CHANGE_EVENTS.SESSION_EXPIRED && !isAuthenticatedRef.current) return;
+        resetAfterSignOut();
+        return;
+      }
       if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && view !== "webauthn_register" && view !== "webauthn_register_success") {
         setView("authenticated");
       }
@@ -117,12 +166,13 @@ export function useScuteAuthFlow() {
       if (event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED) {
         setView("mfa_enroll_suggest");
       }
-      if (event === AUTH_CHANGE_EVENTS.MFA_VERIFIED) {
+      // Only with a live session; otherwise SIGNED_IN moves the flow on.
+      if (event === AUTH_CHANGE_EVENTS.MFA_VERIFIED && isAuthenticatedRef.current) {
         setView("authenticated");
       }
     });
     return () => unsubscribe();
-  }, [scuteClient, view]);
+  }, [scuteClient, view, resetAfterSignOut]);
 
   // ── 3. Process magic link from URL ──
   useEffect(() => {
@@ -170,9 +220,10 @@ export function useScuteAuthFlow() {
         return;
       }
 
-      // Offer passkey registration after magic link verify (if passkeys enabled)
+      // Offer passkey registration after magic link verify, only when the app
+      // says passkeys are on. Missing field or app data fails closed (SEC-40).
       const appData = (await scuteClient.getAppData())?.data;
-      const passkeysEnabled = appData?.passkeys_enabled !== false;
+      const passkeysEnabled = appData?.passkeys_enabled === true;
       if (!skipPasskeyOffer && passkeysEnabled && data?.authPayload) {
         setAuthPayload(data.authPayload);
         setView("webauthn_register");
@@ -183,21 +234,44 @@ export function useScuteAuthFlow() {
   }, [view, scuteClient]);
 
   // ── 4. Poll magic link status ──
+  // One request at a time: the next poll is scheduled only after the previous
+  // one settles, and a response that lands after the view changed is ignored.
   useEffect(() => {
-    if (view !== "magic_pending" || !magicLinkId) {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-      return;
-    }
+    if (view !== "magic_pending" || !magicLinkId) return;
 
-    pollingRef.current = setInterval(async () => {
-      const { data, error } = await scuteClient.getMagicLinkStatus(magicLinkId);
-      if (!error && data) {
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        await scuteClient.signInWithTokenPayload(data);
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const deadline = Date.now() + MAGIC_LINK_POLL_TIMEOUT_MS;
+
+    const poll = async () => {
+      if (stopped) return;
+      if (Date.now() >= deadline) {
+        stopped = true;
+        setError(MAGIC_LINK_TIMEOUT_MESSAGE);
+        setView("error");
+        return;
       }
-    }, 2000);
+      let result;
+      try {
+        result = await scuteClient.getMagicLinkStatus(magicLinkId);
+      } catch {
+        result = null;
+      }
+      if (stopped) return;
+      if (result && !result.error && result.data) {
+        stopped = true;
+        await scuteClient.signInWithTokenPayload(result.data);
+        return;
+      }
+      timer = setTimeout(poll, MAGIC_LINK_POLL_INTERVAL_MS);
+    };
 
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+    timer = setTimeout(poll, MAGIC_LINK_POLL_INTERVAL_MS);
+
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [view, magicLinkId, scuteClient]);
 
   // ── 5. Track authenticated state ──
@@ -207,11 +281,19 @@ export function useScuteAuthFlow() {
     }
   }, [isAuthenticated]);
 
+  // ── 6. Leave "authenticated" once the session is gone ──
+  useEffect(() => {
+    if (view === "authenticated" && !isAuthenticated && !isLoading) {
+      resetAfterSignOut();
+    }
+  }, [view, isAuthenticated, isLoading, resetAfterSignOut]);
+
   // ── Actions ──
 
   const submitIdentifier = useCallback(async (id?: string) => {
     const email = id || identifier;
-    if (!email || submitting) return;
+    if (!email || submittingRef.current) return;
+    submittingRef.current = true;
     setIdentifier(email);
     setSubmitting(true);
     setError(null);
@@ -233,9 +315,10 @@ export function useScuteAuthFlow() {
     } catch (err: any) {
       setError(err?.message || "Failed to sign in");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [identifier, submitting, scuteClient]);
+  }, [identifier, scuteClient]);
 
   const submitOtp = useCallback(async (code: string) => {
     setError(null);
@@ -250,7 +333,8 @@ export function useScuteAuthFlow() {
       }
       if (result?.data?.authPayload) {
         const appData = (await scuteClient.getAppData())?.data;
-        if (appData?.passkeys_enabled !== false) {
+        // Fail closed (SEC-40): offer a passkey only when the app says they are on.
+        if (appData?.passkeys_enabled === true) {
           setAuthPayload(result.data.authPayload);
           setView("webauthn_register");
         } else {
@@ -262,9 +346,11 @@ export function useScuteAuthFlow() {
     }
   }, [identifier, scuteClient]);
 
+  // Only the optional suggestion can be skipped, not required enrollment.
   const skipMfaEnrollment = useCallback(() => {
+    if (view !== "mfa_enroll_suggest") return;
     setView("authenticated");
-  }, []);
+  }, [view]);
 
   const submitMfaCode = useCallback(async (code: string) => {
     if (!mfaChallenge) return;
@@ -283,15 +369,19 @@ export function useScuteAuthFlow() {
   const registerPasskey = useCallback(async () => {
     setError(null);
     try {
-      if (authPayload) {
+      if (authPayload && exchangedPayloadRef.current !== authPayload) {
         const { error: signInError } = await scuteClient.signInWithTokenPayload(authPayload);
         if (signInError) { setError(signInError.message); return; }
+        exchangedPayloadRef.current = authPayload;
       }
       const { error: addError } = await scuteClient.addDevice();
+      // The user is signed in by now: show the error; skipPasskey still continues.
       if (addError) { setError(addError.message); return; }
       setView("webauthn_register_success");
       const suggestion = scuteClient.pendingMfaEnrollmentSuggestion;
-      setTimeout(() => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => {
+        successTimerRef.current = null;
         if (suggestion) {
           setMfaAvailableMethods(suggestion.available_methods || []);
           setMfaGracePeriod(true);
@@ -307,18 +397,33 @@ export function useScuteAuthFlow() {
   }, [authPayload, scuteClient]);
 
   const skipPasskey = useCallback(async () => {
-    try {
-      if (authPayload) {
-        await scuteClient.signInWithTokenPayload(authPayload);
+    setError(null);
+    if (!authPayload) {
+      // Nothing to exchange: continue only on a live session.
+      setView(isAuthenticated ? "authenticated" : "login");
+      return;
+    }
+    if (exchangedPayloadRef.current !== authPayload) {
+      try {
+        const result = await scuteClient.signInWithTokenPayload(authPayload);
+        if (result?.error) {
+          setError(result.error.message || "Failed to sign in");
+          return;
+        }
+      } catch (err: any) {
+        setError(err?.message || "Failed to sign in");
         return;
       }
-    } catch {}
+      exchangedPayloadRef.current = authPayload;
+    }
+    // The register view ignores SIGNED_IN, so move on here.
     setView("authenticated");
-  }, [authPayload, scuteClient]);
+  }, [authPayload, isAuthenticated, scuteClient]);
 
   const retry = useCallback(() => {
     setError(null);
     setIdentifier("");
+    setMagicLinkId(null);
     setView("login");
   }, []);
 
@@ -328,7 +433,8 @@ export function useScuteAuthFlow() {
     identifier,
     error,
     submitting,
-    isAuthenticated: isAuthenticated || view === "authenticated",
+    // Follows the real session (useAuth), not the view.
+    isAuthenticated,
     isLoading,
     user,
 

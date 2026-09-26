@@ -238,24 +238,41 @@ describe("useEnrollMfa", () => {
     expect(result.current.error).toBeNull();
   });
 
-  it("keeps the TOTP secret in state after the user signs out", async () => {
-    const { client, result } = setup(() => ({ mfa: useEnrollMfa(), auth: useAuth() }));
+  it.each([AUTH_CHANGE_EVENTS.SIGNED_OUT, AUTH_CHANGE_EVENTS.SESSION_EXPIRED])(
+    "drops the TOTP secret and the enrollment on %s",
+    async (event) => {
+      const { client, result } = setup(() => ({ mfa: useEnrollMfa(), auth: useAuth() }));
+      act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, authenticatedSession(), makeUser()));
+      client.enrollMfa.mockResolvedValue({
+        data: { enrollment: totpEnrollment, provisioning_uri: TOTP_URI, secret: TOTP_SECRET },
+        error: null,
+      });
+      await act(async () => {
+        await result.current.mfa.enroll({ method: "totp" });
+      });
+      expect(result.current.mfa.secret).toBe(TOTP_SECRET);
+      act(() => client.emit(event, unauthenticatedSession(), null));
+      expect(result.current.auth.isAuthenticated).toBe(false);
+      expect(result.current.mfa.secret).toBeNull();
+      expect(result.current.mfa.provisioningUri).toBeNull();
+      expect(result.current.mfa.enrollment).toBeNull();
+      expect(result.current.mfa.state).toBe("idle");
+    }
+  );
+
+  it("keeps the enrollment through events that carry no session", async () => {
+    const { client, result } = setup(() => useEnrollMfa());
     act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, authenticatedSession(), makeUser()));
     client.enrollMfa.mockResolvedValue({
       data: { enrollment: totpEnrollment, provisioning_uri: TOTP_URI, secret: TOTP_SECRET },
       error: null,
     });
     await act(async () => {
-      await result.current.mfa.enroll({ method: "totp" });
+      await result.current.enroll({ method: "totp" });
     });
-    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_OUT, unauthenticatedSession(), null));
-    expect(result.current.auth.isAuthenticated).toBe(false);
-    // CURRENT BEHAVIOR (suspected bug): the hook does not watch auth state,
-    // so an unverified TOTP seed and otpauth URI stay renderable after
-    // sign-out (shared-device exposure) until reset() or unmount.
-    expect(result.current.mfa.secret).toBe(TOTP_SECRET);
-    expect(result.current.mfa.provisioningUri).toBe(TOTP_URI);
-    expect(result.current.mfa.state).toBe("pending_verify");
+    act(() => client.emit(AUTH_CHANGE_EVENTS.OTP_PENDING));
+    expect(result.current.secret).toBe(TOTP_SECRET);
+    expect(result.current.state).toBe("pending_verify");
   });
 });
 
@@ -286,15 +303,30 @@ describe("useMfaVerify", () => {
     expect(result.current.challengeToken).toBeNull();
   });
 
-  it("does not pick up a challenge that appears after mount", () => {
-    const { client, result } = setup(() => useMfaVerify());
-    client.pendingMfaChallenge = challenge;
-    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED));
-    // CURRENT BEHAVIOR (suspected bug): the snapshot only refreshes when the
-    // client instance changes, not on MFA_REQUIRED. A verify screen mounted
-    // before primary auth finishes stays tokenless and every verify() fails
-    // with "No pending MFA challenge" (REF-16).
-    expect(result.current.challengeToken).toBeNull();
+  it.each([AUTH_CHANGE_EVENTS.MFA_REQUIRED, AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED])(
+    "picks up a challenge that appears after mount on %s, and verify() uses it",
+    async (event) => {
+      const { client, result } = setup(() => useMfaVerify());
+      expect(result.current.challengeToken).toBeNull();
+      client.pendingMfaChallenge = challenge;
+      act(() => client.emit(event));
+      expect(result.current.pendingChallenge).toBe(challenge);
+      expect(result.current.challengeToken).toBe("chl_totp_1");
+
+      client.verifyMfaChallenge.mockResolvedValue({ error: null });
+      await act(async () => {
+        await result.current.verify("246810");
+      });
+      expect(client.verifyMfaChallenge).toHaveBeenCalledWith("chl_totp_1", "246810");
+      expect(result.current.state).toBe("verified");
+    }
+  );
+
+  it("stops listening for new challenges on unmount", () => {
+    const { client, unmount } = setup(() => useMfaVerify());
+    expect(client.listeners.size).toBe(2);
+    unmount();
+    expect(client.listeners.size).toBe(0);
   });
 
   it("verify without a challenge errors locally and does not call the client", async () => {
@@ -373,7 +405,7 @@ describe("useMfaVerify", () => {
     expect(client.verifyMfaChallenge).toHaveBeenLastCalledWith("chl_backup_2", "abcd-efgh");
   });
 
-  it("switchMethod failure is returned but not surfaced in hook state", async () => {
+  it("switchMethod failure sets the error and drops the cancelled challenge", async () => {
     const { client, result } = setup(() => useMfaVerify(), { pendingMfaChallenge: challenge });
     const err = { message: "Method not available" };
     client.switchMfaMethod.mockResolvedValue({ data: null, error: err });
@@ -382,13 +414,17 @@ describe("useMfaVerify", () => {
       returned = await result.current.switchMethod("sms");
     });
     expect(returned).toEqual({ data: null, error: err });
-    // CURRENT BEHAVIOR (suspected bug): a failed switch leaves `error` null
-    // and forces state to "idle", so a UI driven by hook state shows no
-    // failure. The real client has already cancelled the old challenge
-    // before the failing create, so the token kept here is dead.
-    expect(result.current.error).toBeNull();
-    expect(result.current.state).toBe("idle");
-    expect(result.current.challengeToken).toBe("chl_totp_1");
+    expect(result.current.error).toBe(err);
+    expect(result.current.state).toBe("error");
+    // The real client cancels the old challenge before creating the new one,
+    // so the old token is not kept.
+    expect(result.current.challengeToken).toBeNull();
+
+    await act(async () => {
+      await result.current.verify("123456");
+    });
+    expect(client.verifyMfaChallenge).not.toHaveBeenCalled();
+    expect(result.current.error).toEqual({ message: "No pending MFA challenge" });
   });
 
   it("switchMethod without a challenge errors locally", async () => {
@@ -413,7 +449,7 @@ describe("useMfaVerify", () => {
     expect(returned).toBe(ok);
   });
 
-  it("resend failure is returned but not stored in error", async () => {
+  it("resend failure is returned and stored in error", async () => {
     const { client, result } = setup(() => useMfaVerify(), { pendingMfaChallenge: challenge });
     const err = { message: "Too many resends" };
     client.resendChallenge.mockResolvedValue({ data: null, error: err });
@@ -422,11 +458,22 @@ describe("useMfaVerify", () => {
       returned = await result.current.resend();
     });
     expect(returned).toEqual({ data: null, error: err });
-    // CURRENT BEHAVIOR (suspected bug): unlike verify(), resend() never sets
-    // `error`, so rate-limit or delivery failures are invisible to UIs that
-    // render from hook state.
-    expect(result.current.error).toBeNull();
+    expect(result.current.error).toBe(err);
     expect(result.current.state).toBe("idle");
+    expect(result.current.challengeToken).toBe("chl_totp_1");
+  });
+
+  it("a successful resend clears an earlier error", async () => {
+    const { client, result } = setup(() => useMfaVerify(), { pendingMfaChallenge: challenge });
+    client.resendChallenge.mockResolvedValueOnce({ data: null, error: { message: "Too many resends" } });
+    await act(async () => {
+      await result.current.resend();
+    });
+    client.resendChallenge.mockResolvedValueOnce({ data: { challenge: {} }, error: null });
+    await act(async () => {
+      await result.current.resend();
+    });
+    expect(result.current.error).toBeNull();
   });
 
   it("resend without a challenge errors locally", async () => {
@@ -459,7 +506,7 @@ describe("useMfaVerify", () => {
     expect(client.verifyMfaChallenge).not.toHaveBeenCalled();
   });
 
-  it("cancel forgets the challenge locally even when the server cancel fails", async () => {
+  it("cancel keeps the challenge and reports the error when the server cancel fails", async () => {
     const { client, result } = setup(() => useMfaVerify(), { pendingMfaChallenge: challenge });
     const err = { message: "Network error" };
     client.cancelChallenge.mockResolvedValue({ data: null, error: err });
@@ -468,13 +515,10 @@ describe("useMfaVerify", () => {
       returned = await result.current.cancel();
     });
     expect(returned).toEqual({ data: null, error: err });
-    // CURRENT BEHAVIOR (suspected bug): the challenge may still be live on
-    // the server, but the hook drops it and reports no error. The client's
-    // own pendingMfaChallenge is also left untouched, so a remounted hook
-    // would snapshot the "cancelled" challenge again.
-    expect(result.current.challengeToken).toBeNull();
-    expect(result.current.error).toBeNull();
-    expect(client.pendingMfaChallenge).toBe(challenge);
+    // The challenge may still be live on the server, so it is kept.
+    expect(result.current.error).toBe(err);
+    expect(result.current.challengeToken).toBe("chl_totp_1");
+    expect(result.current.pendingChallenge).toBe(challenge);
   });
 
   it("cancel without a challenge is a silent no-op", async () => {
@@ -532,8 +576,7 @@ describe("useFactorList", () => {
       listMfaMethods: vi.fn(async () => ({ data: null, error: authErr })),
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    // CURRENT BEHAVIOR (suspected bug): the JSDoc promises "an empty list
-    // (not an error) while unauthenticated", but the auth error is surfaced.
+    // Known limitation, tracked separately: the JSDoc says signed-out returns an empty list with no error, but the auth error is surfaced.
     expect(result.current.error).toBe(authErr);
     expect(result.current.factors).toEqual([]);
   });
@@ -706,17 +749,19 @@ describe("useBackupCodes", () => {
     expect(result.current.codes).toBeNull();
   });
 
-  it("keeps plaintext codes in state after the user signs out", async () => {
-    const { client, result } = setup(() => ({ codes: useBackupCodes(), auth: useAuth() }));
-    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, authenticatedSession(), makeUser()));
-    client.generateBackupCodes.mockResolvedValue({ data: { backup_codes: codes }, error: null });
-    await act(async () => {
-      await result.current.codes.generate();
-    });
-    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_OUT, unauthenticatedSession(), null));
-    expect(result.current.auth.isAuthenticated).toBe(false);
-    // CURRENT BEHAVIOR (suspected bug): recovery codes are not cleared on
-    // sign-out; they stay renderable until clear() or unmount.
-    expect(result.current.codes.codes).toEqual(codes);
-  });
+  it.each([AUTH_CHANGE_EVENTS.SIGNED_OUT, AUTH_CHANGE_EVENTS.SESSION_EXPIRED])(
+    "drops plaintext codes on %s",
+    async (event) => {
+      const { client, result } = setup(() => ({ codes: useBackupCodes(), auth: useAuth() }));
+      act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, authenticatedSession(), makeUser()));
+      client.generateBackupCodes.mockResolvedValue({ data: { backup_codes: codes }, error: null });
+      await act(async () => {
+        await result.current.codes.generate();
+      });
+      expect(result.current.codes.codes).toEqual(codes);
+      act(() => client.emit(event, unauthenticatedSession(), null));
+      expect(result.current.auth.isAuthenticated).toBe(false);
+      expect(result.current.codes.codes).toBeNull();
+    }
+  );
 });

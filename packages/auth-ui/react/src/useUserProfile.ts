@@ -81,17 +81,28 @@ export function useUserProfile(): UseUserProfileResult {
   const { user, isAuthenticated, isLoading, signOut } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A fresher copy of the signed-in user (from refetch or updateMeta). It is
+  // only used while the auth context still holds the user it was fetched
+  // for, so any newer user from the context, or a sign-out, replaces it.
+  const [fresh, setFresh] = useState<{ base: ScuteUserData; user: ScuteUserData } | null>(null);
+  const currentUser = fresh && fresh.base === user ? fresh.user : user;
+
+  const applyUser = useCallback((base: ScuteUserData | null, next: ScuteUserData | null | undefined) => {
+    if (base && next && next.id === base.id) setFresh({ base, user: next });
+  }, []);
 
   const refetch = useCallback(async () => {
-    // Force a fresh fetch from the server, then re-emit the session so the
-    // AuthContextProvider re-renders with the new user.
-    await scuteClient.getUser?.();
-  }, [scuteClient]);
+    // client.getUser() emits no auth event, so apply the result here.
+    const base = user;
+    const res = await scuteClient.getUser?.();
+    applyUser(base, res?.data?.user);
+  }, [scuteClient, user, applyUser]);
 
   const updateMeta = useCallback<UseUserProfileResult["updateMeta"]>(
     async (meta) => {
       setIsUpdating(true);
       setError(null);
+      const base = user;
       try {
         const res = await scuteClient.updateUserMeta(meta);
         if (res.error) {
@@ -114,13 +125,16 @@ export function useUserProfile(): UseUserProfileResult {
             error: { code: fieldErrors ? "validation_error" : "unknown", message, fieldErrors },
           };
         }
+        // The response carries the updated user; the refetch below replaces
+        // it with the server's latest copy when that succeeds.
+        applyUser(base, (res.data as { user?: ScuteUserData } | null)?.user);
         await refetch();
         return { ok: true };
       } finally {
         setIsUpdating(false);
       }
     },
-    [scuteClient, refetch]
+    [scuteClient, refetch, user, applyUser]
   );
 
   const wrappedSignOut = useCallback(async () => {
@@ -128,7 +142,7 @@ export function useUserProfile(): UseUserProfileResult {
   }, [signOut]);
 
   return {
-    user: user ?? null,
+    user: currentUser ?? null,
     isAuthenticated,
     isLoading,
     isUpdating,
