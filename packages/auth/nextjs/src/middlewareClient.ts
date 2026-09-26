@@ -41,17 +41,70 @@ class ScuteNextMiddlewareStorage extends ScuteCookieStorage {
   }
 
   private _setCookie(name: string, value: string, options?: CookieAttributes) {
-    const cookieStr = serializeCookie(name, value, {
-      ...this.defaultCookieOptions,
-      ...options,
-    });
+    const attributes = { ...this.defaultCookieOptions, ...options };
+    const cookieStr = serializeCookie(name, value, attributes);
 
     if (this.context.res.headers) {
       this.context.res.headers.append("set-cookie", cookieStr);
-      this.context.res.headers.append("cookie", cookieStr);
+      forwardCookieToRequest(
+        this.context,
+        name,
+        attributes.maxAge === 0 ? null : cookieStr.split(";")[0]
+      );
     }
   }
 }
+
+const OVERRIDE_HEADERS = "x-middleware-override-headers";
+const REQUEST_HEADER = "x-middleware-request-";
+
+/**
+ * Makes a cookie write visible to the request Next renders after this
+ * middleware (server components, route handlers), the same way
+ * `NextResponse.next({ request: { headers } })` does: Next reads these
+ * internal headers into the downstream request and strips them, so they are
+ * not sent to the browser. `pair` is `name=value`, or null for a deletion.
+ */
+const forwardCookieToRequest = (
+  { req, res }: { req: NextRequest; res: NextResponse },
+  name: string,
+  pair: string | null
+) => {
+  const overridden = res.headers.get(OVERRIDE_HEADERS);
+  const keys = overridden
+    ? overridden
+        .split(",")
+        .map((k) => k.trim())
+        .filter((k) => !!k)
+    : [];
+
+  if (!overridden) {
+    // overriding drops every request header that is not listed, so list
+    // (and keep) all of them
+    req.headers.forEach((value, key) => {
+      keys.push(key);
+      res.headers.set(REQUEST_HEADER + key, value);
+    });
+  }
+  if (keys.indexOf("cookie") === -1) {
+    keys.push("cookie");
+  }
+
+  const current =
+    res.headers.get(REQUEST_HEADER + "cookie") ??
+    req.headers.get("cookie") ??
+    "";
+  const pairs = current
+    .split(";")
+    .map((p) => p.trim())
+    .filter((p) => !!p && p.split("=")[0].trim() !== name);
+  if (pair) {
+    pairs.push(pair);
+  }
+
+  res.headers.set(REQUEST_HEADER + "cookie", pairs.join("; "));
+  res.headers.set(OVERRIDE_HEADERS, keys.join(","));
+};
 
 export const createMiddlewareClient = (
   context: { req: NextRequest; res: NextResponse },

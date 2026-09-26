@@ -23,9 +23,9 @@ import {
   json,
   lastCookie,
   makeAccess,
+  makeJwt,
   makeRefresh,
   makeRouteContext,
-  parseCookies,
   settle,
   captureUnhandledRejections,
   type Upstream,
@@ -222,9 +222,8 @@ describe("GET /auth/csrf", () => {
     expect(body).toMatch(/^[0-9a-f]{128}$/);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): an empty namespaced cookie is
-  // reflected back as the token ("" ?? ...) so the client gets an empty
-  // token and every CSRF-protected call fails until the cookie is cleared.
+  // Known limitation, tracked separately: an empty namespaced cookie is
+  // returned as an empty token instead of minting a new one.
   it("returns an empty token when the namespaced cookie is present but empty", async () => {
     const { body } = await run({
       method: "GET",
@@ -286,10 +285,10 @@ describe("POST /auth/sign-in", () => {
     expect(refresh.path).toBe("/");
     expect(refresh.expires).toBeInstanceOf(Date);
 
-    // only namespaced names are written, never legacy ones
-    const names = parseCookies(setCookies).map((c) => c.name);
-    expect(names).not.toContain(LEGACY_ACCESS_KEY);
-    expect(names).not.toContain(LEGACY_REFRESH_KEY);
+    // only namespaced names get a value; legacy ones are only ever cleared
+    for (const name of [LEGACY_ACCESS_KEY, LEGACY_REFRESH_KEY]) {
+      expect(isDeletion(lastCookie(setCookies, name))).toBe(true);
+    }
   });
 
   it("sets Expires from the JWT exp claim", async () => {
@@ -344,100 +343,111 @@ describe("POST /auth/sign-in", () => {
     expect(isDeletion(lastCookie(setCookies, LEGACY_ACCESS_KEY))).toBe(true);
   });
 
-  it("401s, signs out and revokes when the new token lives > 30s longer than access_expiration", async () => {
-    upstream.issued.rotateAccess = makeAccess({ expIn: 900 + 120, tag: "long" });
-    const { res, setCookies } = await run({
+  // SIGN_IN_MAX_DELAY_MS: only an access token issued in the last 30s may
+  // be exchanged. Scute access tokens have no `iat`, so the issue time is
+  // `exp - access_expiration` (APP_DATA.access_expiration is 900s here).
+  it.each([
+    ["issued 31s ago", 900 - 31],
+    ["issued ~15 minutes ago", 5],
+    ["expired an hour ago", -3600],
+    ["claiming to be issued 2 minutes in the future", 900 + 120],
+  ])("rejects a presented access token %s: 401, no upstream token call, session cleared", async (_label, expIn) => {
+    const presented = makeAccess({ expIn, tag: `presented${expIn}` });
+    const { res, body, setCookies } = await run({
       path: "/auth/sign-in",
-      headers: { Authorization: `Bearer ${makeAccess()}` },
+      headers: { Authorization: `Bearer ${presented}` },
+      cookies: { [ACCESS_KEY]: makeAccess({ tag: "existing" }), [REFRESH_KEY]: makeRefresh({ tag: "existing" }) },
       csrf: true,
     });
     expect(res.status).toBe(401);
-    const del = upstream.callsTo("/current_user", "DELETE");
-    expect(del).toHaveLength(1);
-    expect(del[0].headers.get("x-authorization")).toBe(upstream.issued.rotateAccess);
+    expect(body).toBe("");
+    expect(upstream.callsTo("/tokens/")).toEqual([]);
+    expect(upstream.callsTo("/current_user")).toEqual([]);
     expect(isDeletion(lastCookie(setCookies, ACCESS_KEY))).toBe(true);
     expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
   });
 
-  // CURRENT BEHAVIOR (suspected security bug): SIGN_IN_MAX_DELAY_MS is meant
-  // to reject replayed/old access tokens ("if more than 30s passed after
-  // sign in it may be an attack"), but it measures the token *returned by
-  // rotate_access*, which is always fresh. An old (or even expired) access
-  // token that upstream still rotates is upgraded into a full session with
-  // an HttpOnly refresh cookie. The Next layer itself never checks exp.
-  it("accepts an old or expired presented access token as long as upstream rotates it", async () => {
-    for (const expIn of [5, -3600]) {
-      upstream.calls.length = 0;
-      const presented = makeAccess({ expIn, tag: `old${expIn}` });
-      const { res, setCookies } = await run({
-        path: "/auth/sign-in",
-        headers: { Authorization: `Bearer ${presented}` },
-        csrf: true,
-      });
-      expect(res.status).toBe(200);
-      expect(upstream.callsTo("/tokens/rotate_access")[0].headers.get("x-authorization")).toBe(presented);
-      expect(lastCookie(setCookies, REFRESH_KEY)!.value).toBe(upstream.issued.rotateRefresh);
-    }
-  });
-
-  // CURRENT BEHAVIOR (suspected security bug): if ANY refresh cookie is
-  // already present, sign-in ignores the presented access token and
-  // refreshes the existing session instead. A planted or stale refresh
-  // cookie (e.g. from another user, or cookie tossing) wins over the
-  // credential the user just proved, i.e. session fixation.
-  it("ignores the presented token when a refresh cookie already exists", async () => {
-    const presented = makeAccess({ uuid: "user-B", tag: "B" });
-    const stale = makeRefresh({ tag: "user-A" });
+  it("accepts a presented access token issued within the last 30s", async () => {
+    const presented = makeAccess({ expIn: 900 - 20, tag: "recent" });
     const { res, setCookies } = await run({
       path: "/auth/sign-in",
       headers: { Authorization: `Bearer ${presented}` },
-      cookies: { [REFRESH_KEY]: stale },
       csrf: true,
     });
     expect(res.status).toBe(200);
-    expect(upstream.callsTo("/tokens/rotate_access")).toEqual([]);
-    const refreshCalls = upstream.callsTo("/tokens/refresh", "POST");
-    expect(refreshCalls).toHaveLength(1);
-    expect(refreshCalls[0].headers.get("x-refresh-token")).toBe(stale);
-    expect(lastCookie(setCookies, ACCESS_KEY)!.value).toBe(upstream.issued.refreshedAccess);
+    expect(upstream.callsTo("/tokens/rotate_access")[0].headers.get("x-authorization")).toBe(presented);
+    expect(lastCookie(setCookies, REFRESH_KEY)!.value).toBe(upstream.issued.rotateRefresh);
   });
 
-  // CURRENT BEHAVIOR (REF-41 target): the legacy unsuffixed refresh cookie
-  // is read (and forward-migrated) during sign-in, so a legacy cookie left
-  // by another Scute app on the same host is sent to THIS app's refresh
-  // endpoint.
-  it("uses a legacy unsuffixed refresh cookie during sign-in and migrates it", async () => {
-    const legacy = makeRefresh({ tag: "legacy" });
+  it("uses an `iat` claim when the presented token has one", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const stale = makeJwt({ uuid: "user-1", iat: now - 60, exp: now + 900 });
+    const fresh = makeJwt({ uuid: "user-1", iat: now - 5, exp: now + 3600 });
+    expect((await run({ path: "/auth/sign-in", headers: { Authorization: `Bearer ${stale}` }, csrf: true })).res.status).toBe(401);
+    expect(upstream.callsTo("/tokens/rotate_access")).toEqual([]);
+    expect((await run({ path: "/auth/sign-in", headers: { Authorization: `Bearer ${fresh}` }, csrf: true })).res.status).toBe(200);
+    expect(upstream.callsTo("/tokens/rotate_access")[0].headers.get("x-authorization")).toBe(fresh);
+  });
+
+  it("rejects a decodable JWT without the access token claims (uuid, exp)", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const token of [makeJwt({ exp: now + 900 }), makeJwt({ uuid: "user-1" }), makeJwt({ uuid: "user-1", exp: String(now + 900) })]) {
+      const { res } = await run({ path: "/auth/sign-in", headers: { Authorization: `Bearer ${token}` }, csrf: true });
+      expect(res.status).toBe(401);
+    }
+    expect(upstream.callsTo("/tokens/")).toEqual([]);
+  });
+
+  it("exchanges the presented token even when a refresh cookie already exists, and replaces it", async () => {
+    const presented = makeAccess({ uuid: "user-B", tag: "B" });
+    const existing = makeRefresh({ tag: "user-A" });
+    const { res, setCookies } = await run({
+      path: "/auth/sign-in",
+      headers: { Authorization: `Bearer ${presented}` },
+      cookies: { [REFRESH_KEY]: existing },
+      csrf: true,
+    });
+    expect(res.status).toBe(200);
+    expect(upstream.callsTo("/tokens/refresh")).toEqual([]);
+    const rotate = upstream.callsTo("/tokens/rotate_access", "POST");
+    expect(rotate).toHaveLength(1);
+    expect(rotate[0].headers.get("x-authorization")).toBe(presented);
+    expect(lastCookie(setCookies, ACCESS_KEY)!.value).toBe(upstream.issued.rotateAccess);
+    expect(lastCookie(setCookies, REFRESH_KEY)!.value).toBe(upstream.issued.rotateRefresh);
+  });
+
+  it("clears an existing refresh cookie when rotate_access returns no refresh token", async () => {
+    upstream.on("POST", `/v1/auth/${APP_ID}/tokens/rotate_access`, () =>
+      json({ access: upstream.issued.rotateAccess, access_expires_at: "x" })
+    );
     const { res, setCookies } = await run({
       path: "/auth/sign-in",
       headers: { Authorization: `Bearer ${makeAccess()}` },
-      cookies: { [LEGACY_REFRESH_KEY]: legacy },
+      cookies: { [REFRESH_KEY]: makeRefresh({ tag: "existing" }) },
       csrf: true,
     });
     expect(res.status).toBe(200);
-    expect(upstream.callsTo("/tokens/refresh")[0].headers.get("x-refresh-token")).toBe(legacy);
-    expect(upstream.callsTo("/tokens/rotate_access")).toEqual([]);
-    expect(lastCookie(setCookies, REFRESH_KEY)!.value).toBe(upstream.issued.refreshedRefresh);
+    expect(lastCookie(setCookies, ACCESS_KEY)!.value).toBe(upstream.issued.rotateAccess);
+    expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
   });
 
-  it("a stale legacy refresh cookie makes the first sign-in fail (401) and clears the legacy cookie", async () => {
+  it("ignores legacy unsuffixed session cookies during sign-in and clears them", async () => {
     upstream.on("POST", `/v1/auth/${APP_ID}/tokens/refresh`, () => json({ error: "revoked" }, 401));
     const { res, setCookies } = await run({
       path: "/auth/sign-in",
       headers: { Authorization: `Bearer ${makeAccess()}` },
-      cookies: { [LEGACY_REFRESH_KEY]: makeRefresh({ tag: "dead" }) },
+      cookies: { [LEGACY_ACCESS_KEY]: makeAccess({ tag: "legacy" }), [LEGACY_REFRESH_KEY]: makeRefresh({ tag: "legacy" }) },
       csrf: true,
     });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(upstream.callsTo("/tokens/refresh")).toEqual([]);
+    expect(upstream.callsTo("/tokens/rotate_access")).toHaveLength(1);
+    expect(isDeletion(lastCookie(setCookies, LEGACY_ACCESS_KEY))).toBe(true);
     expect(isDeletion(lastCookie(setCookies, LEGACY_REFRESH_KEY))).toBe(true);
-    expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
+    expect(lastCookie(setCookies, REFRESH_KEY)!.value).toBe(upstream.issued.rotateRefresh);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): if app data cannot be loaded,
-  // sign-in 401s after rotate_access already minted a session upstream,
-  // and signOut() bails before revoking it (no DELETE current_user), so the
-  // server-side session is orphaned until it expires.
-  it("401s without revoking the rotated session when app data is unavailable", async () => {
+  it("401s before minting a session upstream when app data is unavailable", async () => {
     upstream.on("GET", `/v1/apps/${APP_ID}`, () => json({ error: "boom" }, 500));
     const { res, setCookies } = await run({
       path: "/auth/sign-in",
@@ -445,7 +455,7 @@ describe("POST /auth/sign-in", () => {
       csrf: true,
     });
     expect(res.status).toBe(401);
-    expect(upstream.callsTo("/tokens/rotate_access")).toHaveLength(1);
+    expect(upstream.callsTo("/tokens/rotate_access")).toEqual([]);
     expect(upstream.callsTo("/current_user", "DELETE")).toEqual([]);
     expect(isDeletion(lastCookie(setCookies, ACCESS_KEY))).toBe(true);
     expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
@@ -504,8 +514,8 @@ describe("POST /auth/refresh", () => {
     expect(upstream.callsTo("/tokens/rotate_access")[0].headers.get("x-authorization")).toBe(access);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): with no session at all the
-  // refresh endpoint answers 200 {"access":null} rather than 401.
+  // Known limitation, tracked separately: with no session the refresh
+  // endpoint answers 200 {"access":null} rather than 401.
   it("answers 200 with access:null when there is no session", async () => {
     const { res, body } = await run({ path: "/auth/refresh", csrf: true });
     expect(res.status).toBe(200);
@@ -622,11 +632,9 @@ describe("POST /auth/sign-out", () => {
     );
   });
 
-  // CURRENT BEHAVIOR (suspected bug, js-core): ScuteBaseHttp.delete()
-  // awaits wretch's response chain, which is not thenable, so the request
-  // is never actually awaited. A failed upstream revocation is (a) invisible
-  // to the handler, which still says 200, and (b) surfaces as an
-  // UNHANDLED promise rejection in the Next.js server process.
+  // Known limitation, tracked separately (js-core ScuteBaseHttp.delete):
+  // the revocation request is not awaited, so a failed revocation still
+  // answers 200 and surfaces as an unhandled promise rejection.
   it("returns 200 when upstream revocation fails, leaking an unhandled rejection", async () => {
     upstream.on("DELETE", `/v1/auth/${APP_ID}/current_user`, () => json({ error: "x" }, 500));
     const { result, reasons } = await captureUnhandledRejections(() =>

@@ -113,16 +113,35 @@ describe("createScuteClient: no-store fetch middleware", () => {
     expect(appCalls[1].cache).toBe("no-store");
   });
 
-  // CURRENT BEHAVIOR (suspected bug): ScuteClient's constructor fires the
-  // app-data GET synchronously, before createScuteClient pushes the
-  // no-store middleware. On Next 13/14 (fetch cached by default in route
-  // handlers / server components) that first request, which carries the
-  // secret key, can be served from the Next data cache.
-  it("does NOT mark the constructor's first app-data request as no-store", () => {
+  it("marks the constructor's first app-data request (which carries the secret key) as no-store", () => {
     createScuteClient({ appId: APP_ID, baseUrl: BASE_URL, secretKey: SECRET });
     expect(upstream.calls).toHaveLength(1);
     expect(upstream.calls[0].path).toBe(`/v1/apps/${APP_ID}`);
-    expect(upstream.calls[0].cache).toBeUndefined();
+    expect(upstream.calls[0].headers.get("authorization")).toBe(`Bearer ${SECRET}`);
+    expect(upstream.calls[0].cache).toBe("no-store");
+  });
+
+  it("marks requests on the verifications wretcher as no-store", async () => {
+    const client = createScuteClient({ appId: APP_ID, baseUrl: BASE_URL, secretKey: SECRET });
+    await (client.verifications as any).get("/probe");
+    const call = upstream.callsTo("/probe")[0];
+    expect(call).toBeDefined();
+    expect(call.cache).toBe("no-store");
+  });
+
+  it("still runs a caller's onBeforeInitialize, with the client as `this`, before the first request", () => {
+    let self: unknown;
+    let callsSeen = -1;
+    const client = createScuteClient({
+      appId: APP_ID,
+      baseUrl: BASE_URL,
+      onBeforeInitialize() {
+        self = this;
+        callsSeen = upstream.calls.length;
+      },
+    });
+    expect(self).toBe(client);
+    expect(callsSeen).toBe(0);
   });
 });
 

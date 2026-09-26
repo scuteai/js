@@ -60,6 +60,10 @@ describe("fetchWithCsrf", () => {
     vi.unstubAllGlobals();
   });
 
+  /** headers of the n-th fetch, as a lowercase-keyed object */
+  const sentHeaders = (n: number) =>
+    Object.fromEntries(new Headers(calls[n].init?.headers as HeadersInit));
+
   it("GETs the csrf handler first, then calls the target handler with the token header", async () => {
     install();
     const res = await fetchWithCsrf("sign-out", { method: "POST" });
@@ -68,12 +72,10 @@ describe("fetchWithCsrf", () => {
     expect(calls.map((c) => c.url)).toEqual(["/auth/csrf", "/auth/sign-out"]);
     // the token request is a bare GET (no init)
     expect(calls[0].init).toBeUndefined();
-    expect(calls[1].init).toEqual({
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": "tok-1",
-      },
+    expect(calls[1].init?.method).toBe("POST");
+    expect(sentHeaders(1)).toEqual({
+      "content-type": "application/json",
+      "x-csrf-token": "tok-1",
     });
   });
 
@@ -92,56 +94,70 @@ describe("fetchWithCsrf", () => {
       method: "POST",
       headers: { Authorization: "Bearer abc" },
     });
-    expect(calls[1].init?.headers).toEqual({
-      Authorization: "Bearer abc",
-      "Content-Type": "application/json",
-      "X-CSRF-Token": "tok-1",
+    expect(sentHeaders(1)).toEqual({
+      authorization: "Bearer abc",
+      "content-type": "application/json",
+      "x-csrf-token": "tok-1",
     });
   });
 
-  it("overrides a caller-supplied Content-Type and X-CSRF-Token", async () => {
+  it("overrides a caller-supplied Content-Type and X-CSRF-Token, whatever their casing", async () => {
     install();
     await fetchWithCsrf("sign-in", {
       method: "POST",
-      headers: { "Content-Type": "text/plain", "X-CSRF-Token": "forged" },
+      headers: { "content-type": "text/plain", "x-csrf-token": "forged" },
     });
-    expect(calls[1].init?.headers).toEqual({
-      "Content-Type": "application/json",
-      "X-CSRF-Token": "tok-1",
+    expect(sentHeaders(1)).toEqual({
+      "content-type": "application/json",
+      "x-csrf-token": "tok-1",
     });
   });
 
-  // CURRENT BEHAVIOR (suspected bug): headers are merged with object spread,
-  // so a `Headers` instance (or an array of tuples) is silently dropped.
-  // Today every internal caller passes a plain object, so it is latent.
-  it("drops caller headers passed as a Headers instance", async () => {
+  it("keeps caller headers passed as a Headers instance or as tuples", async () => {
     install();
     await fetchWithCsrf("sign-in", {
       method: "POST",
       headers: new Headers({ Authorization: "Bearer abc" }),
     });
-    expect(calls[1].init?.headers).toEqual({
-      "Content-Type": "application/json",
-      "X-CSRF-Token": "tok-1",
+    await fetchWithCsrf("sign-in", {
+      method: "POST",
+      headers: [["Authorization", "Bearer def"]],
     });
+    expect(sentHeaders(1)).toEqual({
+      authorization: "Bearer abc",
+      "content-type": "application/json",
+      "x-csrf-token": "tok-1",
+    });
+    expect(sentHeaders(3).authorization).toBe("Bearer def");
+    expect(sentHeaders(3)["x-csrf-token"]).toBe("tok-1");
   });
 
-  it("still sends the request with an empty token when the csrf fetch rejects", async () => {
+  it("rejects with a clear error, and sends nothing, when the csrf fetch rejects", async () => {
     install(async () => {
       throw new Error("offline");
     });
-    const res = await fetchWithCsrf("sign-out", { method: "POST" });
-    expect(res.status).toBe(200);
-    expect((calls[1].init?.headers as any)["X-CSRF-Token"]).toBe("");
+    await expect(fetchWithCsrf("sign-out", { method: "POST" })).rejects.toThrow(
+      "[Scute] Could not fetch a CSRF token from /auth/csrf"
+    );
+    expect(calls.map((c) => c.url)).toEqual(["/auth/csrf"]);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): the csrf response status is not
-  // checked, so an error page body (here "CSRF error") is sent back as the
-  // token. The server then rejects it, so this fails closed.
-  it("uses whatever body the csrf endpoint returns as the token, even on error status", async () => {
+  it("returns a non-ok response, and sends nothing, when the csrf endpoint answers with an error", async () => {
     install(async () => new Response("Bad Request", { status: 400 }));
-    await fetchWithCsrf("refresh", { method: "POST" });
-    expect((calls[1].init?.headers as any)["X-CSRF-Token"]).toBe("Bad Request");
+    const res = await fetchWithCsrf("refresh", { method: "POST" }, "api");
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(400);
+    expect(res.statusText).toBe("CSRF token unavailable");
+    expect(await res.text()).toBe("[Scute] Could not get a CSRF token from /api/auth/csrf (status 400)");
+    expect(calls.map((c) => c.url)).toEqual(["/api/auth/csrf"]);
+  });
+
+  it("returns a non-ok response, and sends nothing, when the csrf token is empty", async () => {
+    install(async () => new Response(""));
+    const res = await fetchWithCsrf("sign-in", { method: "POST" });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(500);
+    expect(calls.map((c) => c.url)).toEqual(["/auth/csrf"]);
   });
 
   it("uses relative URLs only (never leaves the current origin)", async () => {
