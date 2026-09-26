@@ -329,6 +329,9 @@ export function installBrowser({
   FakeBroadcastChannel.instances = [];
   vi.stubGlobal("window", win);
   vi.stubGlobal("document", document);
+  // Node 21+ has a global navigator and Node 20 doesn't; a browser always
+  // does, so provide it rather than depend on the Node version.
+  vi.stubGlobal("navigator", win.navigator);
   vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
   return { win, document, localStorage };
 }
