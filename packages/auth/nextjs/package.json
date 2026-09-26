@@ -16,13 +16,15 @@
     "tsup-build": "tsup src/index.ts --format cjs,esm --dts",
     "build": "pnpm tsup-build",
     "dev": "pnpm tsup-build --watch",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@scute/react-hooks": "workspace:*",
     "@scute/js-core": "workspace:*",
-    "set-cookie-parser": "^2.6.0",
-    "cookie": "^0.5.0"
+    "@scute/react-hooks": "workspace:*",
+    "cookie": "^0.5.0",
+    "set-cookie-parser": "^2.6.0"
   },
   "peerDependencies": {
     "next": "^13.0.0 || ^14.0.0 || ^15.0.0 || ^16.0.0"
@@ -32,7 +34,8 @@
     "@types/cookie": "^0.5.1",
     "@types/set-cookie-parser": "^2.4.2",
     "next": "16.3.3",
+    "tsup": "^8.1.0",
     "typescript": "4.9.5",
-    "tsup": "^8.1.0"
+    "vitest": "^4.1.8"
   }
 }
