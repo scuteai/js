@@ -1,7 +1,11 @@
-# ci.yml file for GitHub Actions
 name: Deploy docs
 
-on: [push, pull_request, workflow_dispatch]
+# Publishes to gh-pages, so only released code (main) may deploy. PRs and
+# other branches are covered by ci.yml.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build_and_lint:
@@ -10,22 +14,17 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Retrieve the cached "node_modules" directory (if present)
-        uses: actions/cache@v4
-        id: node-cache
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          node-version: 20
+          cache: pnpm
 
-      - name: Install dependencies (if the cached directory was not found)
-        if: steps.node-cache.outputs.cache-hit != 'true'
-        run: pnpm i --frozen-lockfile --prod=false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Test to see if the project compiles
         run: pnpm build
@@ -37,6 +36,7 @@ jobs:
         run: pnpm typedoc
 
       - name: Deploy 🚀
+        if: github.ref == 'refs/heads/main'
         uses: JamesIves/github-pages-deploy-action@v4.4.3
         with:
           branch: gh-pages
