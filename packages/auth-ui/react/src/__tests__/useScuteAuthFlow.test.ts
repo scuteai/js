@@ -8,18 +8,15 @@
  *   3. submitIdentifier calls signInOrUp (not signIn)
  *   4. magic token in URL -> "magic_verifying" -> verifyMagicLinkToken
  *   5. magic verify -> "webauthn_register" (no hasExistingDevice check)
- *   6. sct_sk=true -> skip passkey, sign in directly
- *      NO LONGER TRUE: sct_sk is scrubbed from the URL before it is read,
- *      so registration is still offered. Pinned in "magic link callback".
+ *   6. sct_sk=true -> skip passkey, sign in directly (read before the URL scrub)
  *   7. registerPasskey -> signInWithTokenPayload + addDevice -> success -> authenticated
  *   8. skipPasskey -> signInWithTokenPayload only -> "authenticated"
- *      NO LONGER TRUE: the SIGNED_IN it triggers is ignored while in the
- *      register view, so the view stays "webauthn_register". Pinned below.
  *   9. OTP_PENDING -> "otp_input"; WEBAUTHN_VERIFY_START -> "webauthn_verify"
  *  10. SIGNED_IN -> "authenticated" unless in the register flow
- *  11. magic link polling every 2s while pending, stops on success
+ *  11. magic link polling every 2s while pending, stops on success or after 10 minutes
  *  12. retry resets to login
  *  13. URL cleanup after magic verify
+ *  14. SIGNED_OUT / SESSION_EXPIRED -> back to "login"
  */
 
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -151,11 +148,7 @@ describe("initialization", () => {
     expect(result.current.flow.view).toBe("authenticated");
     await act(async () => init.resolve({ error: null }));
     await flush();
-    // CURRENT BEHAVIOR (suspected bug): the init effect reads isAuthenticated
-    // from the first render's closure (false), so if SIGNED_IN lands before
-    // _initialize() resolves it overwrites "authenticated" with "login". The
-    // user is signed in but the gate shows the login form. With the real
-    // client _initialize usually resolves first, so this needs that ordering.
+    // Known limitation, tracked separately: the init effect reads isAuthenticated from the first render, so a SIGNED_IN that lands before _initialize() resolves is replaced by "login".
     expect(result.current.flow.view).toBe("login");
     expect(result.current.auth.isAuthenticated).toBe(true);
     expect(result.current.flow.isAuthenticated).toBe(true);
@@ -301,28 +294,26 @@ describe("magic link callback", () => {
     expect(result.current.auth.isAuthenticated).toBe(true);
   });
 
-  it("offers passkey registration when passkeys_enabled is missing from app data", async () => {
+  it("signs in directly when passkeys_enabled is missing from app data (fails closed, SEC-40)", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const client = createFakeClient({
       getAppData: vi.fn(async () => ({ data: { name: "App" }, error: null })),
     });
     const { result } = renderFlow(client);
-    // CURRENT BEHAVIOR (suspected bug): `passkeys_enabled !== false` treats a
-    // missing flag as enabled (fail open, SEC-40).
-    await waitFor(() => expect(result.current.flow.view).toBe("webauthn_register"));
+    await waitFor(() => expect(result.current.flow.view).toBe("authenticated"));
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
+    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
   });
 
-  it("offers passkey registration when app data fails to load", async () => {
+  it("signs in directly when app data fails to load (fails closed, SEC-40)", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const client = createFakeClient({
       getAppData: vi.fn(async () => ({ data: null, error: { message: "503" } })),
     });
     const { result } = renderFlow(client);
-    // CURRENT BEHAVIOR (suspected bug): a failed config load yields
-    // appData=null, and `null?.passkeys_enabled !== false` is true, so the
-    // app's "passkeys off" setting is bypassed (fail open, SEC-40).
-    await waitFor(() => expect(result.current.flow.view).toBe("webauthn_register"));
-    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.flow.view).toBe("authenticated"));
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
+    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
   });
 
   it("stores MFA state and follows MFA_REQUIRED when the link needs a second factor", async () => {
@@ -448,14 +439,16 @@ describe("submitIdentifier", () => {
     await act(async () => pending.resolve({ data: null, error: null }));
   });
 
-  it("lets two submits in the same tick both through", async () => {
+  it("sends one request for two submits in the same tick", async () => {
     const { client, result } = await renderAtLogin();
     const submit = result.current.flow.submitIdentifier;
-    // CURRENT BEHAVIOR (suspected bug): the double-submit guard reads the
-    // `submitting` state from the closure, so a double click before React
-    // re-renders sends two sign-in requests (two magic links / OTPs).
     await act(async () => {
       await Promise.all([submit("ada@example.com"), submit("ada@example.com")]);
+    });
+    expect(client.signInOrUp).toHaveBeenCalledTimes(1);
+    // The guard is released once the request settles.
+    await act(async () => {
+      await result.current.flow.submitIdentifier("ada@example.com");
     });
     expect(client.signInOrUp).toHaveBeenCalledTimes(2);
   });
@@ -650,20 +643,47 @@ describe("magic link polling", () => {
     expect(client.getMagicLinkStatus).not.toHaveBeenCalled();
   });
 
-  it("keeps polling forever while the status call errors", async () => {
+  it("stops polling after 10 minutes and shows an error", async () => {
     const client = createFakeClient();
     magicLinkSignIn(client);
-    await atMagicPending(client);
+    const { result } = await atMagicPending(client);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
-    // CURRENT BEHAVIOR (suspected bug): no max attempts, no expiry and no
-    // backoff. An expired or revoked link is polled every 2s for as long as
-    // the tab stays open.
     expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(30);
+    expect(result.current.flow.view).toBe("magic_pending");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9 * 60_000);
+    });
+    const calls = client.getMagicLinkStatus.mock.calls.length;
+    expect(calls).toBeLessThanOrEqual(300);
+    expect(result.current.flow.view).toBe("error");
+    expect(result.current.flow.error).toBe("The sign-in link timed out. Please try again.");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(calls);
+    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
   });
 
-  it("resumes polling the old magic link id after retry()", async () => {
+  it("keeps polling after a status request throws", async () => {
+    const client = createFakeClient();
+    magicLinkSignIn(client);
+    client.getMagicLinkStatus
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ data: AUTH_PAYLOAD, error: null });
+    const { result } = await atMagicPending(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000);
+    });
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(2);
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
+    expect(result.current.flow.view).toBe("authenticated");
+  });
+
+  it("retry() forgets the magic link id, so a later MAGIC_PENDING does not poll the old link", async () => {
     const client = createFakeClient();
     magicLinkSignIn(client, "ml_old");
     const { result } = await atMagicPending(client);
@@ -671,15 +691,12 @@ describe("magic link polling", () => {
     expect(result.current.flow.identifier).toBe("");
     act(() => client.emit(AUTH_CHANGE_EVENTS.MAGIC_PENDING));
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(10_000);
     });
-    // CURRENT BEHAVIOR (suspected bug): retry() clears the identifier but
-    // not magicLinkId, so the next MAGIC_PENDING polls the previous link
-    // (until a new submit replaces the id).
-    expect(client.getMagicLinkStatus).toHaveBeenLastCalledWith("ml_old");
+    expect(client.getMagicLinkStatus).not.toHaveBeenCalled();
   });
 
-  it("can sign in twice when a slow status response overlaps the next tick", async () => {
+  it("waits for a slow status response instead of overlapping, and signs in once", async () => {
     const client = createFakeClient();
     magicLinkSignIn(client);
     client.getMagicLinkStatus.mockImplementation(
@@ -692,12 +709,31 @@ describe("magic link polling", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(8000);
     });
-    // CURRENT BEHAVIOR (suspected bug): ticks are not serialized; a request
-    // still in flight when the interval is cleared still calls
-    // signInWithTokenPayload when it resolves.
-    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(2);
-    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(2);
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
     expect(result.current.flow.view).toBe("authenticated");
+  });
+
+  it("does not sign in from a status response that arrives after the user went back", async () => {
+    const client = createFakeClient();
+    magicLinkSignIn(client);
+    client.getMagicLinkStatus.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve({ data: AUTH_PAYLOAD, error: null }), 3000)
+        )
+    );
+    const { result } = await atMagicPending(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
+    act(() => result.current.flow.retry());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    expect(result.current.flow.view).toBe("login");
   });
 });
 
@@ -738,18 +774,20 @@ describe("OTP verification", () => {
     expect(result.current.flow.view).toBe("authenticated");
   });
 
-  it("offers a passkey when app data fails to load", async () => {
+  it.each([
+    ["app data fails to load", { data: null, error: { message: "503" } }],
+    ["passkeys_enabled is missing", { data: { name: "App" }, error: null }],
+  ])("signs in directly when %s (fails closed, SEC-40)", async (_label, appData) => {
     const client = createFakeClient({
       verifyOtp: vi.fn(async () => ({ data: { authPayload: AUTH_PAYLOAD }, error: null })),
-      getAppData: vi.fn(async () => ({ data: null, error: { message: "503" } })),
+      getAppData: vi.fn(async () => appData),
     });
     const { result } = await atOtpInput(client);
     await act(async () => {
       await result.current.flow.submitOtp("123456");
     });
-    // CURRENT BEHAVIOR (suspected bug): same `!== false` fail-open as the
-    // magic link path (SEC-40).
-    expect(result.current.flow.view).toBe("webauthn_register");
+    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
+    expect(result.current.flow.view).toBe("authenticated");
   });
 
   it("shows the verify error and stays on the code screen", async () => {
@@ -789,9 +827,7 @@ describe("OTP verification", () => {
     expect(result.current.flow.view).toBe("mfa_enroll");
     expect(result.current.flow.mfaChallenge).toEqual(mfaRequiredData.mfaChallenge);
     expect(result.current.flow.mfaAvailableMethods).toEqual(["totp", "backup_code"]);
-    // CURRENT BEHAVIOR (suspected bug): submitOtp copies MFA fields by hand
-    // instead of using handleMfaResponse, so grace-period info is dropped on
-    // the OTP path only (REF-16).
+    // Known limitation, tracked separately (REF-16): submitOtp copies the MFA fields by hand, so the grace-period fields are not stored on the OTP path.
     expect(result.current.flow.mfaGracePeriod).toBe(false);
     expect(result.current.flow.mfaGraceDaysRemaining).toBeUndefined();
   });
@@ -862,19 +898,39 @@ describe("passkey registration offer", () => {
     expect(result.current.flow.view).toBe("webauthn_register");
   });
 
-  it("registerPasskey leaves a signed-in user on the offer when addDevice fails", async () => {
+  it("registerPasskey shows an addDevice error and the signed-in user can still skip to authenticated", async () => {
     const { client, result } = await renderAtRegister();
     client.addDevice.mockResolvedValueOnce({ data: null, error: { message: "The operation was cancelled" } });
     await act(async () => {
       await result.current.flow.registerPasskey();
     });
     expect(result.current.flow.error).toBe("The operation was cancelled");
-    // CURRENT BEHAVIOR (suspected bug): the session is already live (the
-    // SIGNED_IN was swallowed by the register view), so the user is signed in
-    // but parked on the registration offer. Skip does not get them out
-    // either (see skipPasskey below).
     expect(result.current.flow.view).toBe("webauthn_register");
     expect(result.current.auth.isAuthenticated).toBe(true);
+
+    await act(async () => {
+      await result.current.flow.skipPasskey();
+    });
+    expect(result.current.flow.view).toBe("authenticated");
+    expect(result.current.flow.error).toBeNull();
+    expect(result.current.flow.isAuthenticated).toBe(true);
+    // The payload was already exchanged for a session; skip does not sign in again.
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
+  });
+
+  it("registerPasskey retried after an addDevice failure does not sign in again", async () => {
+    const { client, result } = await renderAtRegister();
+    client.addDevice.mockResolvedValueOnce({ data: null, error: { message: "The operation was cancelled" } });
+    await act(async () => {
+      await result.current.flow.registerPasskey();
+    });
+    await act(async () => {
+      await result.current.flow.registerPasskey();
+    });
+    expect(client.addDevice).toHaveBeenCalledTimes(2);
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
+    expect(result.current.flow.view).toBe("webauthn_register_success");
+    expect(result.current.flow.error).toBeNull();
   });
 
   it("registerPasskey reports thrown errors with a fallback message", async () => {
@@ -886,7 +942,7 @@ describe("passkey registration offer", () => {
     expect(result.current.flow.error).toBe("Failed to register passkey");
   });
 
-  it("skipPasskey signs in without adding a device but never leaves the offer", async () => {
+  it("skipPasskey signs in without adding a device and moves to authenticated", async () => {
     const { client, result } = await renderAtRegister();
     await act(async () => {
       await result.current.flow.skipPasskey();
@@ -894,25 +950,27 @@ describe("passkey registration offer", () => {
     expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
     expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
     expect(client.addDevice).not.toHaveBeenCalled();
-    // CURRENT BEHAVIOR (suspected bug): skipPasskey returns right after the
-    // sign-in and relies on SIGNED_IN to move on, but the listener ignores
-    // SIGNED_IN in "webauthn_register" and the isAuthenticated effect also
-    // excludes it. The user is signed in yet stuck on "Register a passkey".
-    expect(result.current.flow.view).toBe("webauthn_register");
+    expect(result.current.flow.view).toBe("authenticated");
     expect(result.current.flow.isAuthenticated).toBe(true);
     expect(result.current.auth.isAuthenticated).toBe(true);
   });
 
-  it("skipPasskey swallows a returned sign-in error", async () => {
+  it("skipPasskey shows a returned sign-in error and stays on the offer", async () => {
     const { client, result } = await renderAtRegister();
     client.signInWithTokenPayload.mockResolvedValueOnce({ error: { message: "Session rejected" } });
     await act(async () => {
       await result.current.flow.skipPasskey();
     });
-    // CURRENT BEHAVIOR (suspected bug): the { error } result is ignored, so
-    // nothing tells the user why "Skip for now" did nothing.
-    expect(result.current.flow.error).toBeNull();
+    expect(result.current.flow.error).toBe("Session rejected");
     expect(result.current.flow.view).toBe("webauthn_register");
+    expect(result.current.flow.isAuthenticated).toBe(false);
+
+    // A later successful skip continues.
+    await act(async () => {
+      await result.current.flow.skipPasskey();
+    });
+    expect(result.current.flow.view).toBe("authenticated");
+    expect(result.current.flow.error).toBeNull();
   });
 });
 
@@ -1028,7 +1086,7 @@ describe("retry and signOut", () => {
 });
 
 describe("security", () => {
-  it("keeps reporting authenticated after SIGNED_OUT", async () => {
+  it("returns to login and reports signed out after SIGNED_OUT", async () => {
     const { client, result } = await renderAtLogin();
     act(() => client.emitSignedIn());
     expect(result.current.flow.view).toBe("authenticated");
@@ -1037,60 +1095,147 @@ describe("security", () => {
     });
     expect(result.current.auth.isAuthenticated).toBe(false);
     expect(result.current.flow.user).toBeNull();
-    // CURRENT BEHAVIOR (suspected bug): nothing handles SIGNED_OUT and the
-    // isAuthenticated effect only ever moves *to* "authenticated", so the
-    // view stays "authenticated" and `isAuthenticated: isAuthenticated ||
-    // view === "authenticated"` stays true after sign-out.
-    expect(result.current.flow.view).toBe("authenticated");
-    expect(result.current.flow.isAuthenticated).toBe(true);
+    expect(result.current.flow.view).toBe("login");
+    expect(result.current.flow.isAuthenticated).toBe(false);
   });
 
-  it("keeps reporting authenticated after SESSION_EXPIRED", async () => {
+  it("returns to login and reports signed out after SESSION_EXPIRED", async () => {
     const { client, result } = await renderAtLogin();
     act(() => client.emitSignedIn());
     act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_EXPIRED));
     expect(result.current.auth.isAuthenticated).toBe(false);
-    // CURRENT BEHAVIOR (suspected bug): same as SIGNED_OUT; an expired
-    // session does not close the flow.
-    expect(result.current.flow.view).toBe("authenticated");
-    expect(result.current.flow.isAuthenticated).toBe(true);
+    expect(result.current.flow.view).toBe("login");
+    expect(result.current.flow.isAuthenticated).toBe(false);
   });
 
-  it("treats MFA_VERIFIED as authenticated without checking for a session", async () => {
-    const { client, result } = await renderAtLogin();
-    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_VERIFIED));
-    // CURRENT BEHAVIOR (suspected bug): the event name alone flips the view;
-    // no session exists (the core never emits MFA_VERIFIED today, so this is
-    // latent).
+  it("clears the MFA state on SIGNED_OUT", async () => {
+    const client = createFakeClient();
+    client.signInOrUp.mockImplementation(async () => {
+      client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      return { data: { ...mfaRequiredData, mfaGracePeriod: true, mfaGraceDaysRemaining: 2 }, error: null };
+    });
+    const { result } = await renderAtLogin(client);
+    await act(async () => {
+      await result.current.flow.submitIdentifier("ada@example.com");
+    });
+    expect(result.current.flow.mfaChallenge).toEqual(mfaRequiredData.mfaChallenge);
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_OUT));
+    expect(result.current.flow.view).toBe("login");
+    expect(result.current.flow.mfaChallenge).toBeNull();
+    expect(result.current.flow.mfaAvailableMethods).toEqual([]);
+    expect(result.current.flow.mfaGracePeriod).toBe(false);
+    expect(result.current.flow.mfaGraceDaysRemaining).toBeUndefined();
+    expect(result.current.flow.identifier).toBe("");
+  });
+
+  it("forgets the stored auth payload on SIGNED_OUT during the passkey offer", async () => {
+    const { client, result } = await renderAtRegister();
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_OUT));
+    expect(result.current.flow.view).toBe("login");
+    // Nothing is left to sign in with.
+    await act(async () => {
+      await result.current.flow.skipPasskey();
+    });
+    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    expect(result.current.flow.view).toBe("login");
+    expect(result.current.flow.isAuthenticated).toBe(false);
+  });
+
+  it("SESSION_EXPIRED for a stale session does not drop a sign-in in progress", async () => {
+    const { client, result } = await renderAtRegister();
+    // No session in this flow yet: the expiry is about an earlier visit's session.
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_EXPIRED));
+    expect(result.current.flow.view).toBe("webauthn_register");
+    await act(async () => {
+      await result.current.flow.skipPasskey();
+    });
+    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
     expect(result.current.flow.view).toBe("authenticated");
-    expect(result.current.flow.isAuthenticated).toBe(true);
+  });
+
+  it("SESSION_EXPIRED after the passkey offer signed in returns to login", async () => {
+    const { client, result } = await renderAtRegister();
+    client.addDevice.mockResolvedValueOnce({ data: null, error: { message: "The operation was cancelled" } });
+    await act(async () => {
+      await result.current.flow.registerPasskey();
+    });
+    expect(result.current.auth.isAuthenticated).toBe(true);
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_EXPIRED));
+    expect(result.current.flow.view).toBe("login");
+    await act(async () => {
+      await result.current.flow.skipPasskey();
+    });
+    expect(result.current.flow.view).toBe("login");
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves authenticated when a session event reports no session", async () => {
+    const { client, result } = await renderAtLogin();
+    act(() => client.emitSignedIn());
+    expect(result.current.flow.view).toBe("authenticated");
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_REFETCH));
+    expect(result.current.auth.isAuthenticated).toBe(false);
+    expect(result.current.flow.view).toBe("login");
+    expect(result.current.flow.isAuthenticated).toBe(false);
+  });
+
+  it("SIGNED_OUT on the passkey success screen cancels the pending move to authenticated", async () => {
+    const { client, result } = await renderAtRegister();
+    vi.useFakeTimers();
+    await act(async () => {
+      await result.current.flow.registerPasskey();
+    });
+    expect(result.current.flow.view).toBe("webauthn_register_success");
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_OUT));
+    expect(result.current.flow.view).toBe("login");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(result.current.flow.view).toBe("login");
+  });
+
+  it("ignores MFA_VERIFIED when there is no session", async () => {
+    const { client, result } = await renderAtLogin();
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED));
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_VERIFIED));
+    expect(result.current.flow.view).toBe("mfa_verify");
+    expect(result.current.flow.isAuthenticated).toBe(false);
     expect(result.current.auth.isAuthenticated).toBe(false);
     expect(result.current.flow.user).toBeNull();
+    // SIGNED_IN, which carries the session, moves the flow on.
+    act(() => client.emitSignedIn());
+    expect(result.current.flow.view).toBe("authenticated");
   });
 
-  it("skipMfaEnrollment during mandatory enrollment reports authenticated with no session", async () => {
+  it("MFA_VERIFIED returns a signed-in user to authenticated after a step-up", async () => {
+    const { client, result } = await renderAtLogin();
+    act(() => client.emitSignedIn());
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED));
+    expect(result.current.flow.view).toBe("mfa_verify");
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_VERIFIED));
+    expect(result.current.flow.view).toBe("authenticated");
+    expect(result.current.flow.isAuthenticated).toBe(true);
+  });
+
+  it("skipMfaEnrollment is ignored during mandatory enrollment", async () => {
     const { client, result } = await renderAtLogin();
     act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED));
     expect(result.current.flow.view).toBe("mfa_enroll");
     act(() => result.current.flow.skipMfaEnrollment());
-    // CURRENT BEHAVIOR (suspected bug): skipMfaEnrollment is meant for the
-    // optional suggestion, but it works in the required-enrollment view too
-    // and flips the client-side gate open without any session.
-    expect(result.current.flow.view).toBe("authenticated");
-    expect(result.current.flow.isAuthenticated).toBe(true);
+    expect(result.current.flow.view).toBe("mfa_enroll");
+    expect(result.current.flow.isAuthenticated).toBe(false);
     expect(result.current.auth.isAuthenticated).toBe(false);
   });
 
-  it("skipPasskey reports authenticated with no session when the sign-in throws", async () => {
+  it("skipPasskey shows a thrown sign-in error and does not authenticate", async () => {
     const { client, result } = await renderAtRegister();
     client.signInWithTokenPayload.mockRejectedValueOnce(new Error("storage unavailable"));
     await act(async () => {
       await result.current.flow.skipPasskey();
     });
-    // CURRENT BEHAVIOR (suspected bug): the catch swallows the failure and
-    // falls through to setView("authenticated"), failing open.
-    expect(result.current.flow.view).toBe("authenticated");
-    expect(result.current.flow.isAuthenticated).toBe(true);
+    expect(result.current.flow.view).toBe("webauthn_register");
+    expect(result.current.flow.error).toBe("storage unavailable");
+    expect(result.current.flow.isAuthenticated).toBe(false);
     expect(result.current.auth.isAuthenticated).toBe(false);
   });
 

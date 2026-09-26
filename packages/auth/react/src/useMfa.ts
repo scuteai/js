@@ -14,7 +14,8 @@
 //   3. Mirrors the Stytch/Auth0 hook ergonomic without forking their SDK.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useScuteClient } from "./AuthContext";
+import { AUTH_CHANGE_EVENTS } from "@scute/js-core";
+import { useAuth, useScuteClient } from "./AuthContext";
 
 // --- Shared types ---------------------------------------------------------
 
@@ -50,7 +51,7 @@ export type EnrollMfaState =
 /**
  * Enroll a new MFA method on the current user. Drives the full enroll →
  * verify state machine; for TOTP also exposes the `otpauth://` URI + the
- * base32 secret (both shown once, then forgotten on reset).
+ * base32 secret (both shown once, then forgotten on reset or sign-out).
  *
  * Usage:
  *
@@ -61,6 +62,7 @@ export type EnrollMfaState =
  */
 export function useEnrollMfa() {
   const client = useScuteClient();
+  const { isAuthenticated, isLoading } = useAuth();
   const [state, setState] = useState<EnrollMfaState>("idle");
   const [enrollment, setEnrollment] = useState<MfaEnrollment | null>(null);
   const [provisioningUri, setProvisioningUri] = useState<string | null>(null);
@@ -126,6 +128,11 @@ export function useEnrollMfa() {
     setError(null);
   }, []);
 
+  // Signed out or the session expired: the seed and URI must not outlive it.
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) reset();
+  }, [isAuthenticated, isLoading, reset]);
+
   return {
     state,
     enrollment,
@@ -146,7 +153,8 @@ export type MfaVerifyState = "idle" | "verifying" | "verified" | "error";
  * Verify a pending MFA challenge during sign-in (the second-factor step
  * after primary auth has produced a `pendingMfaChallenge` on the client).
  * Supports switching method mid-flow (e.g. "use backup code instead") and
- * resending OTP-style codes.
+ * resending OTP-style codes. A challenge issued after the hook mounts
+ * (MFA_REQUIRED / MFA_ENROLLMENT_REQUIRED) is picked up automatically.
  */
 export function useMfaVerify() {
   const client = useScuteClient();
@@ -160,6 +168,19 @@ export function useMfaVerify() {
 
   useEffect(() => {
     setPendingChallenge(client.pendingMfaChallenge);
+    // Pick up a challenge issued after mount, e.g. when the verify screen
+    // renders before primary auth has finished.
+    const unsubscribe = client.onAuthStateChange((event) => {
+      if (
+        event === AUTH_CHANGE_EVENTS.MFA_REQUIRED ||
+        event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED
+      ) {
+        setPendingChallenge(client.pendingMfaChallenge);
+        setState("idle");
+        setError(null);
+      }
+    });
+    return () => unsubscribe();
   }, [client]);
 
   const challengeToken =
@@ -197,6 +218,14 @@ export function useMfaVerify() {
       }
       setError(null);
       const result = await client.switchMfaMethod(challengeToken, method);
+      if (result?.error) {
+        // The client cancels the old challenge before creating the new one,
+        // so the old token is no longer usable.
+        setPendingChallenge(null);
+        setError(result.error as any);
+        setState("error");
+        return result;
+      }
       setPendingChallenge(client.pendingMfaChallenge);
       setState("idle");
       return result;
@@ -210,14 +239,23 @@ export function useMfaVerify() {
       setError(e);
       return { data: null, error: e };
     }
-    return client.resendChallenge(challengeToken);
+    setError(null);
+    const result = await client.resendChallenge(challengeToken);
+    if (result?.error) setError(result.error as any);
+    return result;
   }, [client, challengeToken]);
 
   const cancel = useCallback(async () => {
     if (!challengeToken) return { data: null, error: null };
     const result = await client.cancelChallenge(challengeToken);
+    if (result?.error) {
+      // The challenge may still be live on the server: keep it.
+      setError(result.error as any);
+      return result;
+    }
     setPendingChallenge(null);
     setState("idle");
+    setError(null);
     return result;
   }, [client, challengeToken]);
 
@@ -315,10 +353,11 @@ export function useFactorList() {
  * Generate a fresh batch of backup codes. The returned `codes` array is
  * the plaintext — show it once, let the user save it, then call `clear()`
  * to drop it from React state. Subsequent renders will show `null` until
- * `generate()` runs again.
+ * `generate()` runs again. The codes are also dropped on sign-out.
  */
 export function useBackupCodes() {
   const client = useScuteClient();
+  const { isAuthenticated, isLoading } = useAuth();
   const [codes, setCodes] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ScuteError>(null);
@@ -337,6 +376,11 @@ export function useBackupCodes() {
   }, [client]);
 
   const clear = useCallback(() => setCodes(null), []);
+
+  // Signed out or the session expired: drop the plaintext codes.
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) clear();
+  }, [isAuthenticated, isLoading, clear]);
 
   return { codes, loading, error, generate, clear };
 }

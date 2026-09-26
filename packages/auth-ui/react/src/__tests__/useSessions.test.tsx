@@ -75,19 +75,25 @@ describe("loading", () => {
     expect(result.current.sessions).toEqual(SESSIONS);
   });
 
-  it("lets a thrown list error escape refetch without setting error", async () => {
+  it("sets error instead of rejecting when the list call throws", async () => {
     const { client, result } = await loaded();
     client.listUserSessions.mockRejectedValueOnce(new Error("socket hang up"));
-    // CURRENT BEHAVIOR (suspected bug): refetch has try/finally but no catch.
-    // Called directly it rejects; called from the mount effect (which does
-    // not await or catch) the same throw is an unhandled rejection. Either
-    // way `error` is never set.
     await act(async () => {
-      await expect(result.current.refetch()).rejects.toThrow("socket hang up");
+      await expect(result.current.refetch()).resolves.toBeUndefined();
     });
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBeNull();
-    expect(result.current.sessions).toEqual(SESSIONS);
+    expect(result.current.error).toBe("socket hang up");
+    expect(result.current.sessions).toEqual([]);
+  });
+
+  it("sets error when the list call throws on mount", async () => {
+    const { result } = await loaded({
+      listUserSessions: vi.fn(async () => {
+        throw new Error("offline");
+      }),
+    });
+    expect(result.current.error).toBe("offline");
+    expect(result.current.sessions).toEqual([]);
   });
 });
 
@@ -138,9 +144,7 @@ describe("revoke", () => {
       await result.current.revoke(11);
     });
     expect(client.revokeSession).toHaveBeenCalledWith(11);
-    // CURRENT BEHAVIOR (suspected bug): revoking "this device" does not
-    // clear the local session or call signOut, so the tab keeps acting
-    // signed in until its access token is rejected.
+    // Known limitation, tracked separately: revoking this device's session does not sign out locally.
     expect(client.signOut).not.toHaveBeenCalled();
   });
 });

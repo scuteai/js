@@ -116,9 +116,11 @@ export type UseSecureAccountResult = {
    * phase=="pending_verify"). Transitions to `verified` on success. */
   submitCode: (code: string) => Promise<void>;
 
-  /** Abort the inline enrollment and return to idle. Does NOT delete a
+  /** Abort the inline enrollment and return to idle, dropping any TOTP
+   * secret and backup codes from state. Does NOT delete a
    * server-side row — if the user got partway and bailed, the next
-   * startEnroll for the same method will reset the stale row. */
+   * startEnroll for the same method will reset the stale row. Also runs
+   * automatically on sign-out. */
   cancelEnroll: () => void;
 
   /** Remove an enrolled method. */
@@ -264,7 +266,8 @@ export function useSecureAccount(): UseSecureAccountResult {
 
   const methods: SecureMethod[] = useMemo(() => {
     const allowed: string[] = appData?.mfa_methods_allowed ?? [];
-    const passkeysOn = appData?.passkeys_enabled !== false;
+    // Fail closed (SEC-40): passkeys only when the app says they are on.
+    const passkeysOn = appData?.passkeys_enabled === true;
 
     return METHOD_ORDER.map<SecureMethod | null>((key) => {
       let isAllowed = false;
@@ -429,8 +432,16 @@ export function useSecureAccount(): UseSecureAccountResult {
     setProvisioningUri(null);
     setSecret(null);
     setPendingEnrollmentId(null);
+    setBackupCodes(null);
     setError(null);
   }, []);
+
+  // Signed out or the session expired: drop the one-shot secrets, backup
+  // codes and any inline enrollment.
+  useEffect(() => {
+    if (authLoading || authedFromContext) return;
+    cancelEnroll();
+  }, [authLoading, authedFromContext, cancelEnroll]);
 
   const removeMethod = useCallback(
     async (key: SecureMethodKey) => {

@@ -113,31 +113,62 @@ describe("AuthContextProvider state transitions on client events", () => {
     expect(result.current.auth.user).toBeNull();
   });
 
-  it("derives isAuthenticated from session.status only, not from the user", () => {
+  it("requires a user as well as an authenticated session for isAuthenticated", () => {
     const { client, result } = renderAuth();
-    // CURRENT BEHAVIOR (suspected bug): the AuthSession type promises
-    // `isAuthenticated: true` implies a non-null user, but the provider sets
-    // user and session independently from the event args, so an authenticated
-    // session delivered with a null user yields isAuthenticated=true, user=null.
+    // The AuthSession type promises that isAuthenticated=true comes with a user.
     act(() => client.emit(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, authenticatedSession(), null));
-    expect(result.current.auth.isAuthenticated).toBe(true);
+    expect(result.current.auth.isAuthenticated).toBe(false);
+    expect(result.current.auth.isLoading).toBe(false);
     expect(result.current.auth.user).toBeNull();
   });
 
-  it("applies the session carried by non-session events too", () => {
+  it.each([
+    AUTH_CHANGE_EVENTS.SESSION_REFETCH,
+    AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
+    AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
+  ])("applies the session carried by %s", (event) => {
     const { client, result } = renderAuth();
-    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, authenticatedSession(), makeUser()));
+    const session = authenticatedSession("access.jwt.EVT");
+    const user = makeUser();
+    act(() => client.emit(event, session, user));
     expect(result.current.auth.isAuthenticated).toBe(true);
-    // CURRENT BEHAVIOR (suspected bug): the real client delivers events that
-    // carry no session (OTP_PENDING, MAGIC_PENDING, MFA_REQUIRED,
-    // WEBAUTHN_VERIFY_START, MFA_ENROLLMENT_SUGGESTED...) as the
-    // unauthenticated state with a null user. The provider does not filter by
-    // event type, so a signed-in user who triggers e.g. sendLoginOtp for a
-    // step-up is reported as signed out until the next session event.
-    act(() => client.emit(AUTH_CHANGE_EVENTS.OTP_PENDING));
-    expect(result.current.auth.isAuthenticated).toBe(false);
-    expect(result.current.auth.user).toBeNull();
-    expect(result.current.auth.session.status).toBe("unauthenticated");
+    expect(result.current.auth.session).toBe(session);
+    expect(result.current.auth.user).toBe(user);
+  });
+
+  it.each([
+    AUTH_CHANGE_EVENTS.OTP_PENDING,
+    AUTH_CHANGE_EVENTS.OTP_NEW_DEVICE_PENDING,
+    AUTH_CHANGE_EVENTS.MAGIC_PENDING,
+    AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING,
+    AUTH_CHANGE_EVENTS.MAGIC_VERIFIED,
+    AUTH_CHANGE_EVENTS.MAGIC_VERIFIED_OAUTH,
+    AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_START,
+    AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_SUCCESS,
+    AUTH_CHANGE_EVENTS.MFA_REQUIRED,
+    AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED,
+    AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED,
+    AUTH_CHANGE_EVENTS.MFA_VERIFIED,
+  ])("keeps the signed-in session through %s, which carries no session", (event) => {
+    const { client, result } = renderAuth();
+    const session = authenticatedSession();
+    const user = makeUser();
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, session, user));
+    // The real client delivers these events with the unauthenticated
+    // placeholder and a null user (the fake's emit() does the same).
+    act(() => client.emit(event));
+    expect(result.current.auth.isAuthenticated).toBe(true);
+    expect(result.current.auth.user).toBe(user);
+    expect(result.current.auth.session).toBe(session);
+  });
+
+  it("stays loading when an event without a session arrives before the initial session", () => {
+    const { client, result } = renderAuth();
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MAGIC_PENDING));
+    expect(result.current.auth.isLoading).toBe(true);
+    expect(result.current.auth.session.status).toBe("loading");
+    act(() => client.emit(AUTH_CHANGE_EVENTS.INITIAL_SESSION, unauthenticatedSession(), null));
+    expect(result.current.auth.isLoading).toBe(false);
   });
 });
 
