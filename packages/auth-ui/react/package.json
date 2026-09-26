@@ -2,8 +2,27 @@
   "name": "@scute/auth-ui-react",
   "version": "0.3.1",
   "private": false,
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "publishConfig": {},
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "require": "./dist/index.js",
+    "import": "./dist/index.mjs"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "tsup-build": "tsup src/index.ts --format cjs,esm --dts --external react --external react-dom",
+    "build": "pnpm tsup-build",
+    "dev": "pnpm tsup-build --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@scute/js-core": "0.9.0",
     "@scute/react-hooks": "0.8.1"
@@ -13,17 +32,15 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@scute/tsconfig": "workspace:*",
     "@testing-library/react": "^16.3.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19",
     "jsdom": "^27",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "tsup": "^8.1.0",
     "typescript": "^5.0.0",
     "vitest": "^4.1.8"
-  },
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
   }
 }

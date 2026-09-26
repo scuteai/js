@@ -31,8 +31,11 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Typecheck core
-        run: pnpm --filter @scute/js-core exec tsc --noEmit
+      - name: Typecheck
+        run: |
+          pnpm --filter @scute/js-core exec tsc --noEmit
+          pnpm --filter @scute/react-hooks exec tsc --noEmit
+          pnpm --filter @scute/auth-ui-react typecheck
 
       - name: Test
         # The Playwright e2e suite needs a running API and example app; it

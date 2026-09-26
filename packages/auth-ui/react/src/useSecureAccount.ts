@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 // Headless hook for the "Secure your account" experience — a unified screen

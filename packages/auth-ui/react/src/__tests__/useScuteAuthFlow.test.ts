@@ -1037,15 +1037,18 @@ describe("MFA views", () => {
     expect(result.current.auth.isAuthenticated).toBe(true);
   });
 
-  it("submitMfaCode signs in itself if the client returns an authPayload", async () => {
-    const client = createFakeClient({
-      verifyMfaChallenge: vi.fn(async () => ({ data: { authPayload: AUTH_PAYLOAD }, error: null })),
-    });
+  it("submitMfaCode leaves the sign-in to verifyMfaChallenge (it signs in on success)", async () => {
+    const client = createFakeClient();
+    // The real client's verifyMfaChallenge signs in and returns { error: null }.
+    client.verifyMfaChallenge = vi.fn(async () => {
+      await client.signInWithTokenPayload(AUTH_PAYLOAD);
+      return { error: null };
+    }) as any;
     const { result } = await atMfaVerify(client);
     await act(async () => {
       await result.current.flow.submitMfaCode("246810");
     });
-    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
     expect(result.current.flow.view).toBe("authenticated");
   });
 

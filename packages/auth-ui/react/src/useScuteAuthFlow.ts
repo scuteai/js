@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -338,7 +337,7 @@ export function useScuteAuthFlow() {
         handleMfaResponse(data);
         // View change handled by event listener (MFA_REQUIRED or MFA_ENROLLMENT_REQUIRED)
       } else if ("magic_link" in data) {
-        setMagicLinkId(data.magic_link.id);
+        setMagicLinkId(String(data.magic_link.id));
       }
     } catch (err: any) {
       setError(err?.message || "Failed to sign in");
@@ -383,11 +382,9 @@ export function useScuteAuthFlow() {
     if (!mfaChallenge) return;
     setError(null);
     try {
-      const { data, error: mfaError } = await scuteClient.verifyMfaChallenge(mfaChallenge.token, code);
+      // verifyMfaChallenge signs in on success; SIGNED_IN moves the flow on.
+      const { error: mfaError } = await scuteClient.verifyMfaChallenge(mfaChallenge.token, code);
       if (mfaError) { setError(mfaError.message); return; }
-      if (data?.authPayload) {
-        await scuteClient.signInWithTokenPayload(data.authPayload);
-      }
     } catch (err: any) {
       setError(err?.message || "MFA verification failed");
     }
