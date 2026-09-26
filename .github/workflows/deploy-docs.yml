@@ -8,18 +8,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
 
-      - name: Installl pnpnm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Retrieve the cached "node_modules" directory (if present)
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         id: node-cache
         with:
           path: node_modules
