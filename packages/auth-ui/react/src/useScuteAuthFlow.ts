@@ -78,6 +78,9 @@ export function useScuteAuthFlow() {
   // after registerPasskey signed in does not sign in with it again.
   const exchangedPayloadRef = useRef<any>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True while the verified payload is exchanged for a session just before
+  // the passkey offer, so the sign-in events don't move the flow on.
+  const offeringPasskeyRef = useRef(false);
   const isAuthenticatedRef = useRef(isAuthenticated);
 
   useEffect(() => {
@@ -95,6 +98,28 @@ export function useScuteAuthFlow() {
     setMfaGracePeriod(!!data.mfaGracePeriod);
     setMfaGraceDaysRemaining(data.mfaGraceDaysRemaining);
   }, []);
+
+  // Show the passkey offer with the user already signed in. The payload is
+  // exchanged right away because server-side sign-in (the Next.js handler)
+  // only accepts a freshly issued access token; holding it until the user
+  // clicks would fail after 30 seconds.
+  const offerPasskey = useCallback(async (payload: any) => {
+    offeringPasskeyRef.current = true;
+    setAuthPayload(payload);
+    setView("webauthn_register");
+    try {
+      const result = await scuteClient.signInWithTokenPayload(payload);
+      if (result?.error) {
+        setError(result.error.message || "Sign-in failed");
+      } else {
+        exchangedPayloadRef.current = payload;
+      }
+    } catch (err: any) {
+      setError(err?.message || "Sign-in failed");
+    } finally {
+      offeringPasskeyRef.current = false;
+    }
+  }, [scuteClient]);
 
   // The session ended: forget everything tied to it and start over at login.
   const resetAfterSignOut = useCallback(() => {
@@ -143,6 +168,10 @@ export function useScuteAuthFlow() {
         if (view === "loading" || view === "magic_verifying") return;
         if (event === AUTH_CHANGE_EVENTS.SESSION_EXPIRED && !isAuthenticatedRef.current) return;
         resetAfterSignOut();
+        return;
+      }
+      if (offeringPasskeyRef.current &&
+          (event === AUTH_CHANGE_EVENTS.SIGNED_IN || event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED)) {
         return;
       }
       if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && view !== "webauthn_register" && view !== "webauthn_register_success") {
@@ -225,13 +254,12 @@ export function useScuteAuthFlow() {
       const appData = (await scuteClient.getAppData())?.data;
       const passkeysEnabled = appData?.passkeys_enabled === true;
       if (!skipPasskeyOffer && passkeysEnabled && data?.authPayload) {
-        setAuthPayload(data.authPayload);
-        setView("webauthn_register");
+        await offerPasskey(data.authPayload);
       } else if (data?.authPayload) {
         await scuteClient.signInWithTokenPayload(data.authPayload);
       }
     })();
-  }, [view, scuteClient]);
+  }, [view, scuteClient, offerPasskey]);
 
   // ── 4. Poll magic link status ──
   // One request at a time: the next poll is scheduled only after the previous
@@ -335,8 +363,7 @@ export function useScuteAuthFlow() {
         const appData = (await scuteClient.getAppData())?.data;
         // Fail closed (SEC-40): offer a passkey only when the app says they are on.
         if (appData?.passkeys_enabled === true) {
-          setAuthPayload(result.data.authPayload);
-          setView("webauthn_register");
+          await offerPasskey(result.data.authPayload);
         } else {
           await scuteClient.signInWithTokenPayload(result.data.authPayload);
         }

@@ -171,9 +171,13 @@ describe("magic link callback", () => {
     await waitFor(() => expect(result.current.flow.view).toBe("webauthn_register"));
     // Always offered: no "does this user already have a passkey" check.
     expect(client.getAppData).toHaveBeenCalled();
-    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
-    expect(result.current.auth.isAuthenticated).toBe(false);
-    expect(result.current.flow.isAuthenticated).toBe(false);
+    // Signed in before the offer: server-side sign-in only accepts a freshly
+    // issued token, so the payload is exchanged at once, not on click.
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
+    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
+    expect(result.current.auth.isAuthenticated).toBe(true);
+    // The offer stays up; SIGNED_IN during the exchange doesn't move past it.
+    expect(result.current.flow.view).toBe("webauthn_register");
   });
 
   it("verifies an sct_oauth token (social OAuth / SAML) and signs straight in, no passkey offer", async () => {
@@ -279,7 +283,8 @@ describe("magic link callback", () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}&sct_sk=1`);
     const { client, result } = renderFlow();
     await waitFor(() => expect(result.current.flow.view).toBe("webauthn_register"));
-    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    await waitFor(() => expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1));
+    expect(result.current.flow.view).toBe("webauthn_register");
   });
 
   it("signs in directly when the app has passkeys disabled", async () => {
@@ -758,7 +763,9 @@ describe("OTP verification", () => {
     });
     expect(client.verifyOtp).toHaveBeenCalledWith("123456", "ada@example.com");
     expect(result.current.flow.view).toBe("webauthn_register");
-    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    // Exchanged right away, before the offer (fresh-token sign-in).
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
+    expect(result.current.auth.isAuthenticated).toBe(true);
   });
 
   it("signs in directly when passkeys are disabled", async () => {
@@ -887,15 +894,27 @@ describe("passkey registration offer", () => {
     expect(result.current.flow.view).toBe("authenticated");
   });
 
-  it("registerPasskey stops before addDevice when the sign-in fails", async () => {
-    const { client, result } = await renderAtRegister();
+  it("shows a failed sign-in on the offer; registerPasskey retries it and stops before addDevice if it fails again", async () => {
+    const client = createFakeClient();
     client.signInWithTokenPayload.mockResolvedValueOnce({ error: { message: "Session rejected" } });
+    const { result } = await renderAtRegister(client);
+    await waitFor(() => expect(result.current.flow.error).toBe("Session rejected"));
+    expect(result.current.flow.isAuthenticated).toBe(false);
+
+    client.signInWithTokenPayload.mockResolvedValueOnce({ error: { message: "Still rejected" } });
     await act(async () => {
       await result.current.flow.registerPasskey();
     });
-    expect(result.current.flow.error).toBe("Session rejected");
+    expect(result.current.flow.error).toBe("Still rejected");
     expect(client.addDevice).not.toHaveBeenCalled();
     expect(result.current.flow.view).toBe("webauthn_register");
+
+    await act(async () => {
+      await result.current.flow.registerPasskey();
+    });
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(3);
+    expect(client.addDevice).toHaveBeenCalledTimes(1);
+    expect(result.current.flow.view).toBe("webauthn_register_success");
   });
 
   it("registerPasskey shows an addDevice error and the signed-in user can still skip to authenticated", async () => {
@@ -956,8 +975,11 @@ describe("passkey registration offer", () => {
   });
 
   it("skipPasskey shows a returned sign-in error and stays on the offer", async () => {
-    const { client, result } = await renderAtRegister();
-    client.signInWithTokenPayload.mockResolvedValueOnce({ error: { message: "Session rejected" } });
+    const client = createFakeClient();
+    client.signInWithTokenPayload
+      .mockResolvedValueOnce({ error: { message: "Session rejected" } })
+      .mockResolvedValueOnce({ error: { message: "Session rejected" } });
+    const { result } = await renderAtRegister(client);
     await act(async () => {
       await result.current.flow.skipPasskey();
     });
@@ -1136,20 +1158,31 @@ describe("security", () => {
     await act(async () => {
       await result.current.flow.skipPasskey();
     });
-    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    // Only the exchange before the offer; nothing is left to sign in with.
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
     expect(result.current.flow.view).toBe("login");
     expect(result.current.flow.isAuthenticated).toBe(false);
   });
 
   it("SESSION_EXPIRED for a stale session does not drop a sign-in in progress", async () => {
-    const { client, result } = await renderAtRegister();
-    // No session in this flow yet: the expiry is about an earlier visit's session.
+    const client = createFakeClient();
+    const exchange = deferred<void>();
+    const signIn = client.signInWithTokenPayload.getMockImplementation()!;
+    client.signInWithTokenPayload.mockImplementationOnce(async (p: any) => {
+      await exchange.promise;
+      return signIn(p);
+    });
+    const { result } = await renderAtRegister(client);
+    // The exchange hasn't finished, so there's no session in this flow yet:
+    // the expiry is about an earlier visit's session.
     act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_EXPIRED));
     expect(result.current.flow.view).toBe("webauthn_register");
+    await act(async () => exchange.resolve());
+    await waitFor(() => expect(result.current.auth.isAuthenticated).toBe(true));
     await act(async () => {
       await result.current.flow.skipPasskey();
     });
-    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
+    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
     expect(result.current.flow.view).toBe("authenticated");
   });
 
@@ -1228,8 +1261,12 @@ describe("security", () => {
   });
 
   it("skipPasskey shows a thrown sign-in error and does not authenticate", async () => {
-    const { client, result } = await renderAtRegister();
-    client.signInWithTokenPayload.mockRejectedValueOnce(new Error("storage unavailable"));
+    const client = createFakeClient();
+    client.signInWithTokenPayload
+      .mockRejectedValueOnce(new Error("storage unavailable"))
+      .mockRejectedValueOnce(new Error("storage unavailable"));
+    const { result } = await renderAtRegister(client);
+    await waitFor(() => expect(result.current.flow.error).toBe("storage unavailable"));
     await act(async () => {
       await result.current.flow.skipPasskey();
     });

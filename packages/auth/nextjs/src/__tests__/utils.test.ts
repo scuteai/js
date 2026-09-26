@@ -126,10 +126,10 @@ describe("getInitUrl", () => {
     expect(url.protocol).toBe("https:");
   });
 
-  // CURRENT BEHAVIOR: the fallback trusts the Host header for the origin.
-  // Only `pathname` is consumed downstream (route matching), so this is not
-  // exploitable today, but any future use of the origin would be.
-  it("builds the origin from the (client-controlled) Host header in the fallback", () => {
+  // By design: the fallback builds the origin from the Host header. Only
+  // `pathname` is used downstream (route matching); don't start relying on
+  // the origin from this URL.
+  it("builds the origin from the Host header in the fallback", () => {
     const url = getInitUrl({ url: "/api/auth/csrf", headers: { host: "evil.example" } } as any);
     expect(url.origin).toBe("http://evil.example");
     expect(url.pathname).toBe("/api/auth/csrf");

@@ -632,10 +632,9 @@ describe("POST /auth/sign-out", () => {
     );
   });
 
-  // Known limitation, tracked separately (js-core ScuteBaseHttp.delete):
-  // the revocation request is not awaited, so a failed revocation still
-  // answers 200 and surfaces as an unhandled promise rejection.
-  it("returns 200 when upstream revocation fails, leaking an unhandled rejection", async () => {
+  // The local sign-out always completes; a failed upstream revocation is
+  // awaited and handled, not left as an unhandled rejection.
+  it("still signs out locally (200, cookies cleared) when upstream revocation fails", async () => {
     upstream.on("DELETE", `/v1/auth/${APP_ID}/current_user`, () => json({ error: "x" }, 500));
     const { result, reasons } = await captureUnhandledRejections(() =>
       run({
@@ -646,8 +645,7 @@ describe("POST /auth/sign-out", () => {
     );
     expect(result.res.status).toBe(200);
     expect(isDeletion(lastCookie(result.setCookies, ACCESS_KEY))).toBe(true);
-    expect(reasons).toHaveLength(1);
-    expect((reasons[0] as any).status).toBe(500);
-    expect((reasons[0] as any).url).toBe(`https://api.scute.test/v1/auth/${APP_ID}/current_user`);
+    expect(reasons).toHaveLength(0);
+    expect(upstream.callsTo("/current_user", "DELETE").length).toBeGreaterThan(0);
   });
 });
