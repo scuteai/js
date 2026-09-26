@@ -26,12 +26,47 @@ afterEach(async () => {
   vi.unstubAllEnvs();
 });
 
-const create = (cookies: Record<string, string> = {}) => {
-  const req = makeNextRequest("/dashboard", { cookies });
-  const res = NextResponse.next();
+const create = (cookies: Record<string, string> = {}, res = NextResponse.next()) => {
+  const req = makeNextRequest("/dashboard", { cookies, headers: { "x-app": "1" } });
   const client: any = createMiddlewareClient({ req, res }, clientConfig());
   return { req, res, client, storage: client.scuteStorage };
 };
+
+const OVERRIDE = "x-middleware-override-headers";
+const REQUEST = "x-middleware-request-";
+
+/** Request-override keys Next reads from a middleware response. */
+const overrideKeys = (res: Response) =>
+  (res.headers.get(OVERRIDE) ?? "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter((k) => !!k);
+
+/**
+ * Headers the browser receives from a middleware response: Next consumes
+ * x-middleware-override-headers and every x-middleware-request-<key> it
+ * lists, and strips them (next/dist/server/lib/router-utils/resolve-routes).
+ */
+const browserHeaders = (res: Response) => {
+  const keys = overrideKeys(res);
+  const out: [string, string][] = [];
+  res.headers.forEach((v, k) => {
+    if (k === OVERRIDE) return;
+    if (k.startsWith(REQUEST) && keys.indexOf(k.slice(REQUEST.length)) !== -1) return;
+    out.push([k, v]);
+  });
+  return out;
+};
+
+/** The cookie header the downstream render sees, as name -> value. */
+const downstreamCookies = (res: Response) =>
+  Object.fromEntries(
+    (res.headers.get(REQUEST + "cookie") ?? "")
+      .split(";")
+      .map((p) => p.trim())
+      .filter((p) => !!p)
+      .map((p) => [p.slice(0, p.indexOf("=")), p.slice(p.indexOf("=") + 1)])
+  );
 
 describe("createMiddlewareClient storage", () => {
   it("reads from the request Cookie header", async () => {
@@ -56,21 +91,41 @@ describe("createMiddlewareClient storage", () => {
     expect(res.headers.getSetCookie()).toEqual(["k=v; Path=/; HttpOnly; SameSite=Lax"]);
   });
 
-  // CURRENT BEHAVIOR (suspected security bug): every write is ALSO appended
-  // to a *response* header named `cookie`, full Set-Cookie string included.
-  // `cookie` is not a forbidden response header, so if Next forwards
-  // middleware response headers to the browser (NextResponse.next() does),
-  // same-origin JS can read HttpOnly values (the refresh token) with
-  // fetch(location.href).then(r => r.headers.get("cookie")).
-  it("mirrors every write into a response `cookie` header", async () => {
+  it("never writes a response `cookie` header", async () => {
     const { storage, res } = create();
     await storage.setItem("k", "secret-value", { httpOnly: true });
-    expect(res.headers.get("cookie")).toBe("k=secret-value; Path=/; HttpOnly");
+    await storage.removeItem("k");
+    expect(res.headers.get("cookie")).toBeNull();
   });
 
-  // CURRENT BEHAVIOR (suspected bug): writes are appended without
-  // de-duplication and reads return the FIRST non-empty match, so a second
-  // write in the same middleware run is invisible to later reads.
+  it("forwards writes to the downstream request through Next's request-header override", async () => {
+    const { storage, res } = create({ a: "1", k: "old" });
+    await storage.setItem("k", "new value", { httpOnly: true });
+    await storage.setItem("b", "2");
+    // every original request header stays listed, so Next keeps them
+    expect(overrideKeys(res)).toEqual(expect.arrayContaining(["cookie", "x-app"]));
+    expect(res.headers.get(REQUEST + "x-app")).toBe("1");
+    expect(downstreamCookies(res)).toEqual({ a: "1", k: "new%20value", b: "2" });
+  });
+
+  it("removes deleted cookies from the downstream request", async () => {
+    const { storage, res } = create({ a: "1", k: "stale" });
+    await storage.removeItem("k");
+    expect(downstreamCookies(res)).toEqual({ a: "1" });
+  });
+
+  it("extends an override already set with NextResponse.next({ request: { headers } })", async () => {
+    const headers = new Headers({ "x-custom": "yes", cookie: "a=1" });
+    const { storage, res } = create({ a: "1" }, NextResponse.next({ request: { headers } }));
+    await storage.setItem("k", "v");
+    expect(overrideKeys(res).sort()).toEqual(["cookie", "x-custom"]);
+    expect(res.headers.get(REQUEST + "x-custom")).toBe("yes");
+    expect(res.headers.get(REQUEST + "x-app")).toBeNull();
+    expect(downstreamCookies(res)).toEqual({ a: "1", k: "v" });
+  });
+
+  // Known limitation, tracked separately: reads return the first non-empty
+  // Set-Cookie match, so a second write in the same run is not read back.
   it("a second write for the same name is not visible to reads (first match wins)", async () => {
     const { storage, res } = create();
     await storage.setItem("k", "v1");
@@ -79,9 +134,8 @@ describe("createMiddlewareClient storage", () => {
     expect(await storage.getItem("k")).toBe("v1");
   });
 
-  // CURRENT BEHAVIOR (suspected bug): a deletion writes `k=; Max-Age=0`,
-  // the empty value is skipped on read, and the stale request cookie is
-  // returned again ("resurrection") for the rest of the middleware run.
+  // Known limitation, tracked separately: after a deletion, reads fall back
+  // to the request cookie for the rest of the middleware run.
   it("a deleted cookie is still read back from the request", async () => {
     const { storage, res } = create({ k: "stale" });
     await storage.removeItem("k");
@@ -120,26 +174,26 @@ describe("createMiddlewareClient refresh in middleware", () => {
     expect(r.httpOnly).toBe(true);
   });
 
-  // CURRENT BEHAVIOR (suspected security bug, see storage test above): the
-  // HttpOnly refresh token ends up in a plain `cookie` response header.
-  it("leaks the rotated HttpOnly refresh token into the response `cookie` header", async () => {
+  it("no header the browser receives, other than Set-Cookie, contains the refresh token", async () => {
     const { client, res } = create({ [ACCESS_KEY]: makeAccess({ expIn: -60 }), [REFRESH_KEY]: makeRefresh() });
     await client.getSession();
-    const mirrored = res.headers.get("cookie")!;
-    expect(mirrored).toContain(`${REFRESH_KEY}=${upstream.issued.refreshedRefresh}`);
-    expect(mirrored).toContain("HttpOnly");
+    expect(lastCookie(res.headers.getSetCookie(), REFRESH_KEY)!.value).toBe(upstream.issued.refreshedRefresh);
+    const visible = browserHeaders(res).filter(([k]) => k !== "set-cookie");
+    expect(visible.length).toBeGreaterThan(0);
+    for (const [, v] of visible) expect(v).not.toContain(upstream.issued.refreshedRefresh);
+    // every request-override header is listed, so Next strips all of them
+    for (const [k] of browserHeaders(res)) expect(k.startsWith("x-middleware-request-")).toBe(false);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): refreshed tokens are only put on the
-  // browser-bound response. Nothing overrides the *request* cookies for
-  // the downstream render (no x-middleware-override-headers /
-  // x-middleware-request-cookie), so server components in the same request
-  // still see the expired access token.
-  it("does not forward refreshed cookies to the downstream request", async () => {
-    const { client, res, req } = create({ [ACCESS_KEY]: makeAccess({ expIn: -60 }), [REFRESH_KEY]: makeRefresh() });
+  it("forwards refreshed cookies to the downstream request (server components see the new access token)", async () => {
+    const { client, res, req } = create({ a: "1", [ACCESS_KEY]: makeAccess({ expIn: -60 }), [REFRESH_KEY]: makeRefresh() });
     await client.getSession();
-    expect(res.headers.get("x-middleware-override-headers")).toBeNull();
-    expect(res.headers.get("x-middleware-request-cookie")).toBeNull();
+    const downstream = downstreamCookies(res);
+    expect(downstream[ACCESS_KEY]).toBe(upstream.issued.refreshedAccess);
+    expect(downstream[REFRESH_KEY]).toBe(upstream.issued.refreshedRefresh);
+    expect(downstream.a).toBe("1");
+    expect(overrideKeys(res)).toContain("cookie");
+    // the incoming request object itself is not mutated
     expect(req.headers.get("cookie")).not.toContain(upstream.issued.refreshedAccess);
   });
 

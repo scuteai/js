@@ -115,11 +115,14 @@ describe("ScuteHandler dispatch", () => {
     expect(upstream.calls[0].url).toBe(`${BASE_URL}/v1/apps/${APP_ID}`);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): an explicit `undefined` config
-  // makes the dispatcher read `undefined._write` and throw.
-  it("(context, undefined) throws a TypeError", () => {
+  it("(context, undefined) returns a route handler that falls back to env config", async () => {
+    stubScuteEnv();
     const { context } = makeRouteContext();
-    expect(() => (ScuteHandler as any)(context, undefined)).toThrow(TypeError);
+    const h = (ScuteHandler as any)(context, undefined);
+    expect(typeof h).toBe("function");
+    const res = await h(makeNextRequest("/auth/csrf"));
+    expect(res.status).toBe(200);
+    expect(res.headers.getSetCookie()[0].startsWith(`${CSRF_COOKIE}=`)).toBe(true);
   });
 
   it("(NextRequest) runs the edge handler and returns a Promise<Response>", async () => {
@@ -161,20 +164,23 @@ describe("ScuteHandler dispatch", () => {
     expect(body()).toMatch(/^[0-9a-f]{128}$/);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, high for Pages Router users): the
-  // 2-arg Node overload detects `res` via `res._write`, which a real Node
-  // http.ServerResponse does not have. `res` is therefore popped as the
-  // *config*, and since a NextApiRequest has no `nextUrl` the call returns
-  // the App Router closure instead of handling the request: nothing is
-  // written and the API route never responds.
-  it("(req, realServerResponse) is mis-dispatched: returns a function and never responds", () => {
+  it("(req, realServerResponse) runs the Node pages handler (as `export default ScuteHandler`)", async () => {
     stubScuteEnv();
-    const { res, ended } = makeNodeRes();
+    const { res, body, ended } = makeNodeRes();
     expect(typeof (ServerResponse.prototype as any)._write).toBe("undefined");
     const out = (ScuteHandler as any)(makeNodeReq("/api/auth/csrf"), res);
-    expect(typeof out).toBe("function");
-    expect(ended()).toBe(false);
-    expect(upstream.calls).toHaveLength(0);
+    expect(out).toBeInstanceOf(Promise);
+    await out;
+    expect(res.statusCode).toBe(200);
+    expect(body()).toMatch(/^[0-9a-f]{128}$/);
+    expect(ended()).toBe(true);
+    expect(upstream.calls[0].url).toBe(`${BASE_URL}/v1/apps/${APP_ID}`);
+  });
+
+  it("(req, event, config) runs the edge handler with the config", async () => {
+    const event = { waitUntil: () => {} };
+    const res = await (ScuteHandler as any)(makeNextRequest("/auth/csrf"), event, clientConfig({ appId: "evt-cfg" }));
+    expect(res.headers.getSetCookie()[0].startsWith("X-CSRF-Token__evt-cfg=")).toBe(true);
   });
 });
 
@@ -260,7 +266,7 @@ describe("App Router route handler", () => {
 });
 
 describe("Pages API (Node)", () => {
-  it("csrf: copies status, every Set-Cookie, the cookie header and the body onto res", async () => {
+  it("csrf: copies status, every Set-Cookie, the other headers and the body onto res", async () => {
     const { res, body, setCookies } = makeNodeRes();
     await (ScuteHandler as any)(makeNodeReq("/api/auth/csrf"), res, clientConfig());
     const token = body();
@@ -269,8 +275,10 @@ describe("Pages API (Node)", () => {
       `${CSRF_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax`,
       `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
     ]);
-    expect(res.getHeader("cookie")).toBe(`${CSRF_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax`);
+    expect(res.getHeader("cookie")).toBeUndefined();
     expect(res.getHeader("content-type")).toBe("text/plain;charset=UTF-8");
+    expect(res.getHeader("x-content-type-options")).toBe("nosniff");
+    expect(res.getHeader("cache-control")).toBe("no-store");
   });
 
   it("sign-in: session cookies are written to res via setHeader (refresh HttpOnly), body empty", async () => {
@@ -318,11 +326,9 @@ describe("Pages API (Node)", () => {
     expect(res.statusCode).toBe(200);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): on the Pages Node adapter a deleted
-  // cookie "resurrects" from req.cookies (see pagesServerClient tests), so
-  // a dead refresh token is sent upstream twice per refresh attempt (once
-  // by refreshSession, again by the signOut cleanup). App Router sends it
-  // once.
+  // Known limitation, tracked separately: on the Pages Node adapter a
+  // deleted cookie is read back from req.cookies (see pagesServerClient
+  // tests), so a failed refresh sends the refresh token upstream twice.
   it("refresh failure: dead refresh token is sent upstream twice, cookies still end up cleared", async () => {
     upstream.on("POST", `/v1/auth/${APP_ID}/tokens/refresh`, () => json({ error: "revoked" }, 401));
     const dead = makeRefresh({ tag: "dead" });
@@ -351,11 +357,7 @@ describe("Pages API (Edge)", () => {
     expect(res.headers.getSetCookie()[0]).toBe(`${CSRF_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax`);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, high for Edge Pages users): the edge
-  // storage adapter writes session cookies onto the *request* cookie jar
-  // (NextRequest.cookies.set), never onto the Response. Sign-in answers 200
-  // but the browser receives no session cookies at all.
-  it("sign-in: answers 200 but sends no session Set-Cookie to the browser", async () => {
+  it("sign-in: sends the session cookies to the browser with their attributes", async () => {
     const headers = { Authorization: `Bearer ${makeAccess()}`, "X-CSRF-Token": CSRF };
     const req = makeNextRequest("/api/auth/sign-in", {
       method: "POST",
@@ -364,13 +366,35 @@ describe("Pages API (Edge)", () => {
     });
     const res = await ScuteHandler(req as any, clientConfig() as any);
     expect(res.status).toBe(200);
-    expect(res.headers.getSetCookie()).toEqual([]);
-    // ...the tokens only live on the incoming request object
-    expect(req.cookies.get(REFRESH_KEY)?.value).toBe(upstream.issued.rotateRefresh);
-    expect(req.headers.get("cookie")).toContain(`${REFRESH_KEY}=`);
+    const sc = res.headers.getSetCookie();
+    const refresh = lastCookie(sc, REFRESH_KEY)!;
+    expect(refresh.value).toBe(upstream.issued.rotateRefresh);
+    expect(refresh.httpOnly).toBe(true);
+    expect(refresh.sameSite).toBe("Lax");
+    expect(refresh.path).toBe("/");
+    expect(refresh.expires).toBeInstanceOf(Date);
+    const access = lastCookie(sc, ACCESS_KEY)!;
+    expect(access.value).toBe(upstream.issued.rotateAccess);
+    expect(access.httpOnly).toBeUndefined();
+    // exactly one Set-Cookie per session cookie name
+    expect(sc.filter((c) => c.startsWith(`${ACCESS_KEY}=`))).toHaveLength(1);
+    expect(sc.filter((c) => c.startsWith(`${REFRESH_KEY}=`))).toHaveLength(1);
+    // the incoming request is left alone
+    expect(req.headers.get("cookie")).not.toContain(`${REFRESH_KEY}=`);
   });
 
-  it("refresh: returns the new access token but never persists the rotated refresh token", async () => {
+  it("sign-in in production: session cookies are Secure", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const headers = { Authorization: `Bearer ${makeAccess()}`, "X-CSRF-Token": CSRF };
+    const res = await ScuteHandler(
+      makeNextRequest("/api/auth/sign-in", { method: "POST", headers, cookies: { [CSRF_COOKIE]: CSRF } }) as any,
+      clientConfig() as any
+    );
+    expect(lastCookie(res.headers.getSetCookie(), REFRESH_KEY)!.secure).toBe(true);
+    expect(lastCookie(res.headers.getSetCookie(), ACCESS_KEY)!.secure).toBe(true);
+  });
+
+  it("refresh: returns the new access token and persists the rotated refresh token", async () => {
     const old = makeRefresh({ tag: "old" });
     const headers = { "X-CSRF-Token": CSRF };
     const req = makeNextRequest("/api/auth/refresh", {
@@ -381,6 +405,24 @@ describe("Pages API (Edge)", () => {
     const res = await ScuteHandler(req as any, clientConfig() as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(await res.text()).access).toBe(upstream.issued.refreshedAccess);
-    expect(res.headers.getSetCookie()).toEqual([]);
+    const refresh = lastCookie(res.headers.getSetCookie(), REFRESH_KEY)!;
+    expect(refresh.value).toBe(upstream.issued.refreshedRefresh);
+    expect(refresh.httpOnly).toBe(true);
+  });
+
+  it("sign-out: clears the session cookies on the response", async () => {
+    const headers = { "X-CSRF-Token": CSRF };
+    const res = await ScuteHandler(
+      makeNextRequest("/api/auth/sign-out", {
+        method: "POST",
+        headers,
+        cookies: { [CSRF_COOKIE]: CSRF, [ACCESS_KEY]: makeAccess(), [REFRESH_KEY]: makeRefresh() },
+      }) as any,
+      clientConfig() as any
+    );
+    expect(res.status).toBe(200);
+    expect(isDeletion(lastCookie(res.headers.getSetCookie(), ACCESS_KEY))).toBe(true);
+    expect(isDeletion(lastCookie(res.headers.getSetCookie(), REFRESH_KEY))).toBe(true);
+    expect(isDeletion(lastCookie(res.headers.getSetCookie(), CSRF_COOKIE))).toBe(true);
   });
 });

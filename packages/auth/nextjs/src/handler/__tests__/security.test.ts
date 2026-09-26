@@ -133,9 +133,8 @@ describe("CSRF enforcement on state-changing endpoints", () => {
     expect(tokenCalls()).toEqual([]);
   });
 
-  // CURRENT BEHAVIOR (defense-in-depth gap): there is no Origin / Referer
-  // check anywhere. Protection rests entirely on the custom X-CSRF-Token
-  // header (which forces a CORS preflight cross-origin) plus the HttpOnly
+  // Known limitation, tracked separately: there is no Origin / Referer
+  // check; CSRF protection is the X-CSRF-Token header plus the HttpOnly
   // SameSite=Lax double-submit cookie.
   it("accepts a valid double-submit even with a cross-origin Origin and Referer", async () => {
     const r = await call(
@@ -154,11 +153,8 @@ describe("CSRF enforcement on state-changing endpoints", () => {
     expect(r.res.status).toBe(200);
   });
 
-  // CURRENT BEHAVIOR (suspected weakness, REF-41): a legacy unsuffixed
-  // `X-CSRF-Token` cookie is accepted for this app. Anything that can plant
-  // that one shared name (another Scute app on the host, a sibling
-  // subdomain via Domain=) supplies a secret the attacker knows. The header
-  // requirement still forces a same-origin or CORS-approved request.
+  // Known limitation, tracked separately (REF-41): the legacy unsuffixed
+  // `X-CSRF-Token` cookie is still accepted for this app.
   it("accepts a planted legacy X-CSRF-Token cookie as the CSRF secret", async () => {
     const r = await call({
       path: "/auth/sign-out",
@@ -235,10 +231,9 @@ describe("refresh token confidentiality", () => {
     }
   });
 
-  // CURRENT BEHAVIOR (by design, noted for review): the access token cookie
-  // is deliberately NOT HttpOnly so the browser SDK can read it. Any XSS can
-  // read the access token, and combined with the sign-in max-delay bug (see
-  // internalHandler tests) can mint a long-lived session from it.
+  // By design: the access token cookie is not HttpOnly so the browser SDK
+  // can read it. Sign-in only exchanges access tokens issued in the last
+  // 30s (see internalHandler tests).
   it("the access token cookie is readable by JS (not HttpOnly)", async () => {
     const r = await call(withCsrf({ path: "/auth/sign-in", headers: { Authorization: `Bearer ${makeAccess()}` } }));
     const a = lastCookie(r.setCookies, ACCESS_KEY)!;
@@ -256,6 +251,81 @@ describe("refresh token confidentiality", () => {
     );
     expect(r.text).toBe('{"access":null}');
     expect(upstream.callsTo("/tokens/refresh")).toEqual([]);
+  });
+
+  describe("no response header other than Set-Cookie ever contains the refresh token", () => {
+    const leaks = (headers: Headers | Record<string, unknown>, token: string) => {
+      const entries: [string, string][] = [];
+      if (headers instanceof Headers) headers.forEach((v, k) => entries.push([k, v]));
+      else for (const [k, v] of Object.entries(headers)) entries.push([k, String(v)]);
+      return entries.filter(([k, v]) => k.toLowerCase() !== "set-cookie" && v.includes(token)).map(([k]) => k);
+    };
+
+    const nodeCall = async (path: string, headers: Record<string, string>, cookies: Record<string, string>) => {
+      const res = new ServerResponse(new IncomingMessage(new Socket()));
+      (res as any).write = () => true;
+      (res as any).end = () => res;
+      await (ScuteHandler as any)(
+        { method: "POST", url: path, headers: { host: "localhost", ...headers }, cookies, query: {} },
+        res,
+        clientConfig()
+      );
+      return res;
+    };
+
+    it("App Router sign-in and refresh", async () => {
+      const signIn = await call(withCsrf({ path: "/auth/sign-in", headers: { Authorization: `Bearer ${makeAccess()}` } }));
+      expect(signIn.res.status).toBe(200);
+      expect(leaks(signIn.res.headers, upstream.issued.rotateRefresh)).toEqual([]);
+      const refresh = await call(withCsrf({ path: "/auth/refresh", cookies: { [REFRESH_KEY]: makeRefresh() } }));
+      expect(refresh.res.status).toBe(200);
+      expect(leaks(refresh.res.headers, upstream.issued.refreshedRefresh)).toEqual([]);
+    });
+
+    it("Pages Node sign-in and refresh", async () => {
+      const signIn = await nodeCall(
+        "/api/auth/sign-in",
+        { authorization: `Bearer ${makeAccess()}`, "x-csrf-token": CSRF },
+        { [CSRF_COOKIE]: CSRF }
+      );
+      expect(signIn.statusCode).toBe(200);
+      expect(leaks(signIn.getHeaders(), upstream.issued.rotateRefresh)).toEqual([]);
+      const refresh = await nodeCall(
+        "/api/auth/refresh",
+        { "x-csrf-token": CSRF },
+        { [CSRF_COOKIE]: CSRF, [REFRESH_KEY]: makeRefresh() }
+      );
+      expect(refresh.statusCode).toBe(200);
+      expect(leaks(refresh.getHeaders(), upstream.issued.refreshedRefresh)).toEqual([]);
+    });
+
+    it("Pages Edge sign-in and refresh", async () => {
+      const signIn = await ScuteHandler(
+        makeNextRequest("/api/auth/sign-in", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${makeAccess()}`, "X-CSRF-Token": CSRF },
+          cookies: { [CSRF_COOKIE]: CSRF },
+        }) as any,
+        clientConfig() as any
+      );
+      expect(signIn.status).toBe(200);
+      expect(leaks(signIn.headers, upstream.issued.rotateRefresh)).toEqual([]);
+      const refresh = await ScuteHandler(
+        makeNextRequest("/api/auth/refresh", {
+          method: "POST",
+          headers: { "X-CSRF-Token": CSRF },
+          cookies: { [CSRF_COOKIE]: CSRF, [REFRESH_KEY]: makeRefresh() },
+        }) as any,
+        clientConfig() as any
+      );
+      expect(refresh.status).toBe(200);
+      expect(leaks(refresh.headers, upstream.issued.refreshedRefresh)).toEqual([]);
+    });
+
+    it("the CSRF endpoint sets no response `cookie` header", async () => {
+      const r = await call({ path: "/auth/csrf", method: "GET" });
+      expect(r.res.headers.get("cookie")).toBeNull();
+    });
   });
 
   it("Pages Node sign-in never sets a response `cookie` header with session tokens", async () => {
@@ -320,16 +390,11 @@ describe("upstream error handling does not leak", () => {
   });
 });
 
-describe("unhandled rejections reachable by an anonymous client", () => {
-  // CURRENT BEHAVIOR (suspected bug, js-core ScuteBaseHttp.delete): an
-  // anonymous visitor can mint a CSRF pair (GET /auth/csrf), plant any
-  // decodable JWT as the access cookie in their own browser and POST
-  // /auth/sign-out. The handler revokes that token upstream with an
-  // unawaited DELETE; upstream rejects it (401) and the rejection is never
-  // handled. With Node's default --unhandled-rejections=throw a host that
-  // does not install its own handler would crash; otherwise it is log noise
-  // an attacker controls.
-  it("forged access cookie + own CSRF pair -> sign-out 200 and an unhandled rejection", async () => {
+describe("sign-out when upstream rejects the revocation", () => {
+  // Known limitation, tracked separately (js-core ScuteBaseHttp.delete):
+  // the sign-out revocation request is not awaited, so an upstream 401 on it
+  // surfaces as an unhandled promise rejection.
+  it("any decodable access cookie + a valid CSRF pair -> sign-out 200 and an unhandled rejection", async () => {
     upstream.on("DELETE", `/v1/auth/${APP_ID}/current_user`, () => json({ error: "invalid token" }, 401));
     const forged = makeAccess({ uuid: "anyone", tag: "forged" });
     const { result, reasons } = await captureUnhandledRejections(() =>
@@ -359,28 +424,22 @@ describe("header / cookie injection", () => {
     expect(parsed.every((c) => c.domain === undefined)).toBe(true);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): the CSRF endpoint reflects the
-  // cookie value verbatim into a text/plain body without
-  // X-Content-Type-Options: nosniff.
-  it("reflects the CSRF cookie value into a text/plain body without nosniff", async () => {
+  it("serves the reflected CSRF token as text/plain with nosniff and no-store", async () => {
     const r = await call({ path: "/auth/csrf", method: "GET", cookies: { [CSRF_COOKIE]: "<script>1</script>" } });
     expect(r.text).toBe("<script>1</script>");
     expect(r.res.headers.get("content-type")).toBe("text/plain;charset=UTF-8");
-    expect(r.res.headers.get("x-content-type-options")).toBeNull();
+    expect(r.res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(r.res.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("a bearer token carrying cookie attributes is stored percent-encoded, never as attributes", async () => {
-    upstream.on("POST", `/v1/auth/${APP_ID}/tokens/rotate_access`, () => json({ error: "x" }, 401));
+  it("a bearer token carrying cookie attributes is rejected before it is stored or sent upstream", async () => {
     const forged = `${makeAccess()}; Domain=evil.example; Path=/; HttpOnly`;
     const r = await call(withCsrf({ path: "/auth/sign-in", headers: { Authorization: `Bearer ${forged}` } }));
     expect(r.res.status).toBe(401);
-    // the forged value was written once (before upstream rejected it)...
     const written = r.history.filter((c) => c.startsWith(`${ACCESS_KEY}=`) && !c.startsWith(`${ACCESS_KEY}=;`));
-    expect(written).toHaveLength(1);
-    expect(written[0]).toContain("%3B%20Domain%3Devil.example%3B%20Path%3D%2F%3B%20HttpOnly");
+    expect(written).toEqual([]);
     for (const c of parseCookies(r.history)) expect(c.domain).toBeUndefined();
-    // ...and forwarded upstream verbatim as a header value
-    expect(upstream.callsTo("/tokens/rotate_access")[0].headers.get("x-authorization")).toBe(forged);
+    expect(upstream.callsTo("/tokens/")).toEqual([]);
   });
 });
 
@@ -485,10 +544,8 @@ describe("no SSRF-style proxying", () => {
     expect(rotate.headers.get("authorization")).toBe(`Bearer ${SECRET}`);
   });
 
-  // CURRENT BEHAVIOR (suspected weakness, low): every request, including
-  // unauthenticated junk paths, constructs a new ScuteClient whose
-  // constructor GETs /v1/apps/:id upstream with the secret key. Anyone can
-  // amplify traffic to the Scute API through the handler.
+  // Known limitation, tracked separately: every request, including unknown
+  // paths, constructs a ScuteClient whose constructor GETs /v1/apps/:id.
   it("each unauthenticated request triggers one upstream app-data GET", async () => {
     for (let i = 0; i < 5; i++) await call({ path: `/auth/junk-${i}`, method: "GET" });
     expect(upstream.calls).toHaveLength(5);

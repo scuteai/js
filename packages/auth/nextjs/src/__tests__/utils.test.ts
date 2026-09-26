@@ -1,4 +1,4 @@
-import { getBody, getInitUrl, randomBytes } from "../utils";
+import { decodeJwtPayload, getBody, getInitUrl, randomBytes } from "../utils";
 
 const req = (init: RequestInit & { url?: string } = {}) =>
   new Request(init.url ?? "http://localhost/auth/x", init);
@@ -86,6 +86,15 @@ describe("getInitUrl", () => {
     expect(url.href).toBe("https://app.example/api/auth/csrf?x=1");
   });
 
+  it("reads the Next 14+ `initURL` meta key", () => {
+    const r: any = {
+      url: "/ignored",
+      headers: { host: "other.example" },
+      [Symbol.for("NextInternalRequestMeta")]: { initURL: "https://app.example/api/auth/refresh" },
+    };
+    expect(getInitUrl(r).href).toBe("https://app.example/api/auth/refresh");
+  });
+
   it("matches the meta symbol by description, not identity", () => {
     const r: any = {
       url: "/x",
@@ -131,16 +140,44 @@ describe("getInitUrl", () => {
     expect(url.pathname).toBe("/api/auth/%63srf");
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): when the meta symbol exists but
-  // has no __NEXT_INIT_URL, `new URL(undefined)` throws outside the
-  // try/catch instead of using the Host fallback.
-  it("throws when the meta symbol exists without __NEXT_INIT_URL", () => {
-    const r: any = {
-      url: "/a",
-      headers: { host: "h" },
-      [Symbol("NextInternalRequestMeta")]: {},
-    };
-    expect(() => getInitUrl(r)).toThrow(TypeError);
+  it("falls back to the Host header when the meta symbol exists without an init URL", () => {
+    for (const meta of [{}, { __NEXT_INIT_URL: "" }, { initURL: "not a url" }, null]) {
+      const r: any = {
+        url: "/a",
+        headers: { host: "h" },
+        [Symbol("NextInternalRequestMeta")]: meta,
+      };
+      expect(getInitUrl(r).href).toBe("http://h/a");
+    }
+  });
+});
+
+describe("decodeJwtPayload", () => {
+  const seg = (obj: unknown) => Buffer.from(JSON.stringify(obj)).toString("base64url");
+
+  it("decodes the payload of a compact JWT (including UTF-8)", () => {
+    expect(decodeJwtPayload(`${seg({ alg: "none" })}.${seg({ uuid: "u", exp: 1, name: "J\u00f6rg" })}.sig`)).toEqual({
+      uuid: "u",
+      exp: 1,
+      name: "J\u00f6rg",
+    });
+  });
+
+  it("returns null for anything that is not three base64url segments with a JSON object payload", () => {
+    for (const token of [
+      "",
+      "not-a-jwt",
+      "a.b",
+      "a.b.c.d",
+      `${seg({})}.${seg({ a: 1 })}.`,
+      `${seg({})}.${seg({ a: 1 })}.sig; Domain=x`,
+      `${seg({})}.${seg([1, 2])}.sig`,
+      `${seg({})}.${seg("str")}.sig`,
+      `${seg({})}.${Buffer.from("{not json").toString("base64url")}.sig`,
+      `${seg({})}.a.sig`,
+    ]) {
+      expect(decodeJwtPayload(token)).toBeNull();
+    }
   });
 });
 

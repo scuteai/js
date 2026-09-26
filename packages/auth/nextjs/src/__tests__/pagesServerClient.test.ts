@@ -82,11 +82,9 @@ describe("createPagesServerClient storage", () => {
     ]);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): same resurrection as the middleware
-  // adapter. After a delete (`k=; Max-Age=0`) the empty value is skipped
-  // and the stale req.cookies value is read again for the rest of the
-  // request (causes a second upstream refresh with a dead token, see the
-  // Pages Node handler test).
+  // Known limitation, tracked separately: after a deletion, reads fall back
+  // to req.cookies for the rest of the request (see the Pages Node handler
+  // refresh-failure test).
   it("a deleted cookie is still read back from req.cookies", async () => {
     const { storage, res } = create({ k: "stale" });
     await storage.removeItem("k");

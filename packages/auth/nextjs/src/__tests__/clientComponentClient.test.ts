@@ -149,9 +149,8 @@ describe("browser", () => {
     return { ...browser, client, mod, nextCalls };
   };
 
-  // CURRENT BEHAVIOR (suspected bug for multi-app pages): in the browser
-  // the first client is cached in a module singleton and later calls
-  // return it regardless of their config (appId, prefix, preferences).
+  // Known limitation, tracked separately: in the browser the first client
+  // is a module singleton; later calls return it whatever their config.
   it("returns the same singleton on every call, ignoring later config", async () => {
     const { client, mod } = await create();
     const again: any = mod.createClientComponentClient({ appId: "another-app", baseUrl: "https://other.example" });
@@ -359,6 +358,7 @@ describe("browser", () => {
 
 describe("createPagesBrowserClient handlersPrefix mapping", () => {
   const prefixFor = async (handlersPrefix?: string) => {
+    upstream.calls.length = 0;
     installBrowser();
     installNextRoutes(upstream, "");
     vi.resetModules();
@@ -385,16 +385,16 @@ describe("createPagesBrowserClient handlersPrefix mapping", () => {
 
   it("keeps a prefix that already starts with 'api'", async () => {
     expect(await prefixFor("api/custom")).toBe("/api/custom/auth/csrf");
+    expect(await prefixFor("api")).toBe("/api/auth/csrf");
   });
 
-  // CURRENT BEHAVIOR (suspected bug): the check is startsWith("api"), so a
-  // leading slash defeats it and doubles the api segment...
-  it("doubles the api segment for '/api/custom'", async () => {
-    expect(await prefixFor("/api/custom")).toBe("/api/api/custom/auth/csrf");
+  it("ignores leading and trailing slashes when checking for 'api'", async () => {
+    expect(await prefixFor("/api/custom")).toBe("/api/custom/auth/csrf");
+    expect(await prefixFor("/api/")).toBe("/api/auth/csrf");
+    expect(await prefixFor("/custom/")).toBe("/api/custom/auth/csrf");
   });
 
-  // ...and any prefix that merely starts with the letters "api" is kept.
-  it("does not prepend api/ to 'apiary'", async () => {
-    expect(await prefixFor("apiary")).toBe("/apiary/auth/csrf");
+  it("matches 'api' as a whole path segment, not a text prefix", async () => {
+    expect(await prefixFor("apiary")).toBe("/api/apiary/auth/csrf");
   });
 });

@@ -28,7 +28,6 @@ export const setCsrfToken = (
     secure: process.env.NODE_ENV === "production",
   });
   response.headers.append("set-cookie", cookieStr);
-  response.headers.append("cookie", cookieStr);
 
   // Also clear any legacy unsuffixed cookie this jar may still hold from a
   // pre-namespacing client. Without this, the new namespaced cookie sits
@@ -58,7 +57,6 @@ export const deleteCsrfToken = (
     maxAge: 0,
   });
   response.headers.append("set-cookie", cookieStr);
-  response.headers.append("cookie", cookieStr);
   // Symmetric legacy clear — same reason as in setCsrfToken.
   response.headers.append(
     "set-cookie",
@@ -70,6 +68,22 @@ export const deleteCsrfToken = (
       maxAge: 0,
     })
   );
+};
+
+/**
+ * Compares two strings in time that depends only on their length, not on
+ * where they differ. Plain JS so it runs on both the Node and Edge runtimes.
+ */
+export const timingSafeEqual = (a: string, b: string) => {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
 };
 
 export const isCsrfTokenValid = ({
@@ -93,7 +107,7 @@ export const isCsrfTokenValid = ({
     csrfTokenCookie.trim().length !== 0 &&
     csrfTokenHeader &&
     csrfTokenHeader.trim().length !== 0 &&
-    csrfTokenCookie === csrfTokenHeader
+    timingSafeEqual(csrfTokenCookie, csrfTokenHeader)
   ) {
     return true;
   } else {

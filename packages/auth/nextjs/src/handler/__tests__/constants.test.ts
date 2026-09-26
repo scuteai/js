@@ -47,9 +47,8 @@ describe("handler/constants", () => {
       );
     });
 
-    // CURRENT BEHAVIOR (suspected bug): the guard is a falsy check, so the
-    // legitimate numeric appId 0 is rejected too (js-core's scopedKey only
-    // rejects undefined/null/""). Unlikely in practice but inconsistent.
+    // Known limitation, tracked separately: the guard is a falsy check, so
+    // a numeric appId 0 is rejected too.
     it("throws for numeric appId 0 (falsy guard)", () => {
       expect(() => csrfCookieKey(0)).toThrow(
         "csrfCookieKey called without an appId"

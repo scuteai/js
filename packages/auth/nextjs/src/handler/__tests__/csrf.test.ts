@@ -4,6 +4,7 @@ import {
   getCsrfErrorResponse,
   isCsrfTokenValid,
   setCsrfToken,
+  timingSafeEqual,
 } from "../csrf";
 
 const APP = "app-123";
@@ -54,18 +55,10 @@ describe("setCsrfToken", () => {
     ]);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): the serialized Set-Cookie string is
-  // also appended as a *response* `cookie` header. `cookie` is not a
-  // forbidden response header name, so same-origin JS can read it via
-  // fetch(). For the CSRF token that is harmless (the token is in the body
-  // anyway) but it is the same pattern the middleware adapter uses for
-  // session cookies.
-  it("also appends the namespaced cookie string as a response `cookie` header", () => {
+  it("writes the cookie only as Set-Cookie (no response `cookie` header)", () => {
     const res = new Response("x");
     setCsrfToken("tok123", res, APP);
-    expect(res.headers.get("cookie")).toBe(
-      `${NS}=tok123; Path=/; HttpOnly; SameSite=Lax`
-    );
+    expect(res.headers.get("cookie")).toBeNull();
   });
 
   it("percent-encodes the token value so it cannot inject cookie attributes", () => {
@@ -94,9 +87,7 @@ describe("deleteCsrfToken", () => {
       `${NS}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
       `${LEGACY}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
     ]);
-    expect(res.headers.get("cookie")).toBe(
-      `${NS}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`
-    );
+    expect(res.headers.get("cookie")).toBeNull();
   });
 
   it("adds Secure in production", () => {
@@ -169,10 +160,8 @@ describe("isCsrfTokenValid", () => {
     ).toBe(false);
   });
 
-  // CURRENT BEHAVIOR (suspected bug): the legacy unsuffixed cookie is still
-  // accepted as the CSRF secret for ANY appId. A legacy cookie written by a
-  // different Scute app on the same host validates requests for this app.
-  // REF-41 is expected to remove this fallback.
+  // Known limitation, tracked separately (REF-41): the legacy unsuffixed
+  // cookie is still accepted as the CSRF secret for any appId.
   it("falls back to the legacy unsuffixed cookie when the namespaced one is absent", () => {
     expect(
       isCsrfTokenValid({ cookies: { [LEGACY]: "abc" }, headers: hdrs("abc"), appId: APP })
@@ -209,20 +198,41 @@ describe("isCsrfTokenValid", () => {
     ).toBe(true);
   });
 
-  // CURRENT BEHAVIOR (suspected bug, low): the comparison is a plain `===`,
-  // not a constant-time compare. Remote timing extraction of a 128-char
-  // random token is impractical, so this is defense-in-depth only. This test
-  // just pins that there is no length-independent path: prefix matches fail.
   it("rejects a strict prefix of the token", () => {
     expect(
       isCsrfTokenValid({ cookies: { [NS]: "abcdef" }, headers: hdrs("abc"), appId: APP })
     ).toBe(false);
   });
 
+  it("compares every character even when the first one differs (no early exit)", () => {
+    const cookie = "a" + "x".repeat(127);
+    const headers = hdrs("b" + "x".repeat(127));
+    const charCodeAt = vi.spyOn(String.prototype, "charCodeAt");
+    try {
+      expect(isCsrfTokenValid({ cookies: { [NS]: cookie }, headers, appId: APP })).toBe(false);
+      // two reads per character position
+      expect(charCodeAt.mock.calls.length).toBeGreaterThanOrEqual(256);
+    } finally {
+      charCodeAt.mockRestore();
+    }
+  });
+
   it("throws (rather than returning false) when appId is empty", () => {
     expect(() =>
       isCsrfTokenValid({ cookies: { [LEGACY]: "abc" }, headers: hdrs("abc"), appId: "" })
     ).toThrow("csrfCookieKey called without an appId");
+  });
+});
+
+describe("timingSafeEqual", () => {
+  it("is true only for identical strings", () => {
+    expect(timingSafeEqual("", "")).toBe(true);
+    expect(timingSafeEqual("abc", "abc")).toBe(true);
+    expect(timingSafeEqual("abc", "abd")).toBe(false);
+    expect(timingSafeEqual("abc", "Abc")).toBe(false);
+    expect(timingSafeEqual("abc", "abcd")).toBe(false);
+    expect(timingSafeEqual("abcd", "abc")).toBe(false);
+    expect(timingSafeEqual("\u00e9", "e\u0301")).toBe(false);
   });
 });
 

@@ -109,8 +109,18 @@ const harnesses: Harness[] = [
     create: (cookies, extra) => {
       const request = makeNextRequest("/", { cookies });
       const client = createPagesEdgeRuntimeClient({ request }, clientConfig(extra));
-      // writes land on request.cookies, never on a response
+      // without a response, writes land on request.cookies only
       return { client, writes: () => [] };
+    },
+  },
+  {
+    name: "pagesEdgeRuntimeClient (with response)",
+    persists: true,
+    create: (cookies, extra) => {
+      const request = makeNextRequest("/", { cookies });
+      const response = new Response(null);
+      const client = createPagesEdgeRuntimeClient({ request, response }, clientConfig(extra));
+      return { client, writes: () => parseCookies(response.headers.getSetCookie()) };
     },
   },
 ];
@@ -190,11 +200,9 @@ describe.each(harnesses)("$name: cookie contract", (h) => {
       expect(writes()).toEqual([]);
     });
 
-    // CURRENT BEHAVIOR (REF-41 target, suspected cross-app bleed): with no
-    // namespaced cookie, the legacy unsuffixed cookie is read regardless of
-    // which app wrote it and is copied into THIS app's namespace. The copy
-    // has no Expires/Max-Age (it becomes a browser-session cookie) and the
-    // legacy original is left in place.
+    // Known limitation, tracked separately (REF-41): with no namespaced
+    // cookie, the legacy unsuffixed cookie is read and copied into this
+    // app's namespace without Expires/Max-Age; the original is left alone.
     it("falls back to legacy unsuffixed cookies and forward-migrates them", async () => {
       const access = makeAccess({ tag: "legacy" });
       const refresh = makeRefresh({ tag: "legacy" });
