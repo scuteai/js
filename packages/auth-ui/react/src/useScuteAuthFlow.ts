@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AUTH_CHANGE_EVENTS, useScuteClient, useAuth } from "@scute/react-hooks";
+import { scrubAuthTokensFromUrl } from "@scute/js-core";
 
 /**
  * Auth flow views — represents the current step in the auth lifecycle.
@@ -131,12 +132,12 @@ export function useScuteAuthFlow() {
     const magicToken = scuteClient.getMagicLinkToken();
     if (!magicToken) { setView("login"); return; }
 
-    // Scrub the magic link token from the URL synchronously on detection,
-    // before any await, so it cannot linger if verification fails (SEC-36)
+    // Scrub the login token from the URL synchronously on detection, before
+    // any await, so it cannot linger in history if verification fails
+    // (SEC-36). getMagicLinkToken() reads either sct_magic or sct_oauth, and
+    // SAML SSO and social OAuth both land with sct_oauth, so scrub both.
     if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("sct_magic");
-      window.history.replaceState({}, "", url.toString());
+      window.history.replaceState({}, "", scrubAuthTokensFromUrl(window.location.href));
     }
 
     (async () => {

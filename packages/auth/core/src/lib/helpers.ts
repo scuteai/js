@@ -137,3 +137,18 @@ export const refreshTokenHeaders = (jwt: string | null): HeadersInit => {
     [_SCUTE_REFRESH_HEADER]: jwt,
   };
 };
+
+/**
+ * Removes Scute's one-time sign-in tokens from a URL: the magic-link token,
+ * the OAuth/SAML handoff token and the skip flag. Call it synchronously as
+ * soon as a token is read, before any await, so the token can't stay in
+ * browser history (or in referrers) if verification fails. SAML SSO and
+ * social OAuth both land with `sct_oauth`, so it matters for SSO too.
+ */
+export const scrubAuthTokensFromUrl = (href: string): string => {
+  const url = new URL(href);
+  for (const param of ["sct_magic", "sct_oauth", "sct_sk"]) {
+    url.searchParams.delete(param);
+  }
+  return url.toString();
+};
