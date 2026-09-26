@@ -13,6 +13,10 @@ export const getMeaningfulError = (error: ScuteError | Error) => {
   if (error instanceof TechnicalError) {
     isFatal = true;
     message = "Something went wrong.";
+  } else if (error instanceof SsoRequiredError) {
+    // Not a failure to show: the caller should redirect to SSO.
+    message = error.json?.error ?? "This account must sign in with SSO.";
+    isFatal = false;
   } else if (
     error instanceof BaseHttpError &&
     !(error.code >= 200 && error.code < 300)
@@ -99,6 +103,38 @@ export class BaseHttpError extends ScuteError {
     Object.setPrototypeOf(this, BaseHttpError.prototype);
   }
 }
+
+/**
+ * The account's email domain must sign in with SSO (the workspace enforces
+ * SAML). The API answers 403 `sso_required` with where to send the user.
+ * Catch it around sign-in and redirect: `window.location.assign(e.ssoLoginUrl)`
+ * or call `signInWithSAML()`.
+ */
+export class SsoRequiredError extends BaseHttpError {
+  /** The SP-initiated SAML login URL for this app. */
+  ssoLoginUrl?: string;
+  /** The email domain that requires SSO. */
+  domain?: string;
+
+  constructor({
+    message,
+    cause,
+    json,
+  }: {
+    message: ScuteError["message"];
+    json?: Record<string, any>;
+    cause?: ScuteError["cause"];
+  }) {
+    super({ message, cause, json, code: 403 });
+    this.slug = "sso_required";
+    this.ssoLoginUrl = json?.details?.sso_login_url;
+    this.domain = json?.details?.domain;
+    Object.setPrototypeOf(this, SsoRequiredError.prototype);
+  }
+}
+
+export const isSsoRequiredError = (error: unknown): error is SsoRequiredError =>
+  error instanceof SsoRequiredError;
 
 export class TechnicalError extends ScuteError {
   constructor(cause?: Error) {

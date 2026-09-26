@@ -2,6 +2,7 @@ import wretch, { type Wretch, type WretchError } from "wretch";
 import { retry } from "wretch/middlewares/retry";
 import {
   BaseHttpError,
+  SsoRequiredError,
   ErrorReport,
   NETWORK_ERROR_CODES,
   ScuteError,
@@ -196,6 +197,10 @@ export abstract class ScuteBaseHttp {
   private _getErrorObject(error: WretchError) {
     const message = this._getErrorMessage(error);
     const code = error.status;
+
+    if (code === 403 && error.json?.error_code === "sso_required") {
+      return new SsoRequiredError({ cause: error, message, json: error.json });
+    }
 
     return new BaseHttpError({
       cause: error,
