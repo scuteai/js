@@ -35,4 +35,6 @@ jobs:
         run: pnpm --filter @scute/js-core exec tsc --noEmit
 
       - name: Test
-        run: pnpm -r --if-present test
+        # The Playwright e2e suite needs a running API and example app; it
+        # runs locally (see packages/auth/__e2e__/playwright.config.ts).
+        run: pnpm -r --if-present --filter '!@scute/sdk-e2e' test
