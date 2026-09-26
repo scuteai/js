@@ -219,6 +219,7 @@ describe("environment detection", () => {
 
   it("isWebauthnSupported is false in a browser without navigator.credentials", () => {
     vi.stubGlobal("window", { document: { createElement: () => ({}) } });
+    vi.stubGlobal("navigator", {});
     expect(isWebauthnSupported()).toBe(false);
   });
 });
