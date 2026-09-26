@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AUTH_CHANGE_EVENTS, useScuteClient, useAuth } from "@scute/react-hooks";
+import { scrubAuthTokensFromUrl } from "@scute/js-core";
 
 /**
  * Auth flow views — represents the current step in the auth lifecycle.
@@ -131,12 +132,18 @@ export function useScuteAuthFlow() {
     const magicToken = scuteClient.getMagicLinkToken();
     if (!magicToken) { setView("login"); return; }
 
-    // Scrub the magic link token from the URL synchronously on detection,
-    // before any await, so it cannot linger if verification fails (SEC-36)
+    // Read the "skip the passkey offer" signals before scrubbing: sct_sk=true
+    // on the link, or an OAuth/SAML landing (sct_oauth). Same rule as the
+    // core's shouldSkipDeviceRegister, which can't see them once scrubbed.
+    const landing = typeof window !== "undefined" ? new URL(window.location.href).searchParams : null;
+    const skipPasskeyOffer = !!landing && (landing.get("sct_sk") === "true" || !!landing.get("sct_oauth"));
+
+    // Scrub the login token from the URL synchronously on detection, before
+    // any await, so it cannot linger in history if verification fails
+    // (SEC-36). getMagicLinkToken() reads either sct_magic or sct_oauth, and
+    // SAML SSO and social OAuth both land with sct_oauth, so scrub both.
     if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("sct_magic");
-      window.history.replaceState({}, "", url.toString());
+      window.history.replaceState({}, "", scrubAuthTokensFromUrl(window.location.href));
     }
 
     (async () => {
@@ -149,13 +156,6 @@ export function useScuteAuthFlow() {
         return;
       }
       const { data, error: verifyError } = verifyResult;
-
-      // Clean URL
-      if (typeof window !== "undefined") {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("sct_sk");
-        window.history.replaceState({}, "", url.toString());
-      }
 
       if (verifyError) {
         setError(verifyError.message || "Invalid or expired link");
@@ -171,10 +171,9 @@ export function useScuteAuthFlow() {
       }
 
       // Offer passkey registration after magic link verify (if passkeys enabled)
-      const shouldSkip = typeof window !== "undefined" && new URL(window.location.href).searchParams.get("sct_sk");
       const appData = (await scuteClient.getAppData())?.data;
       const passkeysEnabled = appData?.passkeys_enabled !== false;
-      if (!shouldSkip && passkeysEnabled && data?.authPayload) {
+      if (!skipPasskeyOffer && passkeysEnabled && data?.authPayload) {
         setAuthPayload(data.authPayload);
         setView("webauthn_register");
       } else if (data?.authPayload) {

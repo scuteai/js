@@ -36,6 +36,7 @@ export {
   accessTokenHeader,
   refreshTokenHeaders,
   decodeMagicLinkToken,
+  scrubAuthTokensFromUrl,
 } from "./lib/helpers";
 export type { CookieAttributes, UniqueIdentifier } from "./lib/types/general";
 export * from "./lib/types/scute";
