@@ -371,7 +371,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * Start SP-initiated SAML login by redirecting the browser to the
    * workspace SP-initiate endpoint. Login completes via the existing
    * magic-link status poll (same handoff as signInWithOAuthProvider).
-   * @param relayState - Optional opaque value round-tripped back after ACS.
+   * @param relayState - Deprecated and ignored by the v2 API; see
+   *   {@link getSamlLoginUrl}.
    */
   signInWithSAML(relayState?: string) {
     window.location.href = this.getSamlLoginUrl(relayState);
