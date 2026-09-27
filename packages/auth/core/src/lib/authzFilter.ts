@@ -43,27 +43,39 @@ const isVar = (o: unknown): o is AuthzVar =>
 
 const fieldOf = (v: AuthzVar) => v.var.replace(/^resource\./, "");
 
+const isPlainObject = (o: unknown): o is Row =>
+  typeof o === "object" && o !== null && !Array.isArray(o);
+
+// Own keys of plain objects only, like the engine: no array properties
+// ("length"), nothing from the prototype ("constructor").
 const lookup = (row: Row, path: string): unknown => {
   let current: unknown = row;
   for (const part of path.split(".")) {
-    if (
-      typeof current !== "object" ||
-      current === null ||
-      !(part in (current as Row))
-    ) {
+    if (!isPlainObject(current) || !Object.prototype.hasOwnProperty.call(current, part)) {
       return undefined;
     }
-    current = (current as Row)[part];
+    current = current[part];
   }
   return current;
+};
+
+/** Structural equality, as the engine compares values (lists and objects too). */
+const same = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((v, i) => same(v, b[i]));
+  if (isPlainObject(a) && isPlainObject(b)) {
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every((k) => Object.prototype.hasOwnProperty.call(b, k) && same(a[k], b[k]));
+  }
+  return false;
 };
 
 const compare = (op: string, left: unknown, right: unknown): boolean => {
   switch (op) {
     case "eq":
-      return left === right;
+      return same(left, right);
     case "ne":
-      return left !== right;
+      return !same(left, right);
     case "lt":
     case "lte":
     case "gt":
@@ -76,10 +88,10 @@ const compare = (op: string, left: unknown, right: unknown): boolean => {
       return op === "lt" ? l < r : op === "lte" ? l <= r : op === "gt" ? l > r : l >= r;
     }
     case "in":
-      return Array.isArray(right) && right.includes(left as never);
+      return Array.isArray(right) && right.some((v) => same(v, left));
     case "contains":
       return (
-        (Array.isArray(left) && left.includes(right as never)) ||
+        (Array.isArray(left) && left.some((v) => same(v, right))) ||
         (typeof left === "string" &&
           typeof right === "string" &&
           left.includes(right))
@@ -95,32 +107,43 @@ const compare = (op: string, left: unknown, right: unknown): boolean => {
   }
 };
 
+export type EvaluateOptions = {
+  /**
+   * For `exists` on an absent attribute: true when someone else (the
+   * server) may know it, so the answer is "unknown" rather than false.
+   */
+  mayExistElsewhere?: (path: string) => boolean;
+};
+
 /**
  * Evaluate a condition against attributes ({ resource: {...}, user: {...} }).
- * Returns true, false or "unknown" (a missing attribute left it open).
+ * Returns true, false or "unknown" (a missing attribute left it open). A
+ * null counts as missing.
  */
-export function evaluateCondition(condition: AuthzCondition, attrs: Row): Tri {
+export function evaluateCondition(condition: AuthzCondition, attrs: Row, options: EvaluateOptions = {}): Tri {
   const [op, arg] = Object.entries(condition)[0] as [string, any];
   switch (op) {
     case "all": {
-      const parts = (arg as AuthzCondition[]).map((c) => evaluateCondition(c, attrs));
+      const parts = (arg as AuthzCondition[]).map((c) => evaluateCondition(c, attrs, options));
       if (parts.includes(false)) return false;
       return parts.includes("unknown") ? "unknown" : true;
     }
     case "any": {
-      const parts = (arg as AuthzCondition[]).map((c) => evaluateCondition(c, attrs));
+      const parts = (arg as AuthzCondition[]).map((c) => evaluateCondition(c, attrs, options));
       if (parts.includes(true)) return true;
       return parts.includes("unknown") ? "unknown" : false;
     }
     case "not": {
-      const inner = evaluateCondition(arg, attrs);
+      const inner = evaluateCondition(arg, attrs, options);
       return inner === "unknown" ? "unknown" : !inner;
     }
     case "unknown":
       return "unknown";
     case "exists": {
-      const value = lookup(attrs, (arg as AuthzVar).var);
-      return value !== undefined && value !== null;
+      const path = (arg as AuthzVar).var;
+      const value = lookup(attrs, path);
+      if (value !== undefined && value !== null) return true;
+      return options.mayExistElsewhere?.(path) ? "unknown" : false;
     }
     default: {
       const values = (arg as AuthzOperand[]).map((o) =>
@@ -291,6 +314,9 @@ export function toSqlWhere(
   };
   const operand = (o: AuthzOperand) => (isVar(o) ? column(o) : bind(o));
   const list = (values: AuthzLiteral[]) => values.map(bind).join(", ");
+  // Nothing is in an empty list, but a NULL column is unknown, not false:
+  // otherwise a NOT around it would select rows with no value.
+  const empty = (o: AuthzOperand) => (isVar(o) ? `(${column(o)} IS NULL AND NULL)` : "FALSE");
 
   const node = (c: AuthzCondition): string => {
     const [op, arg] = Object.entries(c)[0] as [string, any];
@@ -309,12 +335,12 @@ export function toSqlWhere(
       case "in": {
         const [left, right] = arg;
         if (!Array.isArray(right)) throw new Error("in needs a list");
-        return right.length ? `(${operand(left)} IN (${list(right)}))` : "FALSE";
+        return right.length ? `(${operand(left)} IN (${list(right)}))` : empty(left);
       }
       case "contains": {
         const [left, right] = arg;
         if (Array.isArray(left)) {
-          return left.length ? `(${operand(right)} IN (${list(left)}))` : "FALSE";
+          return left.length ? `(${operand(right)} IN (${list(left)}))` : empty(right);
         }
         return `(strpos(${operand(left)}, ${operand(right)}) > 0)`;
       }

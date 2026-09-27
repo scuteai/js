@@ -29,24 +29,6 @@
         "verification_ttl": null,
         "requires_approval": false
       },
-      "invoice:read": {
-        "enabled": true,
-        "resource": "invoice",
-        "action": "read",
-        "requires_verification": false,
-        "verification_method": null,
-        "verification_ttl": null,
-        "requires_approval": false
-      },
-      "document:delete": {
-        "enabled": true,
-        "resource": "document",
-        "action": "delete",
-        "requires_verification": true,
-        "verification_method": "any",
-        "verification_ttl": 300,
-        "requires_approval": false
-      },
       "invoice:export": {
         "enabled": false,
         "resource": "invoice",
@@ -64,6 +46,24 @@
         "verification_method": null,
         "verification_ttl": null,
         "requires_approval": true
+      },
+      "invoice:read": {
+        "enabled": true,
+        "resource": "invoice",
+        "action": "read",
+        "requires_verification": false,
+        "verification_method": null,
+        "verification_ttl": null,
+        "requires_approval": false
+      },
+      "document:delete": {
+        "enabled": true,
+        "resource": "document",
+        "action": "delete",
+        "requires_verification": true,
+        "verification_method": "any",
+        "verification_ttl": 300,
+        "requires_approval": false
       },
       "reports.view": {
         "enabled": true,
@@ -543,6 +543,27 @@
       }
     },
     {
+      "name": "nobody reports.view {\"channel\":null}",
+      "roles": [
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "reports.view",
+      "resource": null,
+      "context": {
+        "channel": null
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "reports.view"
+      }
+    },
+    {
       "name": "nobody fly invoice {}",
       "roles": [
         "member"
@@ -958,6 +979,30 @@
       }
     },
     {
+      "name": "clerk_eu reports.view {\"channel\":null}",
+      "roles": [
+        "clerk",
+        "member"
+      ],
+      "user": {
+        "region": "eu",
+        "department": "finance",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "reports.view",
+      "resource": null,
+      "context": {
+        "channel": null
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "reports.view"
+      }
+    },
+    {
       "name": "clerk_eu fly invoice {}",
       "roles": [
         "clerk",
@@ -1361,6 +1406,30 @@
       "resource": null,
       "context": {
         "channel": "web"
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "condition_failed",
+        "permission": "reports.view"
+      }
+    },
+    {
+      "name": "regional_eu reports.view {\"channel\":null}",
+      "roles": [
+        "analyst",
+        "member",
+        "regional"
+      ],
+      "user": {
+        "region": "eu",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "reports.view",
+      "resource": null,
+      "context": {
+        "channel": null
       },
       "now": "2026-09-28T10:30:00Z",
       "expect": {
@@ -1791,6 +1860,30 @@
       }
     },
     {
+      "name": "editor reports.view {\"channel\":null}",
+      "roles": [
+        "analyst",
+        "editor",
+        "member"
+      ],
+      "user": {
+        "department": "sales",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "reports.view",
+      "resource": null,
+      "context": {
+        "channel": null
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "condition_failed",
+        "permission": "reports.view"
+      }
+    },
+    {
       "name": "editor fly invoice {}",
       "roles": [
         "analyst",
@@ -1799,6 +1892,405 @@
       ],
       "user": {
         "department": "sales",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "fly",
+      "resource": {
+        "type": "invoice"
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "unknown_permission",
+        "permission": "invoice:fly"
+      }
+    },
+    {
+      "name": "analyst_null read document {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "read",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "allow",
+        "reason": "role_grant",
+        "permission": "document:read",
+        "roles": [
+          "member"
+        ]
+      }
+    },
+    {
+      "name": "analyst_null edit document {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
+      }
+    },
+    {
+      "name": "analyst_null delete document {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "delete",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:delete"
+      }
+    },
+    {
+      "name": "analyst_null edit document {\"region\":\"eu\"} {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document",
+        "attributes": {
+          "region": "eu"
+        }
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
+      }
+    },
+    {
+      "name": "analyst_null edit document {\"region\":\"us\"} {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document",
+        "attributes": {
+          "region": "us"
+        }
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
+      }
+    },
+    {
+      "name": "analyst_null read invoice {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "read",
+      "resource": {
+        "type": "invoice"
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "invoice:read"
+      }
+    },
+    {
+      "name": "analyst_null pay invoice {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "pay",
+      "resource": {
+        "type": "invoice"
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "invoice:pay"
+      }
+    },
+    {
+      "name": "analyst_null export invoice {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "export",
+      "resource": {
+        "type": "invoice"
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "permission_disabled",
+        "permission": "invoice:export"
+      }
+    },
+    {
+      "name": "analyst_null approve invoice {\"amount\":4200} {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "approve",
+      "resource": {
+        "type": "invoice",
+        "attributes": {
+          "amount": 4200
+        }
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "invoice:approve"
+      }
+    },
+    {
+      "name": "analyst_null approve invoice {\"amount\":9000} {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "approve",
+      "resource": {
+        "type": "invoice",
+        "attributes": {
+          "amount": 9000
+        }
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "invoice:approve"
+      }
+    },
+    {
+      "name": "analyst_null approve invoice {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "approve",
+      "resource": {
+        "type": "invoice"
+      },
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "invoice:approve"
+      }
+    },
+    {
+      "name": "analyst_null view {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "view",
+      "resource": null,
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "unknown_permission",
+        "permission": "view"
+      }
+    },
+    {
+      "name": "analyst_null reports.view {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "reports.view",
+      "resource": null,
+      "context": {
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "condition_failed",
+        "permission": "reports.view"
+      }
+    },
+    {
+      "name": "analyst_null reports.view {\"channel\":\"api\"}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "reports.view",
+      "resource": null,
+      "context": {
+        "channel": "api"
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "condition_failed",
+        "permission": "reports.view"
+      }
+    },
+    {
+      "name": "analyst_null reports.view {\"channel\":\"web\"}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "reports.view",
+      "resource": null,
+      "context": {
+        "channel": "web"
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "condition_failed",
+        "permission": "reports.view"
+      }
+    },
+    {
+      "name": "analyst_null reports.view {\"channel\":null}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "reports.view",
+      "resource": null,
+      "context": {
+        "channel": null
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "condition_failed",
+        "permission": "reports.view"
+      }
+    },
+    {
+      "name": "analyst_null fly invoice {}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
         "status": "active",
         "identity_verified": false
       },

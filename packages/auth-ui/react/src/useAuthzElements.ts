@@ -162,18 +162,29 @@ export function useElementDecisionLog(
   const [pages, setPages] = useState<ElementDecision[][]>([]);
   const [next, setNext] = useState<string | undefined>();
   const first = useLoader(() => api.decisions(filters), [api, filters.userId, filters.decision]);
+  // One page in flight at a time, and a page answered for older filters is dropped.
+  const inFlight = useRef<string | null>(null);
+  const generation = useRef(0);
 
   useEffect(() => {
+    generation.current += 1;
+    inFlight.current = null;
     setPages(first.data ? [first.data.decisions] : []);
     setNext(first.data?.next as string | undefined);
   }, [first.data]);
 
   const loadMore = useCallback(async () => {
-    if (!next) return;
-    const { data } = await api.decisions({ ...filters, before: next });
-    if (!data) return;
-    setPages((p) => [...p, data.decisions]);
-    setNext(data.next as string | undefined);
+    if (!next || inFlight.current === next) return;
+    inFlight.current = next;
+    const asked = generation.current;
+    try {
+      const { data } = await api.decisions({ ...filters, before: next });
+      if (!data || asked !== generation.current) return;
+      setPages((p) => [...p, data.decisions]);
+      setNext(data.next as string | undefined);
+    } finally {
+      if (inFlight.current === next) inFlight.current = null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, next, filters.userId, filters.decision]);
 

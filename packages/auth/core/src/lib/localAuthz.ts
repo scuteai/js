@@ -89,9 +89,11 @@ const decision = (
 });
 
 export function decideLocally(policy: AuthzPolicy, check: LocalCheck): LocalDecision {
-  const { type, key, attributes } = parseResource(check.resource);
+  const parsed = parseResource(check.resource);
+  const { key, attributes } = parsed;
+  const type = parsed.type?.trim().toLowerCase();
   const action = check.action.trim().toLowerCase();
-  const slug = type ? `${type.trim().toLowerCase()}:${action}` : action;
+  const slug = type ? `${type}:${action}` : action;
   const perm = policy.permissions[slug];
   if (!perm) return decision("deny", "unknown_permission", slug);
   if (!perm.enabled) return decision("deny", "permission_disabled", slug);
@@ -117,13 +119,19 @@ export function decideLocally(policy: AuthzPolicy, check: LocalCheck): LocalDeci
     },
   };
 
+  // Unless strict, an attribute the caller didn't pass may still exist on
+  // the server (the user's stored meta, a known object's attributes): an
+  // `exists` on it is unknown here, never a local answer.
+  const mayExistElsewhere = (path: string) =>
+    !check.strict && (path.startsWith("user.") || (!!key && path.startsWith("resource.")));
+
   let failed = false;
   let unknown = false;
   const unconditional = granting.filter((r) => !conditionOf(r));
   const passing = unconditional.length
     ? unconditional
     : granting.filter((r) => {
-        const result = evaluateCondition(conditionOf(r)!, attrs);
+        const result = evaluateCondition(conditionOf(r)!, attrs, { mayExistElsewhere });
         if (result === "unknown") unknown = true;
         if (result !== true) failed = true;
         return result === true;

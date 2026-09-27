@@ -194,6 +194,16 @@ describe("toSqlWhere", () => {
     const { sql } = toSqlWhere({ eq: [v("resource.team"), "ops"] }, { columns: { team: "team" }, placeholder: () => "?" });
     expect(sql).toBe("(team = ?)");
     expect(toSqlWhere("all", { columns: {} }).sql).toBe("TRUE");
-    expect(toSqlWhere({ in: [v("resource.key"), []] }, { columns: { key: "id" } }).sql).toBe("FALSE");
+    expect(toSqlWhere({ in: [v("resource.key"), []] }, { columns: { key: "id" } }).sql).toBe("(id IS NULL AND NULL)");
+  });
+
+  it("keeps rows with no value out of NOT over an empty list (like matchesFilter)", () => {
+    const filter = { not: { in: [v("resource.region"), []] } } as const;
+    const { sql } = toSqlWhere(filter as never, { columns: { region: "region" } });
+
+    // FALSE for a value, NULL (unknown) for no value: NOT of NULL selects nothing.
+    expect(sql).toBe("(NOT (region IS NULL AND NULL))");
+    expect(matchesFilter(filter as never, { region: null })).toBe(false);
+    expect(matchesFilter(filter as never, { region: "eu" })).toBe(true);
   });
 });
