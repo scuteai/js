@@ -9,7 +9,8 @@
         "requires_verification": false,
         "verification_method": null,
         "verification_ttl": null,
-        "requires_approval": false
+        "requires_approval": false,
+        "autonomous_allowed": false
       },
       "document:read": {
         "enabled": true,
@@ -18,7 +19,8 @@
         "requires_verification": false,
         "verification_method": null,
         "verification_ttl": null,
-        "requires_approval": false
+        "requires_approval": false,
+        "autonomous_allowed": false
       },
       "invoice:approve": {
         "enabled": true,
@@ -27,7 +29,8 @@
         "requires_verification": false,
         "verification_method": null,
         "verification_ttl": null,
-        "requires_approval": false
+        "requires_approval": false,
+        "autonomous_allowed": false
       },
       "invoice:export": {
         "enabled": false,
@@ -36,7 +39,8 @@
         "requires_verification": false,
         "verification_method": null,
         "verification_ttl": null,
-        "requires_approval": false
+        "requires_approval": false,
+        "autonomous_allowed": false
       },
       "invoice:pay": {
         "enabled": true,
@@ -45,7 +49,8 @@
         "requires_verification": false,
         "verification_method": null,
         "verification_ttl": null,
-        "requires_approval": true
+        "requires_approval": true,
+        "autonomous_allowed": false
       },
       "invoice:read": {
         "enabled": true,
@@ -54,7 +59,8 @@
         "requires_verification": false,
         "verification_method": null,
         "verification_ttl": null,
-        "requires_approval": false
+        "requires_approval": false,
+        "autonomous_allowed": false
       },
       "document:delete": {
         "enabled": true,
@@ -63,7 +69,8 @@
         "requires_verification": true,
         "verification_method": "any",
         "verification_ttl": 300,
-        "requires_approval": false
+        "requires_approval": false,
+        "autonomous_allowed": false
       },
       "reports.view": {
         "enabled": true,
@@ -72,7 +79,8 @@
         "requires_verification": false,
         "verification_method": null,
         "verification_ttl": null,
-        "requires_approval": false
+        "requires_approval": false,
+        "autonomous_allowed": false
       }
     },
     "roles": {

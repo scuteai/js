@@ -1,0 +1,54 @@
+{
+  "name": "@scute/harness",
+  "version": "0.1.0",
+  "description": "Guardrails for the agents you build: permissions, verification, approvals, grounding and budgets from Scute, on the agent framework you already use.",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "ai",
+    "guardrails",
+    "authorization",
+    "human-in-the-loop",
+    "ai-sdk",
+    "scute"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scuteai/js.git",
+    "directory": "packages/harness"
+  },
+  "publishConfig": {},
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "@scute/tsconfig": "workspace:*",
+    "@types/node": "^18.0.0",
+    "ai": "7.0.118",
+    "tsup": "^8.1.0",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.8",
+    "zod": "^4.1.8"
+  }
+}
