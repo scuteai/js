@@ -48,6 +48,16 @@ describe("useCan", () => {
     expect(result.current.allowed).toBe(false);
   });
 
+  it("reports approval as not allowed yet", async () => {
+    const can = vi.fn(async () => ({ data: decision("allow_with_approval"), error: null }));
+    const { client, result } = setup(() => useCan("pay", "invoice:9"), { can });
+
+    signIn(client);
+
+    await waitFor(() => expect(result.current.needsApproval).toBe(true));
+    expect(result.current.allowed).toBe(false);
+  });
+
   it("keeps the newest answer when checks overlap", async () => {
     const first = deferred<any>();
     const can = vi

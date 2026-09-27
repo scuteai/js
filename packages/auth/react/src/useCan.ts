@@ -15,6 +15,8 @@ export type UseCanResult = {
   allowed: boolean;
   /** The permission needs a fresh verification first (see decision.step_up). */
   needsStepUp: boolean;
+  /** The permission needs a reviewer's approval first (see decision.approval). */
+  needsApproval: boolean;
   decision: AuthzDecision | null;
   loading: boolean;
   error: ScuteError;
@@ -71,6 +73,7 @@ export function useCan(
   return {
     allowed: decision?.decision === "allow",
     needsStepUp: decision?.decision === "allow_with_step_up",
+    needsApproval: decision?.decision === "allow_with_approval",
     decision,
     loading,
     error,

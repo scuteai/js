@@ -15,6 +15,8 @@ import type {
 import type { ScuteAdminApiConfig } from "./lib/types/config";
 import type { UniqueIdentifier } from "./lib/types/general";
 import type {
+  AuthzAccessRequest,
+  AuthzAccessRequestInput,
   AuthzCheck,
   AuthzDecision,
   AuthzPermissions,
@@ -308,9 +310,11 @@ class ScuteAdminApi extends ScuteBaseHttp {
 
   /**
    * Check one permission. Pass `challenge` (a completed step-up challenge's
-   * token) to satisfy a permission that answered `allow_with_step_up`.
+   * token) to satisfy `allow_with_step_up`, and `approval` (an approved
+   * request's id) to satisfy `allow_with_approval`. An approval is spent
+   * when the answer is `allow`.
    */
-  async authzCheck(params: AuthzCheck & { userId: UniqueIdentifier; challenge?: string }) {
+  async authzCheck(params: AuthzCheck & { userId: UniqueIdentifier; challenge?: string; approval?: UniqueIdentifier }) {
     const { userId, ...rest } = params;
     return this.post<AuthzDecision>(
       `${this._authPath}/authz/check`,
@@ -320,7 +324,9 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   /** Up to 100 checks, for any users of the app, in one call. */
-  async authzCheckBatch(checks: (AuthzCheck & { userId: UniqueIdentifier; challenge?: string })[]) {
+  async authzCheckBatch(
+    checks: (AuthzCheck & { userId: UniqueIdentifier; challenge?: string; approval?: UniqueIdentifier })[]
+  ) {
     const { data, error } = await this.post<{ results: AuthzDecision[] }>(
       `${this._authPath}/authz/check-batch`,
       { checks: checks.map(({ userId, ...rest }) => ({ user_id: userId, ...rest })) },
@@ -394,6 +400,45 @@ class ScuteAdminApi extends ScuteBaseHttp {
     return this.post<{ challenge: { token: string; status: string; method: string; expires_at: string } }>(
       `${this._authPath}/challenges`,
       { purpose: "step_up", method, app_user_id: params.userId, metadata: { authorizes_action: permission } },
+      this._authorizationHeader
+    );
+  }
+
+  /** Access requests: list (optionally by status or user). */
+  async authzRequests(params: { status?: AuthzAccessRequest["status"]; userId?: UniqueIdentifier } = {}) {
+    const query = new URLSearchParams();
+    if (params.status) query.set("status", params.status);
+    if (params.userId) query.set("user_id", String(params.userId));
+    const qs = query.toString() ? `?${query}` : "";
+    const { data, error } = await this.get<{ requests: AuthzAccessRequest[] }>(
+      `${this._appsPath}/authz/requests${qs}`,
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.requests, error: null };
+  }
+
+  /** File a request for a user (a role, or approval for one operation). */
+  async authzCreateRequest(userId: UniqueIdentifier, input: AuthzAccessRequestInput) {
+    return this.post<AuthzAccessRequest>(
+      `${this._appsPath}/authz/requests`,
+      { user_id: userId, ...input },
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Approve or deny a request. Pass `reviewerId` when a user decides through
+   * your UI (they must be a reviewer, and never the requester); without it
+   * the decision is your backend's.
+   */
+  async authzDecideRequest(
+    id: UniqueIdentifier,
+    verdict: "approve" | "deny",
+    options: { reviewerId?: UniqueIdentifier; note?: string } = {}
+  ) {
+    return this.post<AuthzAccessRequest>(
+      `${this._appsPath}/authz/requests/${encodeURIComponent(id)}/${verdict}`,
+      { reviewer_id: options.reviewerId, note: options.note },
       this._authorizationHeader
     );
   }

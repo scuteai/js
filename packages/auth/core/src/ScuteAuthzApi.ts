@@ -10,7 +10,7 @@ export type AuthzResource =
   | { type: string; key?: string; attributes?: Record<string, unknown> };
 
 export type AuthzDecision = {
-  decision: "allow" | "deny" | "allow_with_step_up";
+  decision: "allow" | "deny" | "allow_with_step_up" | "allow_with_approval";
   /** true only for "allow". A step-up answer is false until verified. */
   allowed: boolean;
   reason: string;
@@ -32,8 +32,38 @@ export type AuthzDecision = {
     error?: string;
     detail?: string;
   };
+  /**
+   * Present when the permission needs a reviewer's approval. The user files
+   * a request (scute.authz.requestAccess); once approved, your backend
+   * checks again with `approval: <request id>`. Each approval works once.
+   */
+  approval?: { permission: string; resource?: string; error?: string };
   explanation?: string;
 };
+
+export type AuthzAccessRequest = {
+  id: UniqueIdentifier;
+  kind: "role" | "operation";
+  user_id: UniqueIdentifier;
+  status: "pending" | "approved" | "denied" | "cancelled" | "expired" | "used";
+  role?: string;
+  resource_role?: string;
+  resource?: string;
+  permission?: string;
+  reason?: string;
+  duration_seconds?: number;
+  expires_at: string;
+  decided_at?: string;
+  decided_by?: string;
+  decision_note?: string;
+  used_at?: string;
+  created_at: string;
+};
+
+/** A role (app-wide, or on one object with `resource`), or approval for one operation. */
+export type AuthzAccessRequestInput =
+  | { role: string; resource?: string; duration?: number; reason?: string }
+  | { action: string; resource?: AuthzResource; reason?: string };
 
 export type AuthzCheck = {
   action: string;
@@ -105,6 +135,52 @@ class ScuteAuthzApi extends ScuteBaseHttp {
       await this.authHeaders()
     );
     return error ? { data: null, error } : { data: data.results, error: null };
+  }
+
+  // ── Access requests (the app must allow them: authz settings `access_requests`) ──
+
+  /** Ask for a role, or for approval of one operation. */
+  async requestAccess(input: AuthzAccessRequestInput) {
+    return this.post<AuthzAccessRequest>(`${this.path}/requests`, input, await this.authHeaders());
+  }
+
+  /** The signed-in user's own requests. */
+  async myRequests(status?: AuthzAccessRequest["status"]) {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    const { data, error } = await this.get<{ requests: AuthzAccessRequest[] }>(
+      `${this.path}/requests${query}`,
+      await this.authHeaders()
+    );
+    return error ? { data: null, error } : { data: data.requests, error: null };
+  }
+
+  async cancelRequest(id: UniqueIdentifier) {
+    return this.delete(`${this.path}/requests/${encodeURIComponent(id)}`, await this.authHeaders());
+  }
+
+  /** Pending requests the signed-in user may review (empty if they aren't a reviewer). */
+  async reviews() {
+    const { data, error } = await this.get<{ requests: AuthzAccessRequest[] }>(
+      `${this.path}/reviews`,
+      await this.authHeaders()
+    );
+    return error ? { data: null, error } : { data: data.requests, error: null };
+  }
+
+  async approveRequest(id: UniqueIdentifier, note?: string) {
+    return this.post<AuthzAccessRequest>(
+      `${this.path}/reviews/${encodeURIComponent(id)}/approve`,
+      { note },
+      await this.authHeaders()
+    );
+  }
+
+  async denyRequest(id: UniqueIdentifier, note?: string) {
+    return this.post<AuthzAccessRequest>(
+      `${this.path}/reviews/${encodeURIComponent(id)}/deny`,
+      { note },
+      await this.authHeaders()
+    );
   }
 
   /** Everything the signed-in user can do, app-wide or on one object. */

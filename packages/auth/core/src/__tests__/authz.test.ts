@@ -56,6 +56,21 @@ describe("scute.authz (signed-in user)", () => {
     expect(server.calls[0].query.get("resource")).toBe("document:42");
   });
 
+  it("files, lists and reviews access requests with the session token", async () => {
+    server.on("POST", `/v1/auth/${APP_ID}/authz/me/requests`, { status: 201, body: { id: "req_1", status: "pending" } });
+    server.on("GET", `/v1/auth/${APP_ID}/authz/me/reviews`, { body: { requests: [{ id: "req_2", status: "pending" }] } });
+    server.on("POST", `/v1/auth/${APP_ID}/authz/me/reviews/req_2/deny`, { body: { id: "req_2", status: "denied" } });
+
+    const created = await api().requestAccess({ action: "pay", resource: "invoice:9", reason: "vendor call" });
+    const reviews = await api().reviews();
+    const denied = await api().denyRequest("req_2", "not this quarter");
+
+    expect(created.data?.id).toBe("req_1");
+    expect(reviews.data?.map((r) => r.id)).toEqual(["req_2"]);
+    expect(denied.data?.status).toBe("denied");
+    expect(server.calls.every((c) => c.headers["x-authorization"] === "access.jwt")).toBe(true);
+  });
+
   it("surfaces the API's refusal when client checks are off", async () => {
     server.on("POST", `/v1/auth/${APP_ID}/authz/me/check`, {
       status: 403,
@@ -125,6 +140,20 @@ describe("ScuteAdminApi authorization helpers (server)", () => {
       app_user_id: "u1",
       metadata: { authorizes_action: "invoice:delete" },
     });
+  });
+
+  it("passes an approval through and manages requests", async () => {
+    server.on("POST", `/v1/auth/${APP_ID}/authz/check`, { body: allow });
+    server.on("POST", `/v1/apps/${APP_ID}/authz/requests`, { status: 201, body: { id: "req_1", status: "pending" } });
+    server.on("POST", `/v1/apps/${APP_ID}/authz/requests/req_1/approve`, { body: { id: "req_1", status: "approved" } });
+
+    await admin().authzCheck({ userId: "u1", action: "pay", resource: "invoice:9", approval: "req_1" });
+    await admin().authzCreateRequest("u1", { role: "auditor", duration: 3600 });
+    await admin().authzDecideRequest("req_1", "approve", { reviewerId: "u2", note: "ok" });
+
+    expect(server.calls[0].body).toMatchObject({ approval: "req_1" });
+    expect(server.calls[1].body).toEqual({ user_id: "u1", role: "auditor", duration: 3600 });
+    expect(server.calls[2].body).toEqual({ reviewer_id: "u2", note: "ok" });
   });
 
   it("needs a method when the decision allows any", async () => {

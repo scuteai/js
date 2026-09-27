@@ -18,6 +18,8 @@ export {
 };
 
 export type {
+  AuthzAccessRequest,
+  AuthzAccessRequestInput,
   AuthzDecision,
   AuthzCheck,
   AuthzPermissions,
