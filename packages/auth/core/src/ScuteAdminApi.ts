@@ -14,6 +14,12 @@ import type {
 } from "./lib/types/scute";
 import type { ScuteAdminApiConfig } from "./lib/types/config";
 import type { UniqueIdentifier } from "./lib/types/general";
+import type {
+  AuthzCheck,
+  AuthzDecision,
+  AuthzPermissions,
+} from "./ScuteAuthzApi";
+import type { AuthzFilter } from "./lib/authzFilter";
 
 class ScuteAdminApi extends ScuteBaseHttp {
   protected appId: UniqueIdentifier;
@@ -291,6 +297,104 @@ class ScuteAdminApi extends ScuteBaseHttp {
       {
         ...this._authorizationHeader,
       }
+    );
+  }
+
+  // ── Authorization (server side) ──
+  //
+  // "May this user do this?" from your backend. The browser can ask about
+  // itself (scute.authz.can); the decision that guards a real action belongs
+  // here, and this is where a step-up verification is redeemed.
+
+  /**
+   * Check one permission. Pass `challenge` (a completed step-up challenge's
+   * token) to satisfy a permission that answered `allow_with_step_up`.
+   */
+  async authzCheck(params: AuthzCheck & { userId: UniqueIdentifier; challenge?: string }) {
+    const { userId, ...rest } = params;
+    return this.post<AuthzDecision>(
+      `${this._authPath}/authz/check`,
+      { user_id: userId, ...rest },
+      this._authorizationHeader
+    );
+  }
+
+  /** Up to 100 checks, for any users of the app, in one call. */
+  async authzCheckBatch(checks: (AuthzCheck & { userId: UniqueIdentifier; challenge?: string })[]) {
+    const { data, error } = await this.post<{ results: AuthzDecision[] }>(
+      `${this._authPath}/authz/check-batch`,
+      { checks: checks.map(({ userId, ...rest }) => ({ user_id: userId, ...rest })) },
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.results, error: null };
+  }
+
+  /** Roles and permissions a user holds, app-wide or on one object ("document:42"). */
+  async authzUserPermissions(userId: UniqueIdentifier, options: { resource?: string } = {}) {
+    const query = options.resource ? `?resource=${encodeURIComponent(options.resource)}` : "";
+    return this.get<AuthzPermissions>(
+      `${this._authPath}/authz/users/${encodeURIComponent(userId)}/permissions${query}`,
+      this._authorizationHeader
+    );
+  }
+
+  /** Who may do this (paged). `everyone` is true when a default role grants it. */
+  async authzAuthorizedUsers(params: { action: string; resource?: string; limit?: number; offset?: number }) {
+    const query = new URLSearchParams({ action: params.action });
+    if (params.resource) query.set("resource", params.resource);
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.offset) query.set("offset", String(params.offset));
+    return this.get<{
+      permission: string;
+      everyone: boolean;
+      total: number;
+      users: { id: UniqueIdentifier; email?: string; phone?: string }[];
+      resource?: string;
+      conditions?: { role: string; when: string }[];
+    }>(`${this._authPath}/authz/authorized-users?${query}`, this._authorizationHeader);
+  }
+
+  /**
+   * A data filter for lists: "all", "none" or a condition over your own
+   * fields. Turn it into a query with toPrismaWhere or toSqlWhere.
+   */
+  async authzFilter(params: {
+    userId: UniqueIdentifier;
+    action: string;
+    resourceType: string;
+    context?: Record<string, unknown>;
+  }) {
+    return this.post<{ permission: string; filter: AuthzFilter; step_up?: boolean; truncated?: boolean }>(
+      `${this._authPath}/authz/filter`,
+      { user_id: params.userId, action: params.action, resource_type: params.resourceType, context: params.context },
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Start the verification a step-up permission asks for: a challenge for
+   * the user, bound to the permission. When the user has completed it, call
+   * authzCheck again with `challenge: <token>`.
+   *
+   * `method` defaults to the one the decision asks for; pass one when the
+   * decision allows any (e.g. "entra_push", "email_otp", "sms_otp").
+   */
+  async authzStartStepUp(params: {
+    userId: UniqueIdentifier;
+    decision?: AuthzDecision;
+    permission?: string;
+    method?: string;
+  }) {
+    const permission = params.permission ?? params.decision?.step_up?.authorizes_action ?? params.decision?.permission;
+    const asked = params.decision?.step_up?.method;
+    const method = params.method ?? (asked && asked !== "any" ? asked : undefined);
+    if (!permission || !method) {
+      throw new Error("authzStartStepUp needs a permission (or decision) and a method");
+    }
+    return this.post<{ challenge: { token: string; status: string; method: string; expires_at: string } }>(
+      `${this._authPath}/challenges`,
+      { purpose: "step_up", method, app_user_id: params.userId, metadata: { authorizes_action: permission } },
+      this._authorizationHeader
     );
   }
 

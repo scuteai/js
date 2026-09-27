@@ -2,6 +2,7 @@ import mitt, { type Emitter, type Handler } from "mitt";
 
 import ScuteAdminApi from "./ScuteAdminApi";
 import ScuteVerifyApi from "./ScuteVerifyApi";
+import ScuteAuthzApi from "./ScuteAuthzApi";
 import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
 import { ScuteSession, sessionUnAuthenticatedState } from "./lib/ScuteSession";
 import {
@@ -115,6 +116,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   readonly admin: ScuteAdminApi;
   readonly verifications: ScuteVerifyApi;
+  /** Permission checks for the signed-in user (can, canMany, permissions). */
+  readonly authz: ScuteAuthzApi;
 
   protected readonly scuteStorage: ScuteStorage | ScuteCookieStorage;
   protected readonly emitter: Emitter<InternalEvent>;
@@ -208,6 +211,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     });
 
     this.verifications = new ScuteVerifyApi({
+      appId,
+      baseUrl,
+      errorReporting,
+      getAccessToken: async () => {
+        const { data } = await this.getAuthToken();
+        return data?.access ?? null;
+      },
+    });
+
+    this.authz = new ScuteAuthzApi({
       appId,
       baseUrl,
       errorReporting,

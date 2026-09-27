@@ -1,6 +1,7 @@
 import ScuteClient, { createClient } from "./ScuteClient";
 import ScuteAdminApi from "./ScuteAdminApi";
 import ScuteVerifyApi from "./ScuteVerifyApi";
+import ScuteAuthzApi from "./ScuteAuthzApi";
 import ScuteBrowserCookieStorage from "./lib/ScuteBrowserCookieStorage";
 import { ScuteCookieStorage } from "./lib/ScuteStorage";
 
@@ -9,11 +10,31 @@ export * from "./lib/errors";
 export {
   ScuteAdminApi,
   ScuteVerifyApi,
+  ScuteAuthzApi,
   ScuteClient,
   createClient,
   ScuteCookieStorage,
   ScuteBrowserCookieStorage,
 };
+
+export type {
+  AuthzDecision,
+  AuthzCheck,
+  AuthzPermissions,
+  AuthzResource,
+} from "./ScuteAuthzApi";
+export {
+  evaluateCondition,
+  matchesFilter,
+  toPrismaWhere,
+  toSqlWhere,
+} from "./lib/authzFilter";
+export type {
+  AuthzCondition,
+  AuthzFilter,
+  PrismaWhereOptions,
+  SqlWhereOptions,
+} from "./lib/authzFilter";
 
 export type {
   Verification,
