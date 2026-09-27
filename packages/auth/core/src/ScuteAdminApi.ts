@@ -279,7 +279,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async listUserSessions(id: UniqueIdentifier) {
     return this.get<ScuteUserSession[]>(
-      `${this._appsPath}/users/${encodeURIComponent(id)}/sessions`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}/sessions`,
       {
         ...this._authorizationHeader,
       }
