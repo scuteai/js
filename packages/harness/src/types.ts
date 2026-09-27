@@ -26,6 +26,8 @@ export type EngineDecision = {
   approval?: { permission?: string; resource?: string; error?: string };
   agent?: { agent: string; task: string; chain: string[]; roles: string[] };
   explanation?: string;
+  /** A line for the person, when the answer isn't a plain allow. */
+  say?: string;
 };
 
 export type Decision = {
@@ -34,6 +36,8 @@ export type Decision = {
   reason?: string;
   /** Words for the model (guide, deny, redirect) or for the person (verify, approve). */
   message?: string;
+  /** A line for the person (voice or chat), when there's something to tell them. */
+  say?: string;
   /** transform: the arguments the tool runs with instead. */
   args?: Record<string, unknown>;
   /** From an after-guard: what the model sees instead of the tool's result. */
@@ -61,6 +65,8 @@ export interface Guard {
   name: string;
   /** Overrides the harness mode for this guard. */
   mode?: Mode;
+  /** Evaluate after the other guards (for guards that spend single-use proofs). */
+  runsLast?: boolean;
   before?(call: ToolCall): Decision | void | Promise<Decision | void>;
   after?(call: ToolCall, result: unknown): Decision | void | Promise<Decision | void>;
 }
@@ -72,7 +78,11 @@ export type ToolConfig = {
   tier?: Tier;
   /** The argument that names the object (default: `<type>_id`, `<type>Id`, then `id`). */
   key?: string;
-  /** Attributes for policy conditions. Default: the call's plain (string, number, boolean) arguments. */
+  /**
+   * The object's attributes for policy conditions, from the arguments. Off
+   * by default: arguments go to the engine as `context.args`, and attributes
+   * Scute stores for the object always win over these.
+   */
   attributes?: (args: Args) => Record<string, unknown>;
   /** Build the resource yourself. */
   resource?: (args: Args) => Resource | undefined;
@@ -107,6 +117,8 @@ export interface ToolCall {
   readonly approvedByUser: boolean;
   /** The mode of the guard looking at the call. Side effects (sending a push, filing a request) belong in enforce only. */
   readonly mode: Mode;
+  /** No guard so far stops the call: the moment to spend single-use proofs (an approval, a challenge). */
+  readonly clear: boolean;
   readonly run: Run;
   proceed(): Decision;
   deny(message: string, reason?: string): Decision;
@@ -133,6 +145,8 @@ export type Verdict = {
   args: Args;
   /** What to tell the model when the call doesn't run. */
   message?: string;
+  /** What to tell the person, when there's something to tell them. */
+  say?: string;
   results: GuardResult[];
   callId: string;
   tool: string;
