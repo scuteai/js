@@ -3,6 +3,7 @@ import ScuteAdminApi from "./ScuteAdminApi";
 import ScuteVerifyApi from "./ScuteVerifyApi";
 import ScuteAuthzApi from "./ScuteAuthzApi";
 import ScuteElementsApi from "./ScuteElementsApi";
+import ScuteLocalAuthz from "./ScuteLocalAuthz";
 import ScuteBrowserCookieStorage from "./lib/ScuteBrowserCookieStorage";
 import { ScuteCookieStorage } from "./lib/ScuteStorage";
 
@@ -13,6 +14,7 @@ export {
   ScuteVerifyApi,
   ScuteAuthzApi,
   ScuteElementsApi,
+  ScuteLocalAuthz,
   ScuteClient,
   createClient,
   ScuteCookieStorage,
@@ -33,6 +35,9 @@ export type {
   AuthzPermissions,
   AuthzResource,
 } from "./ScuteAuthzApi";
+export { decideLocally, verifySnapshotToken, decodeSnapshotToken } from "./lib/localAuthz";
+export type { AuthzPolicy, LocalCheck, LocalDecision, SnapshotClaims } from "./lib/localAuthz";
+export type { ScuteLocalAuthzOptions } from "./ScuteLocalAuthz";
 export {
   evaluateCondition,
   matchesFilter,

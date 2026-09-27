@@ -404,6 +404,17 @@ class ScuteAdminApi extends ScuteBaseHttp {
     );
   }
 
+  /**
+   * The app's policy as a signed snapshot (RS256 JWS; keys at
+   * /v1/auth/:app_id/jwks) for local decisions. See ScuteLocalAuthz.
+   */
+  async authzSnapshot() {
+    return this.get<{ version: number; token: string; expires_at: string; jwks: string }>(
+      `${this._appsPath}/authz/snapshot`,
+      this._authorizationHeader
+    );
+  }
+
   /** Access requests: list (optionally by status or user). */
   async authzRequests(params: { status?: AuthzAccessRequest["status"]; userId?: UniqueIdentifier } = {}) {
     const query = new URLSearchParams();
