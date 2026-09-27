@@ -16,9 +16,42 @@ import {
   SIGN_IN_HANDLER,
   SIGN_OUT_HANDLER,
 } from "./constants";
+import { decodeJwtPayload } from "../utils";
 
-// 30 seconds
+// Sign-in only accepts an access token issued within this window (30 seconds).
 const SIGN_IN_MAX_DELAY_MS = 30 * 1000;
+
+const getBearerToken = (headers: Headers) => {
+  const authorization = headers.get("Authorization");
+  return authorization?.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : null;
+};
+
+/**
+ * True when `token` is a decodable, unexpired access token issued within
+ * SIGN_IN_MAX_DELAY_MS of now. Scute access tokens carry `exp` but no `iat`,
+ * so the issue time falls back to `exp - access_expiration`.
+ */
+const isFreshAccessToken = (token: string, accessExpiration: unknown) => {
+  const claims = decodeJwtPayload(token);
+  if (!claims || !claims.uuid || typeof claims.exp !== "number") {
+    return false;
+  }
+
+  const issuedAt =
+    typeof claims.iat === "number"
+      ? claims.iat
+      : typeof accessExpiration === "number"
+      ? claims.exp - accessExpiration
+      : NaN;
+  const now = Date.now();
+
+  return (
+    claims.exp * 1000 > now &&
+    Math.abs(now - issuedAt * 1000) <= SIGN_IN_MAX_DELAY_MS
+  );
+};
 
 const internalHandler = async (
   scute: ScuteClient,
@@ -48,26 +81,31 @@ const internalHandler = async (
       return response;
     }
 
-    await scute["setSession"]({
-      access: headers.get("Authorization")?.split("Bearer ")?.[1],
-    });
+    const presented = getBearerToken(headers);
 
-    // sets refresh token http-only
-    const { data: session, error } = await scute.refreshSession();
+    // Start from a clean slate: session cookies already present for this
+    // app (namespaced or legacy) must never stand in for the presented token.
+    await scute["removeSession"]();
+
     const { data: appData } = await scute.getAppData();
 
     if (
-      error ||
-      !session?.access ||
+      !presented ||
       !appData ||
-      // if more than `SIGN_IN_MAX_DELAY_MS` passed after sign in
-      // it may be an attack, so do not allow
-      session.accessExpiresAt.getTime() -
-        (new Date().getTime() + appData.access_expiration * 1000) >
-        SIGN_IN_MAX_DELAY_MS
+      !isFreshAccessToken(presented, appData.access_expiration)
     ) {
-      await scute.signOut();
+      return new Response(null, {
+        status: 401,
+      });
+    }
 
+    // Exchange exactly the presented token; sets the refresh token http-only.
+    const { data: tokens, error } = await scute.admin.refreshWithAccess(
+      presented
+    );
+    const session = error ? null : await scute["setSession"](tokens);
+
+    if (!session?.access) {
       return new Response(null, {
         status: 401,
       });
@@ -102,6 +140,10 @@ const internalHandler = async (
 
     const response = new Response(token, {
       status: 200,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
     });
 
     setCsrfToken(token, response, appId);

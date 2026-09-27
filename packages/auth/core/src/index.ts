@@ -1,6 +1,9 @@
 import ScuteClient, { createClient } from "./ScuteClient";
 import ScuteAdminApi from "./ScuteAdminApi";
 import ScuteVerifyApi from "./ScuteVerifyApi";
+import ScuteAuthzApi from "./ScuteAuthzApi";
+import ScuteElementsApi from "./ScuteElementsApi";
+import ScuteLocalAuthz from "./ScuteLocalAuthz";
 import ScuteBrowserCookieStorage from "./lib/ScuteBrowserCookieStorage";
 import { ScuteCookieStorage } from "./lib/ScuteStorage";
 
@@ -9,11 +12,44 @@ export * from "./lib/errors";
 export {
   ScuteAdminApi,
   ScuteVerifyApi,
+  ScuteAuthzApi,
+  ScuteElementsApi,
+  ScuteLocalAuthz,
   ScuteClient,
   createClient,
   ScuteCookieStorage,
   ScuteBrowserCookieStorage,
 };
+
+export type {
+  ElementUser,
+  ElementRole,
+  ElementDecision,
+  ScuteElementsApiConfig,
+} from "./ScuteElementsApi";
+export type {
+  AuthzAccessRequest,
+  AuthzAccessRequestInput,
+  AuthzDecision,
+  AuthzCheck,
+  AuthzPermissions,
+  AuthzResource,
+} from "./ScuteAuthzApi";
+export { decideLocally, verifySnapshotToken, decodeSnapshotToken } from "./lib/localAuthz";
+export type { AuthzPolicy, LocalCheck, LocalDecision, SnapshotClaims } from "./lib/localAuthz";
+export type { ScuteLocalAuthzOptions } from "./ScuteLocalAuthz";
+export {
+  evaluateCondition,
+  matchesFilter,
+  toPrismaWhere,
+  toSqlWhere,
+} from "./lib/authzFilter";
+export type {
+  AuthzCondition,
+  AuthzFilter,
+  PrismaWhereOptions,
+  SqlWhereOptions,
+} from "./lib/authzFilter";
 
 export type {
   Verification,
@@ -36,6 +72,7 @@ export {
   accessTokenHeader,
   refreshTokenHeaders,
   decodeMagicLinkToken,
+  scrubAuthTokensFromUrl,
 } from "./lib/helpers";
 export type { CookieAttributes, UniqueIdentifier } from "./lib/types/general";
 export * from "./lib/types/scute";

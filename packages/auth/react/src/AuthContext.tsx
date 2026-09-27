@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  AUTH_CHANGE_EVENTS,
   ScuteClient,
   type Session,
   type ScuteUserData,
@@ -35,6 +36,22 @@ export type AuthSession = {
     }
 );
 
+// Events that carry the real session state: ScuteClient.onAuthStateChange
+// resolves the session for these before calling listeners. Every other event
+// (OTP_PENDING, MAGIC_PENDING, MFA_REQUIRED, WEBAUTHN_VERIFY_START, ...) is
+// delivered with an unauthenticated placeholder and a null user, so it must
+// not overwrite the session.
+const SESSION_EVENTS: readonly string[] = [
+  AUTH_CHANGE_EVENTS.INITIAL_SESSION,
+  AUTH_CHANGE_EVENTS.SESSION_REFETCH,
+  AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
+  AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
+  AUTH_CHANGE_EVENTS.SIGNED_IN,
+  AUTH_CHANGE_EVENTS.SIGNED_OUT,
+  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
+  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
+];
+
 const AuthContext = createContext<AuthSession | undefined>(undefined);
 const ScuteClientContext = createContext<ScuteClient | undefined>(undefined);
 
@@ -52,7 +69,8 @@ export const AuthContextProvider = ({
 
   useEffect(() => {
     const unsubscribe = scuteClient.onAuthStateChange(
-      async (_event, session, user) => {
+      async (event, session, user) => {
+        if (SESSION_EVENTS.indexOf(event) === -1) return;
         setSession(session);
         setUser(user);
       }
@@ -61,7 +79,8 @@ export const AuthContextProvider = ({
     return () => unsubscribe();
   }, [scuteClient]);
 
-  const isAuthenticated = session.status === "authenticated";
+  // The AuthSession type promises a user whenever isAuthenticated is true.
+  const isAuthenticated = session.status === "authenticated" && !!user;
   const isLoading = session.status === "loading";
 
   const authContextValue = {

@@ -14,6 +14,14 @@ import type {
 } from "./lib/types/scute";
 import type { ScuteAdminApiConfig } from "./lib/types/config";
 import type { UniqueIdentifier } from "./lib/types/general";
+import type {
+  AuthzAccessRequest,
+  AuthzAccessRequestInput,
+  AuthzCheck,
+  AuthzDecision,
+  AuthzPermissions,
+} from "./ScuteAuthzApi";
+import type { AuthzFilter } from "./lib/authzFilter";
 
 class ScuteAdminApi extends ScuteBaseHttp {
   protected appId: UniqueIdentifier;
@@ -99,7 +107,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async getUser(id: UniqueIdentifier) {
     return this.get<{ user: ScuteUserData | null }>(
-      `${this._v1Path}/users/${id}`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}`,
       this._authorizationHeader
     );
   }
@@ -122,7 +130,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async getUserByUserId(userId: UniqueIdentifier) {
     return this.get<{ user: ScuteUser | null }>(
-      `${this._authPath}/users?user_id=${userId}`
+      `${this._authPath}/users?user_id=${encodeURIComponent(userId)}`
     );
   }
 
@@ -162,7 +170,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async updateUser(id: UniqueIdentifier, data: any) {
     return this.patch<{ user: ScuteUserData }>(
-      `${this._v1Path}/users/${id}`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}`,
       data,
       this._authorizationHeader
     );
@@ -174,7 +182,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async activateUser(id: UniqueIdentifier) {
     return this.post<{ user: ScuteUserData }>(
-      `${this._v1Path}/users/${id}/activate`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}/activate`,
       null,
       this._authorizationHeader
     );
@@ -186,7 +194,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async deactivateUser(id: UniqueIdentifier) {
     return this.post<{ user: ScuteUserData }>(
-      `${this._v1Path}/users/${id}/deactivate`,
+      `${this._v1Path}/users/${encodeURIComponent(id)}/deactivate`,
       null,
       this._authorizationHeader
     );
@@ -215,7 +223,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    * @param id User ID
    */
   async deleteUser(id: UniqueIdentifier) {
-    return this.delete(`${this._v1Path}/users/${id}`, {
+    return this.delete(`${this._v1Path}/users/${encodeURIComponent(id)}`, {
       ...this._authorizationHeader,
     });
   }
@@ -268,7 +276,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
    */
   async listUserSessions(id: UniqueIdentifier) {
     return this.get<ScuteUserSession[]>(
-      `${this._appsPath}/users/${id}/sessions`,
+      `${this._appsPath}/users/${encodeURIComponent(id)}/sessions`,
       {
         ...this._authorizationHeader,
       }
@@ -285,10 +293,164 @@ class ScuteAdminApi extends ScuteBaseHttp {
     sessionId: UniqueIdentifier
   ) {
     return this.delete(
-      `${this._v1Path}/users/${userId}/sessions/${sessionId}`,
+      `${this._v1Path}/users/${encodeURIComponent(
+        userId
+      )}/sessions/${encodeURIComponent(sessionId)}`,
       {
         ...this._authorizationHeader,
       }
+    );
+  }
+
+  // ── Authorization (server side) ──
+  //
+  // "May this user do this?" from your backend. The browser can ask about
+  // itself (scute.authz.can); the decision that guards a real action belongs
+  // here, and this is where a step-up verification is redeemed.
+
+  /**
+   * Check one permission. Pass `challenge` (a completed step-up challenge's
+   * token) to satisfy `allow_with_step_up`, and `approval` (an approved
+   * request's id) to satisfy `allow_with_approval`. An approval is spent
+   * when the answer is `allow`.
+   */
+  async authzCheck(params: AuthzCheck & { userId: UniqueIdentifier; challenge?: string; approval?: UniqueIdentifier }) {
+    const { userId, ...rest } = params;
+    return this.post<AuthzDecision>(
+      `${this._authPath}/authz/check`,
+      { user_id: userId, ...rest },
+      this._authorizationHeader
+    );
+  }
+
+  /** Up to 100 checks, for any users of the app, in one call. */
+  async authzCheckBatch(
+    checks: (AuthzCheck & { userId: UniqueIdentifier; challenge?: string; approval?: UniqueIdentifier })[]
+  ) {
+    const { data, error } = await this.post<{ results: AuthzDecision[] }>(
+      `${this._authPath}/authz/check-batch`,
+      { checks: checks.map(({ userId, ...rest }) => ({ user_id: userId, ...rest })) },
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.results, error: null };
+  }
+
+  /** Roles and permissions a user holds, app-wide or on one object ("document:42"). */
+  async authzUserPermissions(userId: UniqueIdentifier, options: { resource?: string } = {}) {
+    const query = options.resource ? `?resource=${encodeURIComponent(options.resource)}` : "";
+    return this.get<AuthzPermissions>(
+      `${this._authPath}/authz/users/${encodeURIComponent(userId)}/permissions${query}`,
+      this._authorizationHeader
+    );
+  }
+
+  /** Who may do this (paged). `everyone` is true when a default role grants it. */
+  async authzAuthorizedUsers(params: { action: string; resource?: string; limit?: number; offset?: number }) {
+    const query = new URLSearchParams({ action: params.action });
+    if (params.resource) query.set("resource", params.resource);
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.offset) query.set("offset", String(params.offset));
+    return this.get<{
+      permission: string;
+      everyone: boolean;
+      total: number;
+      users: { id: UniqueIdentifier; email?: string; phone?: string }[];
+      resource?: string;
+      conditions?: { role: string; when: string }[];
+    }>(`${this._authPath}/authz/authorized-users?${query}`, this._authorizationHeader);
+  }
+
+  /**
+   * A data filter for lists: "all", "none" or a condition over your own
+   * fields. Turn it into a query with toPrismaWhere or toSqlWhere.
+   */
+  async authzFilter(params: {
+    userId: UniqueIdentifier;
+    action: string;
+    resourceType: string;
+    context?: Record<string, unknown>;
+  }) {
+    return this.post<{ permission: string; filter: AuthzFilter; step_up?: boolean; truncated?: boolean }>(
+      `${this._authPath}/authz/filter`,
+      { user_id: params.userId, action: params.action, resource_type: params.resourceType, context: params.context },
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Start the verification a step-up permission asks for: a challenge for
+   * the user, bound to the permission. When the user has completed it, call
+   * authzCheck again with `challenge: <token>`.
+   *
+   * `method` defaults to the one the decision asks for; pass one when the
+   * decision allows any (e.g. "entra_push", "email_otp", "sms_otp").
+   */
+  async authzStartStepUp(params: {
+    userId: UniqueIdentifier;
+    decision?: AuthzDecision;
+    permission?: string;
+    method?: string;
+  }) {
+    const permission = params.permission ?? params.decision?.step_up?.authorizes_action ?? params.decision?.permission;
+    const asked = params.decision?.step_up?.method;
+    const method = params.method ?? (asked && asked !== "any" ? asked : undefined);
+    if (!permission || !method) {
+      throw new Error("authzStartStepUp needs a permission (or decision) and a method");
+    }
+    return this.post<{ challenge: { token: string; status: string; method: string; expires_at: string } }>(
+      `${this._authPath}/challenges`,
+      { purpose: "step_up", method, app_user_id: params.userId, metadata: { authorizes_action: permission } },
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * The app's policy as a signed snapshot (RS256 JWS; keys at
+   * /v1/auth/:app_id/jwks) for local decisions. See ScuteLocalAuthz.
+   */
+  async authzSnapshot() {
+    return this.get<{ version: number; token: string; expires_at: string; jwks: string }>(
+      `${this._appsPath}/authz/snapshot`,
+      this._authorizationHeader
+    );
+  }
+
+  /** Access requests: list (optionally by status or user). */
+  async authzRequests(params: { status?: AuthzAccessRequest["status"]; userId?: UniqueIdentifier } = {}) {
+    const query = new URLSearchParams();
+    if (params.status) query.set("status", params.status);
+    if (params.userId) query.set("user_id", String(params.userId));
+    const qs = query.toString() ? `?${query}` : "";
+    const { data, error } = await this.get<{ requests: AuthzAccessRequest[] }>(
+      `${this._appsPath}/authz/requests${qs}`,
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.requests, error: null };
+  }
+
+  /** File a request for a user (a role, or approval for one operation). */
+  async authzCreateRequest(userId: UniqueIdentifier, input: AuthzAccessRequestInput) {
+    return this.post<AuthzAccessRequest>(
+      `${this._appsPath}/authz/requests`,
+      { user_id: userId, ...input },
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Approve or deny a request. Pass `reviewerId` when a user decides through
+   * your UI (they must be a reviewer, and never the requester); without it
+   * the decision is your backend's.
+   */
+  async authzDecideRequest(
+    id: UniqueIdentifier,
+    verdict: "approve" | "deny",
+    options: { reviewerId?: UniqueIdentifier; note?: string } = {}
+  ) {
+    return this.post<AuthzAccessRequest>(
+      `${this._appsPath}/authz/requests/${encodeURIComponent(id)}/${verdict}`,
+      { reviewer_id: options.reviewerId, note: options.note },
+      this._authorizationHeader
     );
   }
 

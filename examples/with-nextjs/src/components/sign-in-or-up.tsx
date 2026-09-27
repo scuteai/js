@@ -8,7 +8,7 @@ import {
   ScuteTokenPayload,
   useScuteClient,
 } from "@scute/react-hooks";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export default function SignInOrUp() {
@@ -239,7 +239,8 @@ const OtpForm = ({
       return;
     }
 
-    if (data) {
+    // MFA-required results carry no token; the MFA events take over then.
+    if (data && "authPayload" in data && data.authPayload) {
       setTokenPayload(data.authPayload);
       setComponent("register_device");
     }
@@ -266,48 +267,42 @@ export const RegisterDevice = ({
   scuteClient: ScuteClient;
   tokenPayload: ScuteTokenPayload | null;
 }) => {
-  const handleRegisterDevice = async () => {
-    if (!tokenPayload) {
-      console.error("No token payload");
-      return;
-    }
-    const { error: signInError } = await scuteClient.signInWithTokenPayload(
-      tokenPayload
-    );
-    if (signInError) {
-      console.log("signInWithTokenPayload error");
-      console.log({
-        signInError,
-        meaningfulError: getMeaningfulError(signInError),
+  const router = useRouter();
+  // Exchange the verified payload for a session right away: the Next.js
+  // handler only accepts a freshly issued token (30s), so don't wait for a click.
+  const exchange = useRef<Promise<boolean> | null>(null);
+  const signIn = () => {
+    if (!tokenPayload) return Promise.resolve(false);
+    if (!exchange.current) {
+      exchange.current = scuteClient.signInWithTokenPayload(tokenPayload).then(({ error: signInError }) => {
+        if (!signInError) return true;
+        console.log({ signInError, meaningfulError: getMeaningfulError(signInError) });
+        exchange.current = null;
+        return false;
       });
-      return;
     }
+    return exchange.current;
+  };
+
+  useEffect(() => {
+    signIn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenPayload]);
+
+  const handleRegisterDevice = async () => {
+    if (!(await signIn())) return;
     const { data, error } = await scuteClient.addDevice();
     if (error) {
       console.log("addDevice error");
       console.log({ data, error, meaningfulError: getMeaningfulError(error) });
       return;
     }
-    redirect("/profile");
+    router.push("/profile");
   };
 
   const handleSkipDeviceRegistration = async () => {
-    if (!tokenPayload) {
-      console.error("No token payload");
-      return;
-    }
-    const { error: signInError } = await scuteClient.signInWithTokenPayload(
-      tokenPayload
-    );
-    if (signInError) {
-      console.log("signInWithTokenPayload error");
-      console.log({
-        signInError,
-        meaningfulError: getMeaningfulError(signInError),
-      });
-      return;
-    }
-    redirect("/profile");
+    if (!(await signIn())) return;
+    router.push("/profile");
   };
 
   return (

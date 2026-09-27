@@ -2,12 +2,36 @@ import wretch, { type Wretch, type WretchError } from "wretch";
 import { retry } from "wretch/middlewares/retry";
 import {
   BaseHttpError,
+  SsoRequiredError,
   ErrorReport,
   NETWORK_ERROR_CODES,
   ScuteError,
 } from "./errors";
 import type { BaseResponse, UniqueIdentifier } from "./types/general";
-import { isBrowser } from "./helpers";
+import { isBrowser, scrubAuthTokensFromUrl } from "./helpers";
+import { _SCUTE_REFRESH_HEADER } from "./constants";
+
+/**
+ * Requests that present a refresh token are never replayed, so an ambiguous
+ * failure (502/503/504 or a dropped connection) cannot send the same refresh
+ * token twice. The session layer retries on its next refresh instead.
+ */
+const carriesRefreshToken = (opts: { headers?: HeadersInit } | undefined) => {
+  try {
+    return new Headers(opts?.headers).has(_SCUTE_REFRESH_HEADER);
+  } catch {
+    return false;
+  }
+};
+
+/** The page URL for an error report, without Scute's one-time sign-in tokens. */
+const reportLocation = () => {
+  try {
+    return scrubAuthTokensFromUrl(window.location.toString());
+  } catch {
+    return "";
+  }
+};
 
 export abstract class ScuteBaseHttp {
   protected wretcher: Wretch;
@@ -48,6 +72,7 @@ export abstract class ScuteBaseHttp {
           onRetry: undefined,
           retryOnNetworkError: true,
           resolveWithLatestResponse: true,
+          skip: (_url, opts) => carriesRefreshToken(opts),
         }),
       ])
       .errorType("json");
@@ -138,10 +163,13 @@ export abstract class ScuteBaseHttp {
 
   protected async delete(url: string, headers?: HeadersInit): BaseResponse {
     try {
+      // `.res()` waits for the response and rejects on an error status, so
+      // failures are mapped like the other verbs. The body is not parsed.
       await this.wretcher
         .url(url)
         .headers(headers as any)
-        .delete();
+        .delete()
+        .res();
       return { data: null, error: null };
     } catch (e) {
       const error = this._getErrorObject(e as WretchError);
@@ -167,7 +195,7 @@ export abstract class ScuteBaseHttp {
     }
 
     let errorData: ErrorReport = {
-      location: window.location.toString(),
+      location: reportLocation(),
       name: error.name,
       message: error.message,
       stack: error.stack,
@@ -196,6 +224,10 @@ export abstract class ScuteBaseHttp {
   private _getErrorObject(error: WretchError) {
     const message = this._getErrorMessage(error);
     const code = error.status;
+
+    if (code === 403 && error.json?.error_code === "sso_required") {
+      return new SsoRequiredError({ cause: error, message, json: error.json });
+    }
 
     return new BaseHttpError({
       cause: error,

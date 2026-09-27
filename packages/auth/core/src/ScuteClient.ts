@@ -2,11 +2,12 @@ import mitt, { type Emitter, type Handler } from "mitt";
 
 import ScuteAdminApi from "./ScuteAdminApi";
 import ScuteVerifyApi from "./ScuteVerifyApi";
+import ScuteAuthzApi from "./ScuteAuthzApi";
 import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
 import { ScuteSession, sessionUnAuthenticatedState } from "./lib/ScuteSession";
 import {
   ScuteCookieStorage,
-  ScuteMemoryStorage,
+  createMemoryStorage,
   ScuteStorage,
 } from "./lib/ScuteStorage";
 
@@ -26,7 +27,9 @@ import {
   decodeAccessToken,
   decodeMagicLinkToken,
   Deferred,
+  getLocalStorage,
   getMagicLinkTokenPayloadFromUser,
+  httpUrlOrUndefined,
   isBrowser,
   isMaybePhoneNumber,
   isWebauthnSupported,
@@ -113,6 +116,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   readonly admin: ScuteAdminApi;
   readonly verifications: ScuteVerifyApi;
+  /** Permission checks for the signed-in user (can, canMany, permissions). */
+  readonly authz: ScuteAuthzApi;
 
   protected readonly scuteStorage: ScuteStorage | ScuteCookieStorage;
   protected readonly emitter: Emitter<InternalEvent>;
@@ -127,9 +132,11 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   protected initializeDeferred: Deferred<{ error: ScuteError | null }> | null =
     null;
-  protected getCurrentUserDeferred: Deferred<
-    Awaited<ReturnType<ScuteClient["_getCurrentUser"]>>
-  > | null = null;
+  /** In-flight /current_user requests, keyed by access token. */
+  protected getCurrentUserInFlight = new Map<
+    string,
+    ReturnType<ScuteClient["_getCurrentUser"]>
+  >();
 
   constructor(config: ScuteClientConfig) {
     const baseUrl = config.baseUrl || "https://api.scute.io";
@@ -182,17 +189,19 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         DEFAULT_PREFERENCES.refetchInverval,
     };
 
+    const localStorage = browser ? getLocalStorage() : null;
+
     this.scuteStorage = !this.config.persistSession
-      ? // memory
-        ScuteMemoryStorage
+      ? // memory (per client)
+        createMemoryStorage()
       : config.preferences?.sessionStorageAdapter
       ? // adapter
         config.preferences.sessionStorageAdapter
-      : browser && typeof window !== "undefined" && window.localStorage
+      : localStorage
       ? // browser (localstorage)
-        window.localStorage
-      : // fallback (memory)
-        ScuteMemoryStorage;
+        localStorage
+      : // fallback (memory, per client; also used when localStorage is blocked)
+        createMemoryStorage();
 
     this.admin = new ScuteAdminApi({
       appId,
@@ -202,6 +211,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     });
 
     this.verifications = new ScuteVerifyApi({
+      appId,
+      baseUrl,
+      errorReporting,
+      getAccessToken: async () => {
+        const { data } = await this.getAuthToken();
+        return data?.access ?? null;
+      },
+    });
+
+    this.authz = new ScuteAuthzApi({
       appId,
       baseUrl,
       errorReporting,
@@ -329,7 +348,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   async getUserMetafieldState(user_id: UniqueIdentifier) {
     return await this.get<{ meta: boolean }>(
-      `/users/metafields?user_id=${user_id}`
+      `/users/metafields?user_id=${encodeURIComponent(user_id)}`
     );
   }
 
@@ -364,14 +383,15 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param provider - OAuth provider name
    */
   getOAuthUrl(provider: string) {
-    return `${this.baseOAuthURL}${provider}`;
+    return `${this.baseOAuthURL}${encodeURIComponent(provider)}`;
   }
 
   /**
    * Start SP-initiated SAML login by redirecting the browser to the
    * workspace SP-initiate endpoint. Login completes via the existing
    * magic-link status poll (same handoff as signInWithOAuthProvider).
-   * @param relayState - Optional opaque value round-tripped back after ACS.
+   * @param relayState - Deprecated and ignored by the v2 API; see
+   *   {@link getSamlLoginUrl}.
    */
   signInWithSAML(relayState?: string) {
     window.location.href = this.getSamlLoginUrl(relayState);
@@ -379,7 +399,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   /**
    * Build the SP-initiated SAML login URL for this app.
-   * @param relayState - Optional opaque value round-tripped back after ACS.
+   * @param relayState - Deprecated and ignored by the v2 API: after the IdP,
+   *   the user always lands on the app's configured login URL (carried in a
+   *   server-signed RelayState). Kept only so existing calls keep compiling.
    */
   getSamlLoginUrl(relayState?: string) {
     const url = new URL(this.baseSamlLoginURL);
@@ -399,6 +421,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const { data, error } = await this.admin.discoverSSO(email);
 
     if (error || !data) {
+      return null;
+    }
+
+    // The login URL is meant to be navigated to; anything but http(s) is
+    // treated as a miss.
+    if (!httpUrlOrUndefined(data.saml_login_url)) {
       return null;
     }
 
@@ -563,7 +591,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   ) {
     if (
       options?.webauthn !== "disabled" &&
-      this.appData?.passkeys_enabled !== false &&
+      // fail closed: only an explicit `true` from the app data enables passkeys
+      this.appData?.passkeys_enabled === true &&
       isWebauthnSupported() &&
       user.webauthn_enabled
     ) {
@@ -914,7 +943,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   async verifyMfaChallenge(token: string, code: string) {
     const { data, error } = await this.post<ScuteTokenPayload>(
-      `/challenges/${token}/verify`,
+      `/challenges/${encodeURIComponent(token)}/verify`,
       { code }
     );
 
@@ -932,7 +961,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   async getChallengeStatus(token: string) {
     return this.get<{ challenge: ScuteChallengeResponse }>(
-      `/challenges/${token}`
+      `/challenges/${encodeURIComponent(token)}`
     );
   }
 
@@ -942,7 +971,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   async resendChallenge(token: string) {
     return this.post<{ challenge: ScuteChallengeResponse }>(
-      `/challenges/${token}/resend`,
+      `/challenges/${encodeURIComponent(token)}/resend`,
       {}
     );
   }
@@ -952,7 +981,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param token - Challenge token
    */
   async cancelChallenge(token: string) {
-    return this.delete(`/challenges/${token}`);
+    return this.delete(`/challenges/${encodeURIComponent(token)}`);
   }
 
   /**
@@ -1024,7 +1053,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   async claimMsAuthenticatorSession(token: string) {
     const { data, error } = await this.post<ScuteTokenPayload>(
-      `/challenges/${token}/session`,
+      `/challenges/${encodeURIComponent(token)}/session`,
       {}
     );
 
@@ -1156,7 +1185,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       this._reportClientError(error, "remove_mfa_method");
       return { data: null, error };
     }
-    return this.delete(`/mfa/methods/${id}`, accessTokenHeader(tok.access));
+    return this.delete(
+      `/mfa/methods/${encodeURIComponent(id)}`,
+      accessTokenHeader(tok.access)
+    );
   }
 
   /** Promote a verified MFA method to the user's default factor. */
@@ -1167,7 +1199,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error };
     }
     return this.patch(
-      `/mfa/methods/${id}/default`,
+      `/mfa/methods/${encodeURIComponent(id)}/default`,
       {},
       accessTokenHeader(tok.access)
     );
@@ -1450,17 +1482,23 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   protected async getCurrentUser(
     ...params: Parameters<typeof this._getCurrentUser>
   ) {
-    if (this.getCurrentUserDeferred) {
-      return this.getCurrentUserDeferred.promise;
+    // Concurrent calls share one request only when they ask about the same
+    // token; a different token is a different user.
+    const [accessToken] = params;
+    const inFlight = this.getCurrentUserInFlight.get(accessToken);
+    if (inFlight) {
+      return inFlight;
     }
 
-    this.getCurrentUserDeferred = new Deferred();
-    const response = await this._getCurrentUser(...params);
-
-    this.getCurrentUserDeferred.resolve(response);
-    this.getCurrentUserDeferred = null;
-
-    return response;
+    const request = this._getCurrentUser(...params);
+    this.getCurrentUserInFlight.set(accessToken, request);
+    try {
+      return await request;
+    } finally {
+      if (this.getCurrentUserInFlight.get(accessToken) === request) {
+        this.getCurrentUserInFlight.delete(accessToken);
+      }
+    }
   }
 
   /**
@@ -2111,7 +2149,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @see {@link revokeSession}
    */
   protected async _revokeSession(id: UniqueIdentifier, accessToken: string) {
-    return this.delete(`/sessions/${id}`, accessTokenHeader(accessToken));
+    return this.delete(
+      `/sessions/${encodeURIComponent(id)}`,
+      accessTokenHeader(accessToken)
+    );
   }
 
   /**
@@ -2139,7 +2180,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     id: UniqueIdentifier,
     accessToken: string
   ) {
-    return this.delete(`/devices/${id}`, accessTokenHeader(accessToken));
+    return this.delete(
+      `/devices/${encodeURIComponent(id)}`,
+      accessTokenHeader(accessToken)
+    );
   }
 
   /**
@@ -2207,6 +2251,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   private async _reportClientError(error: Error, label?: string) {
     if (error instanceof BaseHttpError) {
+      return;
+    }
+
+    // Decide before touching the session: getSession() below can hit the
+    // network, and nothing is sent when reporting is off or outside a browser.
+    if (!this.reportErrors || !isBrowser()) {
       return;
     }
 

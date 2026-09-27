@@ -4,7 +4,6 @@ import SignInOrUp from "@/components/sign-in-or-up";
 import { useEffect } from "react";
 import { useScuteClient } from "@scute/react-hooks";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 
 export default function Home() {
   const scuteClient = useScuteClient();

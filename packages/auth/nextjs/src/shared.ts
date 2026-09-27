@@ -44,18 +44,28 @@ export const createScuteClient = (config: ScuteNextjsClientConfig) => {
       ...config.preferences,
       persistSession: true,
     },
+    // Runs inside the ScuteClient constructor, before its first request
+    // (the app-data GET, which carries the secret key).
+    onBeforeInitialize(this: ScuteClient) {
+      disableNextFetchCache(this);
+      config.onBeforeInitialize?.call(this);
+    },
   });
 
-  [scuteClient["wretcher"], scuteClient.admin["wretcher"]].forEach(
-    (wretcher) => {
-      wretcher._middlewares.push((next) => (url, opts) => {
-        // disable nextjs cache
-        (opts as RequestInit).cache = "no-store";
-
-        return next(url, opts);
-      });
-    }
-  );
-
   return scuteClient;
+};
+
+const disableNextFetchCache = (scuteClient: ScuteClient) => {
+  [
+    scuteClient["wretcher"],
+    scuteClient.admin["wretcher"],
+    scuteClient.verifications["wretcher"],
+  ].forEach((wretcher) => {
+    wretcher._middlewares.push((next) => (url, opts) => {
+      // disable nextjs cache
+      (opts as RequestInit).cache = "no-store";
+
+      return next(url, opts);
+    });
+  });
 };
