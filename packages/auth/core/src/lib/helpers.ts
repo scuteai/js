@@ -5,7 +5,7 @@ import {
   _ScuteAccessPayload,
   _ScuteMagicLinkTokenPayload,
 } from "./types/internal";
-import { ScuteUser } from "./types/scute";
+import type { ScuteImpersonation, ScuteImpersonationActor, ScuteUser } from "./types/scute";
 
 export const jwtDecode = _jwtDecode;
 
@@ -67,6 +67,34 @@ export function isValidDomain(hostname: string): boolean {
  * Checks if the webauthn is supported in the browser
  */
 export const isWebauthnSupported = () => isBrowser() && _isWebauthnSupported();
+
+/**
+ * RB-49: who is really acting, when this access token is a session someone
+ * started as the user. Reads the token without verifying it: fine for the
+ * UI, never for a decision.
+ */
+export const decodeImpersonation = (accessToken?: string | null): ScuteImpersonation | null => {
+  if (!accessToken) return null;
+  try {
+    const payload = jwtDecode<{ imp?: boolean; act?: ScuteImpersonationActor; exp?: number }>(accessToken);
+    if (payload.imp !== true || !payload.act || !payload.exp) return null;
+
+    return { actor: payload.act, expiresAt: new Date(payload.exp * 1000) };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * RB-49: the context to send with a server-side authorization check made for
+ * a request, so permissions marked "not while impersonating" are refused.
+ * Pass the claims of the access token you VERIFIED for this request.
+ *
+ *     await scute.admin.authzCheck({ userId, action: "close", resource: "account",
+ *                                    context: impersonationContext(claims) });
+ */
+export const impersonationContext = (claims?: { imp?: unknown; act?: unknown } | null): Record<string, unknown> =>
+  claims?.imp === true ? { impersonated: true, actor: claims.act ?? "unknown" } : {};
 
 export const decodeAccessToken = (accessToken: string) => {
   try {

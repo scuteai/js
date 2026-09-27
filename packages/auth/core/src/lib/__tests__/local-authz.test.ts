@@ -35,7 +35,7 @@ describe("conformance with the API engine", () => {
   it("covers every kind of answer", () => {
     const reasons = new Set(vectors.cases.map((c: any) => c.expect.reason));
     for (const r of ["role_grant", "no_role_grants_permission", "condition_failed", "verification_required",
-      "approval_required", "permission_disabled", "unknown_permission"]) {
+      "approval_required", "permission_disabled", "unknown_permission", "impersonating"]) {
       expect(reasons.has(r)).toBe(true);
     }
   });

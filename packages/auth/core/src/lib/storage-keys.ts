@@ -16,6 +16,9 @@ const LEGACY = {
   cred: "sct_cred_data",
   lastLogin: "sct_last_login",
   remember: "sc-remember-me",
+  // RB-49: the support person's own session, kept aside while they are
+  // signed in as a user.
+  impersonator: "sct_impersonator",
 } as const;
 
 export type StorageKeyKind = keyof typeof LEGACY;

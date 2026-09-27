@@ -5,6 +5,9 @@ import type {
   ListUsersRequestParams,
   ScuteAppData,
   ScuteIdentifier,
+  ScuteImpersonateParams,
+  ScuteImpersonationRecord,
+  ScuteImpersonationTokens,
   ScutePaginationMeta,
   ScuteSsoDiscovery,
   ScuteUser,
@@ -299,6 +302,42 @@ class ScuteAdminApi extends ScuteBaseHttp {
       {
         ...this._authorizationHeader,
       }
+    );
+  }
+
+  // ── Signing in as a user (support access) ──
+  //
+  // Off until the app turns it on. The session is short and never
+  // refreshed; its token names who is really acting (act claim).
+
+  /**
+   * Start a session as this user. Hand the tokens to the browser with
+   * scute.beginImpersonation(tokens).
+   */
+  async impersonateUser(userId: UniqueIdentifier, params: ScuteImpersonateParams) {
+    const { actorUserId, ...rest } = params;
+    return this.post<ScuteImpersonationTokens>(
+      `${this._appsPath}/users/${encodeURIComponent(userId)}/impersonate`,
+      { ...rest, actor_user_id: actorUserId },
+      this._authorizationHeader
+    );
+  }
+
+  /** Sessions as this user that haven't ended. */
+  async listImpersonations(userId: UniqueIdentifier) {
+    const { data, error } = await this.get<{ impersonations: ScuteImpersonationRecord[] }>(
+      `${this._appsPath}/users/${encodeURIComponent(userId)}/impersonations`,
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.impersonations, error: null };
+  }
+
+  /** End sessions as this user: one, or all of them. */
+  async stopImpersonating(userId: UniqueIdentifier, sessionId?: UniqueIdentifier) {
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    return this.delete(
+      `${this._appsPath}/users/${encodeURIComponent(userId)}/impersonate${query}`,
+      this._authorizationHeader
     );
   }
 
