@@ -624,10 +624,15 @@ describe("useFactorList", () => {
     await act(async () => {
       returned = await result.current.remove("enr_totp_1");
     });
-    expect(client.removeMfaMethod).toHaveBeenCalledWith("enr_totp_1");
+    expect(client.removeMfaMethod).toHaveBeenCalledWith("enr_totp_1", {});
     expect(returned).toEqual({ data: {}, error: null });
     expect(client.listMfaMethods).toHaveBeenCalledTimes(2);
     expect(result.current.factors).toEqual([factors[1]]);
+
+    await act(async () => {
+      await result.current.remove("enr_totp_1", { challenge: "ch_9" });
+    });
+    expect(client.removeMfaMethod).toHaveBeenLastCalledWith("enr_totp_1", { challenge: "ch_9" });
   });
 
   it("remove failure returns the error and skips the refresh", async () => {
@@ -701,7 +706,7 @@ describe("useBackupCodes", () => {
       pending = result.current.generate();
     });
     expect(result.current.loading).toBe(true);
-    expect(client.generateBackupCodes).toHaveBeenCalledWith();
+    expect(client.generateBackupCodes).toHaveBeenCalledWith({});
     let returned: any;
     await act(async () => {
       d.resolve({ data: { backup_codes: codes }, error: null });

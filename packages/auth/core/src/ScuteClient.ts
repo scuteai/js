@@ -1139,6 +1139,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     method: "totp" | "sms" | "email";
     secret_data?: string;
     name?: string;
+    /**
+     * A completed step-up or MFA challenge's token. Adding another method
+     * when one is set up needs it unless the user signed in recently (the
+     * app's mfa_reverify_minutes). See needsReverification().
+     */
+    challenge?: string;
   }) {
     const { data: tok, error } = await this.getAuthToken();
     if (error) {
@@ -1182,14 +1188,19 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   }
 
   /** Remove an enrolled MFA method by id. */
-  async removeMfaMethod(id: string) {
+  /**
+   * Needs a recent sign-in (the app's mfa_reverify_minutes) or `challenge`,
+   * a completed step-up or MFA challenge's token. See needsReverification().
+   */
+  async removeMfaMethod(id: string, options: { challenge?: string } = {}) {
     const { data: tok, error } = await this.getAuthToken();
     if (error) {
       this._reportClientError(error, "remove_mfa_method");
       return { data: null, error };
     }
+    const query = options.challenge ? `?challenge=${encodeURIComponent(options.challenge)}` : "";
     return this.delete(
-      `/mfa/methods/${encodeURIComponent(id)}`,
+      `/mfa/methods/${encodeURIComponent(id)}${query}`,
       accessTokenHeader(tok.access)
     );
   }
@@ -1211,9 +1222,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   /**
    * Generate a fresh batch of backup codes. The plaintext codes are returned
    * exactly once — store + display them, then forget. Existing unused codes
-   * are invalidated by this call.
+   * are invalidated by this call. Needs a recent sign-in or `challenge`
+   * (see removeMfaMethod).
    */
-  async generateBackupCodes() {
+  async generateBackupCodes(options: { challenge?: string } = {}) {
     const { data: tok, error } = await this.getAuthToken();
     if (error) {
       this._reportClientError(error, "generate_backup_codes");
@@ -1221,7 +1233,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
     return this.post<{ backup_codes: string[]; message?: string }>(
       "/mfa/backup-codes",
-      {},
+      options.challenge ? { challenge: options.challenge } : {},
       accessTokenHeader(tok.access)
     );
   }

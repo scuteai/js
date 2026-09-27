@@ -74,6 +74,7 @@ export {
   decodeMagicLinkToken,
   decodeImpersonation,
   impersonationContext,
+  needsReverification,
   scrubAuthTokensFromUrl,
 } from "./lib/helpers";
 export type { CookieAttributes, UniqueIdentifier } from "./lib/types/general";

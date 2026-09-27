@@ -313,9 +313,10 @@ export function useFactorList() {
     return { data, error: null };
   }, [client]);
 
+  // options.challenge: see needsReverification() when this is refused.
   const remove = useCallback(
-    async (id: string) => {
-      const { data, error: err } = await client.removeMfaMethod(id);
+    async (id: string, options: { challenge?: string } = {}) => {
+      const { data, error: err } = await client.removeMfaMethod(id, options);
       if (!err) await refresh();
       return { data, error: err };
     },
@@ -362,10 +363,10 @@ export function useBackupCodes() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ScuteError>(null);
 
-  const generate = useCallback(async () => {
+  const generate = useCallback(async (options: { challenge?: string } = {}) => {
     setLoading(true);
     setError(null);
-    const { data, error: err } = await client.generateBackupCodes();
+    const { data, error: err } = await client.generateBackupCodes(options);
     setLoading(false);
     if (err || !data) {
       setError((err as any) ?? null);
