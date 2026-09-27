@@ -2,16 +2,6 @@
   "about": "Scute authorization conformance vectors: local evaluators must reproduce every expect.",
   "policy": {
     "permissions": {
-      "document:edit": {
-        "enabled": true,
-        "resource": "document",
-        "action": "edit",
-        "requires_verification": false,
-        "verification_method": null,
-        "verification_ttl": null,
-        "requires_approval": false,
-        "autonomous_allowed": false
-      },
       "document:read": {
         "enabled": true,
         "resource": "document",
@@ -32,26 +22,6 @@
         "requires_approval": false,
         "autonomous_allowed": false
       },
-      "invoice:export": {
-        "enabled": false,
-        "resource": "invoice",
-        "action": "export",
-        "requires_verification": false,
-        "verification_method": null,
-        "verification_ttl": null,
-        "requires_approval": false,
-        "autonomous_allowed": false
-      },
-      "invoice:pay": {
-        "enabled": true,
-        "resource": "invoice",
-        "action": "pay",
-        "requires_verification": false,
-        "verification_method": null,
-        "verification_ttl": null,
-        "requires_approval": true,
-        "autonomous_allowed": false
-      },
       "invoice:read": {
         "enabled": true,
         "resource": "invoice",
@@ -70,6 +40,37 @@
         "verification_method": "any",
         "verification_ttl": 300,
         "requires_approval": false,
+        "autonomous_allowed": false
+      },
+      "document:edit": {
+        "enabled": true,
+        "resource": "document",
+        "action": "edit",
+        "requires_verification": false,
+        "verification_method": null,
+        "verification_ttl": null,
+        "requires_approval": false,
+        "autonomous_allowed": false,
+        "blocked_while_impersonating": true
+      },
+      "invoice:export": {
+        "enabled": false,
+        "resource": "invoice",
+        "action": "export",
+        "requires_verification": false,
+        "verification_method": null,
+        "verification_ttl": null,
+        "requires_approval": false,
+        "autonomous_allowed": false
+      },
+      "invoice:pay": {
+        "enabled": true,
+        "resource": "invoice",
+        "action": "pay",
+        "requires_verification": false,
+        "verification_method": null,
+        "verification_ttl": null,
+        "requires_approval": true,
         "autonomous_allowed": false
       },
       "reports.view": {
@@ -594,6 +595,78 @@
       }
     },
     {
+      "name": "nobody edit document {\"impersonated\":true}",
+      "roles": [
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
+      }
+    },
+    {
+      "name": "nobody read document {\"impersonated\":true}",
+      "roles": [
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "read",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "allow",
+        "reason": "role_grant",
+        "permission": "document:read",
+        "roles": [
+          "member"
+        ]
+      }
+    },
+    {
+      "name": "nobody edit document {\"impersonated\":false}",
+      "roles": [
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": false
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
+      }
+    },
+    {
       "name": "clerk_eu read document {}",
       "roles": [
         "clerk",
@@ -1036,6 +1109,87 @@
       }
     },
     {
+      "name": "clerk_eu edit document {\"impersonated\":true}",
+      "roles": [
+        "clerk",
+        "member"
+      ],
+      "user": {
+        "region": "eu",
+        "department": "finance",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
+      }
+    },
+    {
+      "name": "clerk_eu read document {\"impersonated\":true}",
+      "roles": [
+        "clerk",
+        "member"
+      ],
+      "user": {
+        "region": "eu",
+        "department": "finance",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "read",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "allow",
+        "reason": "role_grant",
+        "permission": "document:read",
+        "roles": [
+          "member"
+        ]
+      }
+    },
+    {
+      "name": "clerk_eu edit document {\"impersonated\":false}",
+      "roles": [
+        "clerk",
+        "member"
+      ],
+      "user": {
+        "region": "eu",
+        "department": "finance",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": false
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
+      }
+    },
+    {
       "name": "regional_eu read document {}",
       "roles": [
         "analyst",
@@ -1469,6 +1623,87 @@
         "decision": "deny",
         "reason": "unknown_permission",
         "permission": "invoice:fly"
+      }
+    },
+    {
+      "name": "regional_eu edit document {\"impersonated\":true}",
+      "roles": [
+        "analyst",
+        "member",
+        "regional"
+      ],
+      "user": {
+        "region": "eu",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "condition_failed",
+        "permission": "document:edit"
+      }
+    },
+    {
+      "name": "regional_eu read document {\"impersonated\":true}",
+      "roles": [
+        "analyst",
+        "member",
+        "regional"
+      ],
+      "user": {
+        "region": "eu",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "read",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "allow",
+        "reason": "role_grant",
+        "permission": "document:read",
+        "roles": [
+          "member"
+        ]
+      }
+    },
+    {
+      "name": "regional_eu edit document {\"impersonated\":false}",
+      "roles": [
+        "analyst",
+        "member",
+        "regional"
+      ],
+      "user": {
+        "region": "eu",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": false
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "condition_failed",
+        "permission": "document:edit"
       }
     },
     {
@@ -1917,6 +2152,93 @@
       }
     },
     {
+      "name": "editor edit document {\"impersonated\":true}",
+      "roles": [
+        "analyst",
+        "editor",
+        "member"
+      ],
+      "user": {
+        "department": "sales",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "impersonating",
+        "permission": "document:edit",
+        "roles": [
+          "editor"
+        ]
+      }
+    },
+    {
+      "name": "editor read document {\"impersonated\":true}",
+      "roles": [
+        "analyst",
+        "editor",
+        "member"
+      ],
+      "user": {
+        "department": "sales",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "read",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "allow",
+        "reason": "role_grant",
+        "permission": "document:read",
+        "roles": [
+          "member"
+        ]
+      }
+    },
+    {
+      "name": "editor edit document {\"impersonated\":false}",
+      "roles": [
+        "analyst",
+        "editor",
+        "member"
+      ],
+      "user": {
+        "department": "sales",
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": false
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "allow",
+        "reason": "role_grant",
+        "permission": "document:edit",
+        "roles": [
+          "editor"
+        ]
+      }
+    },
+    {
       "name": "analyst_null read document {}",
       "roles": [
         "analyst",
@@ -2313,6 +2635,81 @@
         "decision": "deny",
         "reason": "unknown_permission",
         "permission": "invoice:fly"
+      }
+    },
+    {
+      "name": "analyst_null edit document {\"impersonated\":true}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
+      }
+    },
+    {
+      "name": "analyst_null read document {\"impersonated\":true}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "read",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": true
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "allow",
+        "reason": "role_grant",
+        "permission": "document:read",
+        "roles": [
+          "member"
+        ]
+      }
+    },
+    {
+      "name": "analyst_null edit document {\"impersonated\":false}",
+      "roles": [
+        "analyst",
+        "member"
+      ],
+      "user": {
+        "status": "active",
+        "identity_verified": false
+      },
+      "action": "edit",
+      "resource": {
+        "type": "document"
+      },
+      "context": {
+        "impersonated": false
+      },
+      "now": "2026-09-28T10:30:00Z",
+      "expect": {
+        "decision": "deny",
+        "reason": "no_role_grants_permission",
+        "permission": "document:edit"
       }
     }
   ]

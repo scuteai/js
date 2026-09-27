@@ -25,6 +25,8 @@ export type AuthzPolicy = {
       verification_method?: string | null;
       verification_ttl?: number | null;
       requires_approval?: boolean;
+      /** Refused while someone is signed in as the user (context.impersonated). */
+      blocked_while_impersonating?: boolean;
     }
   >;
   roles: Record<
@@ -70,6 +72,14 @@ const parseResource = (resource: LocalCheck["resource"]) => {
       : { type: resource.slice(0, i), key: resource.slice(i + 1), attributes: {} };
   }
   return { type: resource.type, key: resource.key, attributes: resource.attributes ?? {} };
+};
+
+// The server reads context.impersonated as a Rails boolean: blank is unset,
+// these are false, anything else is true.
+const FALSE_VALUES = new Set<unknown>([false, 0, "0", "f", "F", "false", "FALSE", "off", "OFF"]);
+const impersonating = (context?: Record<string, unknown>) => {
+  const v = context?.impersonated;
+  return v !== undefined && v !== null && v !== "" && !FALSE_VALUES.has(v);
 };
 
 const compact = (o: Record<string, unknown>) =>
@@ -138,6 +148,9 @@ export function decideLocally(policy: AuthzPolicy, check: LocalCheck): LocalDeci
       });
 
   if (passing.length) {
+    if (perm.blocked_while_impersonating && impersonating(check.context)) {
+      return decision("deny", "impersonating", slug, passing);
+    }
     if (perm.requires_approval) return decision("allow_with_approval", "approval_required", slug, passing);
     if (perm.requires_verification) return decision("allow_with_step_up", "verification_required", slug, passing);
     return decision("allow", "role_grant", slug, passing);

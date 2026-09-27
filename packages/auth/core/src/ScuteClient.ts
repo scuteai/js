@@ -25,6 +25,7 @@ import { scopedChannel } from "./lib/storage-keys";
 import {
   accessTokenHeader,
   decodeAccessToken,
+  decodeImpersonation,
   decodeMagicLinkToken,
   Deferred,
   getLocalStorage,
@@ -73,6 +74,8 @@ import type {
   ScuteAppData,
   ScuteUserSession,
   ScuteIdentifier,
+  ScuteImpersonation,
+  ScuteImpersonationTokens,
   ScuteMagicLinkIdResponse,
   ScuteSignInOptions,
   ScuteSignInOrUpOptions,
@@ -1414,6 +1417,83 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     const session = data.session;
     return this._signOut(session?.access);
+  }
+
+  // ── Signing in as a user (support access, RB-49) ──
+
+  /**
+   * Who is really acting, when the current session is someone signed in as
+   * the user; null otherwise. For the UI (a banner); decisions use the
+   * verified token on your server.
+   */
+  async getImpersonation(): Promise<ScuteImpersonation | null> {
+    const { data } = await this._getSession();
+    return decodeImpersonation(data.session?.access);
+  }
+
+  /**
+   * Switch this browser to a session as the user, from the tokens your
+   * backend got with admin.impersonateUser(). The current session (the
+   * support person's own) is kept aside and comes back on
+   * stopImpersonating().
+   */
+  async beginImpersonation(tokens: ScuteImpersonationTokens) {
+    if (!decodeImpersonation(tokens?.access)) {
+      return { error: new TechnicalError() };
+    }
+
+    const { data } = await this._getSession();
+    const own = data.session;
+    if (own?.status === "authenticated" && !decodeImpersonation(own.access)) {
+      await this.scuteStorage.setItem(
+        this._scopedKey("impersonator"),
+        JSON.stringify({ access: own.access, refresh: own.refresh ?? null }),
+        { sameSite: "lax", httpOnly: false, path: "/", expires: own.refreshExpiresAt ?? own.accessExpiresAt } as any
+      );
+    }
+
+    // Nothing of the own session may stay next to the new one (its refresh
+    // token would bring the support person back on the next refresh).
+    await this.removeSession();
+    const session = (await this.setSession({ access: tokens.access, access_expires_at: tokens.access_expires_at })) as AuthenticatedSession;
+    return this._signInWithCheck(session);
+  }
+
+  /**
+   * End the session as the user (the server records it) and bring back the
+   * support person's own session, when one was kept aside. Returns false
+   * when there was nothing to stop.
+   */
+  async stopImpersonating(): Promise<boolean> {
+    const { data } = await this._getSession();
+    const access = data.session?.access;
+    const impersonating = !!decodeImpersonation(access);
+    const key = this._scopedKey("impersonator");
+    const raw = await this.scuteStorage.getItem(key);
+    if (!impersonating && !raw) return false;
+
+    if (impersonating) await this._signOut(access);
+    await this.scuteStorage.removeItem(key, { sameSite: "lax", httpOnly: false, path: "/" } as any);
+
+    let own: { access?: string; refresh?: string | null } | null = null;
+    try {
+      own = raw ? JSON.parse(raw) : null;
+    } catch {
+      own = null;
+    }
+    if (own?.access) {
+      // Through getSession, so an access token that expired meanwhile is
+      // refreshed with the kept refresh token.
+      await this.setSession({ access: own.access, refresh: own.refresh, access_expires_at: "" });
+      const { data: restored } = await this._getSession();
+      if (restored.session?.status === "authenticated") {
+        const { error } = await this._signInWithCheck(restored.session as AuthenticatedSession);
+        if (!error) return true;
+      }
+    }
+
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_OUT, sessionUnAuthenticatedState());
+    return true;
   }
 
   /**
