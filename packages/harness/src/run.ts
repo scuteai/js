@@ -42,6 +42,8 @@ type RunState = {
   challenges: Record<string, string>;
   /** "permission|object" -> access request id */
   approvals: Record<string, string>;
+  /** Calls the person confirmed in your UI (tool + arguments), each good once. */
+  confirmed?: string[];
   calls: number;
   usd: number;
 };
@@ -52,6 +54,17 @@ const HOUR = 3600_000;
 
 export const randomId = () =>
   (globalThis as any).crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+
+const canonical = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(canonical)
+    : value && typeof value === "object"
+    ? Object.keys(value as Record<string, unknown>)
+        .sort()
+        .map((k) => [k, canonical((value as Record<string, unknown>)[k])])
+    : value;
+
+const fingerprint = (tool: string, args: Args) => JSON.stringify([tool, canonical(args ?? {})]);
 
 const approvalKey = (call: ToolCall) => `${call.permission}|${resourceRef(call.resource)}`;
 
@@ -242,6 +255,23 @@ export class Run {
     if (permission) s.challenges[permission] = token;
     s.pending = undefined;
     await this.save();
+  }
+
+  /** The person confirmed this exact call in your UI; guards.approval() lets it through once. */
+  async confirm(tool: string, args: Args) {
+    const s = await this.load();
+    (s.confirmed ??= []).push(fingerprint(tool, args));
+    await this.save();
+  }
+
+  /** @internal */
+  async consumeConfirmation(call: ToolCall): Promise<boolean> {
+    const s = await this.load();
+    const at = (s.confirmed ?? []).indexOf(fingerprint(call.tool, call.args));
+    if (at < 0) return false;
+    s.confirmed!.splice(at, 1);
+    await this.save();
+    return true;
   }
 
   /** When the person last verified in this run (ms), if they have. */

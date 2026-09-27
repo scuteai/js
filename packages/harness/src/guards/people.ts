@@ -25,7 +25,8 @@ export function verifyPerson(
 
 /**
  * The person the agent works for confirms these calls first (your chat
- * UI's approve button; AI SDK `toolApproval` shows it). Default: high tier.
+ * UI's approve button; AI SDK `toolApproval` shows it, or call
+ * run.confirm(tool, args) from your UI). Default: high tier.
  * Approvals by someone else come from the policy (requires_approval).
  */
 export function approval(options: { when?: When; message?: (text: string) => string; mode?: Mode } = {}): Guard {
@@ -33,9 +34,10 @@ export function approval(options: { when?: When; message?: (text: string) => str
   return {
     name: "approval",
     mode: options.mode,
-    before(call) {
+    async before(call) {
       if (!matches(call, when)) return;
       if (call.approvedByUser) return;
+      if (call.mode === "enforce" && (await call.run.consumeConfirmation(call))) return;
       const text = `Confirm: ${describeCall(call)}`;
       return call.approve(options.message ? options.message(text) : text);
     },

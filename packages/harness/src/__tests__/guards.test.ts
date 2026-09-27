@@ -167,4 +167,13 @@ describe("verifyPerson and approval", () => {
     expect((await run.check("refund_invoice", { invoice_id: 42 }, { approvedByUser: true })).kind).toBe("proceed");
     expect((await run.check("read_invoice", {})).kind).toBe("proceed");
   });
+
+  it("lets a call the person confirmed in your UI through, once, and only that exact call", async () => {
+    const run = harness([guards.approval()], { tools: { refund_invoice: { tier: "high" } } }).run();
+    await run.confirm("refund_invoice", { amount: 90, invoice_id: 42 });
+
+    expect((await run.check("refund_invoice", { invoice_id: 42, amount: 91 })).kind).toBe("approve");
+    expect((await run.check("refund_invoice", { invoice_id: 42, amount: 90 })).kind).toBe("proceed");
+    expect((await run.check("refund_invoice", { invoice_id: 42, amount: 90 })).kind).toBe("approve");
+  });
 });

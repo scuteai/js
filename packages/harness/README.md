@@ -92,7 +92,9 @@ tools: {
   passkey, OTP), `run.completeVerification()` records it once Scute confirms
   it's theirs, and the next check goes through.
 - **Confirm.** `guards.approval()` asks the person the agent works for. With
-  the AI SDK that's the tool approval request in your chat UI.
+  the AI SDK that's the tool approval request in your chat UI; elsewhere,
+  call `run.confirm(tool, args)` when they confirm, and that exact call
+  goes through once.
 - **Reviewer approval.** A permission that requires approval files a Scute
   access request for the exact operation; the call goes through once a
   reviewer approves it.
