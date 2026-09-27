@@ -13,7 +13,11 @@ export function fakeScute(
 ) {
   const seen: Seen[] = [];
   let tasks = 0;
-  const state = { requestStatus: options.requestStatus ?? "pending", ttlMs: options.ttlMs ?? 30 * 60_000 };
+  const state = {
+    requestStatus: options.requestStatus ?? "pending",
+    ttlMs: options.ttlMs ?? 30 * 60_000,
+    verificationStatus: "pending",
+  };
 
   const json = (data: unknown, status = 200) =>
     new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -74,12 +78,27 @@ export function fakeScute(
         ? json({ id: "sess1", verified: true })
         : json({ error: "That challenge doesn't verify this person", error_code: "challenge_invalid" }, 422);
     }
-    if (method === "POST" && path === "/v1/auth/app1/challenges") {
-      if (!secret) return json({ error: "Unauthorized" }, 401);
-      return json({ challenge: { token: "ch_ok", status: "pending", method: body.method, expires_at: "" } }, 201);
+    if (method === "POST" && path === "/v1/auth/app1/agent/verifications") {
+      if (!task) return json({ error: "Task token missing" }, 401);
+      return json({ token: "ch_ok", status: "pending", method: body.method, expires_at: "", say: "I've emailed a code to a***@example.com. What's the code?" }, 201);
     }
-    if (method === "POST" && path === "/v1/apps/app1/authz/requests") {
-      return json({ id: "req1", status: state.requestStatus }, 201);
+    if (method === "GET" && path === "/v1/auth/app1/agent/verifications/ch_ok") {
+      const done = state.verificationStatus === "completed";
+      return json({ token: "ch_ok", status: state.verificationStatus, method: "entra_push", say: done ? "Thanks, you're verified." : "Approve it, then tell me." });
+    }
+    if (method === "POST" && path === "/v1/auth/app1/agent/verifications/ch_ok/code") {
+      if (body.code === "123456") {
+        state.verificationStatus = "completed";
+        return json({ token: "ch_ok", status: "completed", method: "email_otp", say: "Thanks, you're verified." });
+      }
+      return json({ token: "ch_ok", status: "pending", method: "email_otp", remaining_attempts: 2, error: "Invalid code", say: "That code didn't work. Want to try again?" }, 422);
+    }
+    if (method === "POST" && path === "/v1/auth/app1/agent/approvals") {
+      if (!task) return json({ error: "Task token missing" }, 401);
+      return json({ id: "req1", status: state.requestStatus, say: "I've asked for approval. I'll let you know when there's an answer." }, 201);
+    }
+    if (method === "GET" && path === "/v1/auth/app1/agent/approvals/req1") {
+      return json({ id: "req1", status: state.requestStatus, say: state.requestStatus === "approved" ? "It's approved." : "Still waiting." });
     }
     return json({ error: `no route ${method} ${path}` }, 404);
   }) as unknown as typeof globalThis.fetch;

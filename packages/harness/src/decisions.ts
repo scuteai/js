@@ -90,7 +90,7 @@ export function describeCall(call: Pick<ToolCall, "tool" | "args">) {
  * What the model reads when a call doesn't run. Written so it knows what to
  * do next, not only that it failed.
  */
-export function modelMessage(v: Pick<Verdict, "kind" | "decision">): string {
+export function modelMessage(v: Pick<Verdict, "kind" | "decision">, options: { humanTools?: boolean } = {}): string {
   const d = v.decision;
   const said = (d.message ?? d.engine?.explanation ?? "").trim();
   switch (v.kind) {
@@ -101,11 +101,13 @@ export function modelMessage(v: Pick<Verdict, "kind" | "decision">): string {
     case "redirect":
       return `Use ${d.redirect?.to ?? "another route"} instead.${said ? ` ${said}` : ""}`;
     case "verify":
-      return `${said || "The person has to verify it's them first."} Tell them; try again once they have.`;
+      return options.humanTools
+        ? `${said || "The person has to verify it's them first."} Verify them with scute_verify_person, then try again.`
+        : `${said || "The person has to verify it's them first."} Tell them; try again once they have.`;
     case "approve":
       if (d.approve?.by !== "reviewer") return `${said || "The person has to confirm this first."} Ask them to confirm, then try again.`;
       return d.approve.requestId
-        ? `${said || "A reviewer has to approve this."} The request is filed; tell the person it's pending and try again once it's approved.`
+        ? `${said || "A reviewer has to approve this."} The request is filed (id ${d.approve.requestId}); tell the person it's pending and try again once it's approved.`
         : `${said || "A reviewer has to approve this."} Tell the person it needs a reviewer's approval.`;
     default:
       return said;

@@ -17,13 +17,14 @@ function fromEngine(engine: EngineDecision): Decision {
         kind: "verify",
         reason: engine.reason,
         message: engine.explanation,
+        say: engine.say,
         verify: { method: engine.step_up?.method, permission: engine.step_up?.authorizes_action ?? engine.permission },
         engine,
       };
     case "allow_with_approval":
-      return { kind: "approve", reason: engine.reason, message: engine.explanation, approve: { by: "reviewer" }, engine };
+      return { kind: "approve", reason: engine.reason, message: engine.explanation, say: engine.say, approve: { by: "reviewer" }, engine };
     default:
-      return { kind: "deny", reason: engine.reason, message: engine.explanation, engine };
+      return { kind: "deny", reason: engine.reason, message: engine.explanation, say: engine.say, engine };
   }
 }
 
@@ -47,7 +48,10 @@ export function permissions(options: PermissionsOptions = {}): Guard {
       // Approved since the last try: check again with it, which spends it.
       if (request?.status === "approved") engine = await call.run.engineCheck(call, context);
       const decision = fromEngine(engine);
-      if (decision.approve && request) decision.approve.requestId = request.id;
+      if (decision.approve && request) {
+        decision.approve.requestId = request.id;
+        decision.say = request.say;
+      }
       return decision;
     },
   };

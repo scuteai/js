@@ -155,7 +155,7 @@ describe("verifyPerson and approval", () => {
     expect(v).toMatchObject({ kind: "verify", decision: { verify: { methods: ["entra_push"] } } });
 
     await r.startVerification({ verdict: v });
-    await r.completeVerification();
+    expect(await r.submitCode("123456")).toMatchObject({ status: "completed" });
     expect((await r.check("reset_mfa", {})).kind).toBe("proceed");
   });
 

@@ -88,16 +88,31 @@ tools: {
 ## People in the loop
 
 - **Verify.** A permission that needs verification (or `guards.verifyPerson()`)
-  answers `verify`. `run.startVerification({ verdict })` sends it (push,
-  passkey, OTP), `run.completeVerification()` records it once Scute confirms
-  it's theirs, and the next check goes through.
+  answers `verify`. Everything works with the task token alone:
+  `run.startVerification({ method: "email_otp" })` sends a code (or
+  `entra_push`, `sms_otp`, `totp`), `run.submitCode(code)` passes on what the
+  person read out, `run.verificationStatus()` checks a push. Scute checks
+  it's the right person; the next check of that permission goes through.
+- **Let the model do it.** Give it the human tools and it verifies the
+  person itself, mid-conversation (voice or chat):
+
+  ```ts
+  import { jsonSchema } from "ai";
+  tools: { ...run.tools(myTools), ...run.humanTools(jsonSchema) }
+  ```
+
+  `scute_verify_person`, `scute_submit_code`, `scute_check_verification`,
+  `scute_approval_status` and `scute_whoami`. Every answer has a `say` line
+  the agent can speak as is ("I've emailed a code to a***@example.com.
+  What's the code?"). Blocked calls tell the model which tool to use.
 - **Confirm.** `guards.approval()` asks the person the agent works for. With
   the AI SDK that's the tool approval request in your chat UI; elsewhere,
   call `run.confirm(tool, args)` when they confirm, and that exact call
   goes through once.
 - **Reviewer approval.** A permission that requires approval files a Scute
-  access request for the exact operation; the call goes through once a
-  reviewer approves it.
+  access request for the exact operation, tagged with the agent and task
+  (`verdict.say`: "I've asked for approval..."); the call goes through once
+  a reviewer approves it. `run.approvalStatus(id)` checks on it.
 
 ## Runs and state
 

@@ -115,7 +115,10 @@ export class Harness {
     }
 
     const verdict: Verdict = { kind: winner.kind, decision: winner, args: call.args, results, callId: call.id, tool: call.tool };
-    if (!runs(verdict)) verdict.message = modelMessage(verdict);
+    if (!runs(verdict)) verdict.message = modelMessage(verdict, { humanTools: call.run.humanToolNames.length > 0 });
+    const say = winner.say ?? winner.engine?.say;
+    if (say) verdict.say = say;
+    if (verdict.kind === "verify") call.run.lastVerify = winner.verify;
     this.emit(call, "before", verdict.kind, winner, results, started);
     return verdict;
   }

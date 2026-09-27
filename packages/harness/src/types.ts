@@ -26,6 +26,8 @@ export type EngineDecision = {
   approval?: { permission?: string; resource?: string; error?: string };
   agent?: { agent: string; task: string; chain: string[]; roles: string[] };
   explanation?: string;
+  /** A line for the person, when the answer isn't a plain allow. */
+  say?: string;
 };
 
 export type Decision = {
@@ -34,6 +36,8 @@ export type Decision = {
   reason?: string;
   /** Words for the model (guide, deny, redirect) or for the person (verify, approve). */
   message?: string;
+  /** A line for the person (voice or chat), when there's something to tell them. */
+  say?: string;
   /** transform: the arguments the tool runs with instead. */
   args?: Record<string, unknown>;
   /** From an after-guard: what the model sees instead of the tool's result. */
@@ -133,6 +137,8 @@ export type Verdict = {
   args: Args;
   /** What to tell the model when the call doesn't run. */
   message?: string;
+  /** What to tell the person, when there's something to tell them. */
+  say?: string;
   results: GuardResult[];
   callId: string;
   tool: string;

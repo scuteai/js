@@ -1,9 +1,10 @@
-import { ScuteHarnessError, type Whoami } from "./client";
+import { ScuteHarnessError, type Approval, type Verification, type Whoami } from "./client";
 import { resourceRef } from "./convention";
 import { Call, describeCall, runs } from "./decisions";
 import { aiSdkPrepareStep, aiSdkToolApproval, aiSdkTools, type AiSdkApprovalStatus } from "./adapters/ai-sdk";
+import { humanTools, type JsonSchemaFn } from "./adapters/human-tools";
 import type { Harness } from "./harness";
-import type { Args, EngineDecision, Tier, ToolCall, Verdict } from "./types";
+import type { Args, Decision, EngineDecision, Tier, ToolCall, Verdict } from "./types";
 
 export type RunOptions = {
   /**
@@ -81,6 +82,10 @@ export class Run {
   private identified = new Set<string>();
   /** Tool names seen through tools(); prepareStep narrows these. */
   toolNames: string[] = [];
+  /** @internal humanTools() names, always offered to the model. */
+  humanToolNames: string[] = [];
+  /** @internal the last verification a guard asked for, for the verify_person tool. */
+  lastVerify?: Decision["verify"];
 
   constructor(readonly harness: Harness, readonly options: RunOptions = {}) {
     this.id = options.id ?? randomId();
@@ -174,12 +179,6 @@ export class Run {
     return this.me;
   }
 
-  private async actsFor(): Promise<string | undefined> {
-    if (this.options.actsFor) return this.options.actsFor;
-    const s = await this.load();
-    if (s.actsFor) return s.actsFor;
-    return (await this.whoami()).acts_for ?? undefined;
-  }
 
   /** The job is done: close the task (and its session). */
   complete() {
@@ -222,38 +221,80 @@ export class Run {
   }
 
   /**
-   * Send the person a verification (push, passkey, OTP) for this run. Pass
-   * the verdict that asked for it, or a method and permission. Needs the
-   * secret key; completing it is completeVerification().
+   * Send the person a verification for this run: a code by email or text,
+   * their authenticator app, or a push. Pass the verdict that asked for it,
+   * or a method and permission. Works with the task token alone; the answer
+   * has a `say` line for the person.
    */
-  async startVerification(options: { verdict?: Pick<Verdict, "decision">; method?: string; permission?: string } = {}) {
-    const userId = await this.actsFor();
-    if (!userId) throw new ScuteHarnessError("This run acts for nobody, so there's no one to verify", 409, "needs_human");
-    const asked = options.verdict?.decision.verify;
+  async startVerification(options: { verdict?: Pick<Verdict, "decision">; method?: string; permission?: string } = {}): Promise<Verification> {
+    const asked = options.verdict?.decision.verify ?? this.lastVerify;
     const permission = options.permission ?? asked?.permission;
     const methods = [options.method, asked?.method, ...(asked?.methods ?? [])].filter((m): m is string => !!m && m !== "any");
-    if (!methods.length) throw new ScuteHarnessError("Pick a verification method (e.g. entra_push, email_otp, sms_otp)", 422, "method_required");
-    const { challenge } = await this.harness.client.startChallenge({ userId, method: methods[0], permission });
+    if (!methods.length) {
+      throw new ScuteHarnessError("Pick a verification method (email_otp, sms_otp, totp, entra_push...)", 422, "method_required");
+    }
+    const verification = await this.harness.client.startVerification(await this.token(), {
+      method: methods[0],
+      permission,
+      session_id: await this.session(),
+    });
     const s = await this.load();
-    s.pending = { token: challenge.token, permission };
+    s.pending = { token: verification.token, permission };
     await this.save();
-    return challenge;
+    return verification;
+  }
+
+  /** The person read out the code they got. A wrong code comes back with status "pending" and a `say` line. */
+  async submitCode(code: string, challengeToken?: string): Promise<Verification> {
+    const token = challengeToken ?? (await this.load()).pending?.token;
+    if (!token) throw new ScuteHarnessError("No verification in progress", 422, "no_challenge");
+    let verification: Verification;
+    try {
+      verification = await this.harness.client.submitCode(await this.token(), token, code);
+    } catch (e) {
+      if (e instanceof ScuteHarnessError && e.status === 422 && (e.body as Verification | undefined)?.status) return e.body as Verification;
+      throw e;
+    }
+    if (verification.status === "completed") await this.recordVerified(token);
+    return verification;
+  }
+
+  /** Where a verification stands (poll this for pushes). Recorded once it's complete. */
+  async verificationStatus(challengeToken?: string): Promise<Verification> {
+    const token = challengeToken ?? (await this.load()).pending?.token;
+    if (!token) throw new ScuteHarnessError("No verification in progress", 422, "no_challenge");
+    const verification = await this.harness.client.verification(await this.token(), token);
+    if (verification.status === "completed") await this.recordVerified(token);
+    return verification;
   }
 
   /**
-   * The person finished a verification. Scute checks it's theirs, completed
-   * and fresh, marks the session verified, and the next check of that
-   * permission goes through.
+   * Record a finished verification. For one this run started, Scute reports
+   * it; for a challenge your backend started, Scute checks it's the person's,
+   * completed and fresh. Throws when it isn't done yet.
    */
   async completeVerification(challengeToken?: string) {
     const s = await this.load();
     const token = challengeToken ?? s.pending?.token;
     if (!token) throw new ScuteHarnessError("No verification to complete", 422, "no_challenge");
+    if (s.pending?.token === token) {
+      const verification = await this.verificationStatus(token);
+      if (verification.status !== "completed") {
+        throw new ScuteHarnessError(`Not verified yet (${verification.status})`, 409, "not_verified");
+      }
+      return;
+    }
     await this.harness.client.verifySession(await this.token(), await this.session(), token);
+    await this.recordVerified(token);
+  }
+
+  private async recordVerified(token: string) {
+    const s = await this.load();
     s.verifiedAt = Date.now();
-    const permission = s.pending?.token === token ? s.pending.permission : undefined;
-    if (permission) s.challenges[permission] = token;
-    s.pending = undefined;
+    if (s.pending?.token === token) {
+      if (s.pending.permission) s.challenges[s.pending.permission] = token;
+      s.pending = undefined;
+    }
     await this.save();
   }
 
@@ -308,19 +349,24 @@ export class Run {
    * File (or find) the access request a reviewer approves for this call.
    * Scute returns the open one if it exists, so this is safe to repeat.
    */
-  async requestApproval(call: ToolCall): Promise<{ id: string; status: string } | undefined> {
-    if (!this.harness.client.canManage || !call.permission) return undefined;
-    const userId = await this.actsFor();
-    if (!userId) return undefined;
-    const request = await this.harness.client.createRequest(userId, {
-      action: call.spec.action!,
-      resource: resourceRef(call.resource) || undefined,
-      reason: `${this.harness.agent} asked: ${describeCall(call)}`,
+  async requestApproval(call: ToolCall): Promise<Approval | undefined> {
+    if (!call.permission || !call.spec.action) return undefined;
+    const approval = await this.harness.client.requestApproval(await this.token(), {
+      action: call.spec.action,
+      resource: call.resource,
+      reason: describeCall(call),
+      context: this.options.context,
     });
+    if (!approval.id) return undefined;
     const s = await this.load();
-    s.approvals[approvalKey(call)] = request.id;
+    s.approvals[approvalKey(call)] = approval.id;
     await this.save();
-    return request;
+    return approval;
+  }
+
+  /** Where an approval this run filed stands, with a `say` line. */
+  async approvalStatus(id: string): Promise<Approval> {
+    return this.harness.client.approval(await this.token(), id);
   }
 
   // ── Checking calls ──
@@ -418,13 +464,23 @@ export class Run {
   /** Tools the task could ever use (its ceiling). Tools without a permission always count. */
   async allowedTools(names: string[] = this.toolNames): Promise<string[]> {
     const { ceiling } = await this.whoami();
-    return names.filter((n) => {
+    const allowed = names.filter((n) => {
+      if (this.humanToolNames.includes(n)) return true;
       const permission = this.harness.spec(n).permission;
       return !permission || ceiling.includes(permission);
     });
+    return Array.from(new Set([...allowed, ...this.humanToolNames]));
   }
 
   // ── Vercel AI SDK (v7) ──
+
+  /**
+   * Tools the model calls to bring the person in (verify, pass on a code,
+   * check a push or an approval, whoami). Pass `jsonSchema` from "ai".
+   */
+  humanTools(jsonSchema: JsonSchemaFn, options: { methods?: string[] } = {}) {
+    return humanTools(this, jsonSchema, options);
+  }
 
   /** Wrap AI SDK tools: guards run before each call, after-guards on the result. */
   tools<T extends Record<string, any>>(tools: T): T {

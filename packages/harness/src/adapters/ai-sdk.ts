@@ -65,6 +65,8 @@ export function aiSdkToolApproval(run: Run) {
     messages?: unknown[];
   }): Promise<AiSdkApprovalStatus> => {
     const { toolCall } = options;
+    // The harness's own tools for human steps aren't actions to guard.
+    if (run.humanToolNames.includes(toolCall.toolName)) return undefined;
     const verdict = await run.check(toolCall.toolName, (toolCall.input ?? {}) as Record<string, unknown>, {
       id: toolCall.toolCallId,
       messages: options.messages ?? [],
@@ -75,7 +77,10 @@ export function aiSdkToolApproval(run: Run) {
         run.keep(verdict);
         return undefined;
       case "verify":
-        return { type: "user-approval", reason: verdict.decision.message ?? verdict.message };
+        // With the human tools, the model verifies the person itself.
+        return run.humanToolNames.length
+          ? { type: "denied", reason: verdict.message }
+          : { type: "user-approval", reason: verdict.decision.message ?? verdict.message };
       case "approve":
         return verdict.decision.approve?.by === "reviewer"
           ? { type: "denied", reason: verdict.message }

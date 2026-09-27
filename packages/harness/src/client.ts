@@ -1,7 +1,8 @@
 import type { EngineDecision, Resource } from "./types";
 
 export class ScuteHarnessError extends Error {
-  constructor(message: string, readonly status?: number, readonly code?: string) {
+  /** body: the API's answer, when it sent one. */
+  constructor(message: string, readonly status?: number, readonly code?: string, readonly body?: unknown) {
     super(message);
     this.name = "ScuteHarnessError";
   }
@@ -33,6 +34,30 @@ export type Whoami = {
   actions: string[] | null;
   resources: string[] | null;
   expires_at: string;
+  expires_in?: number;
+  /** "expires_soon" when the task has under five minutes left. */
+  warnings?: string[];
+};
+
+/** A verification an agent started for its person. `say` is ready to speak or write. */
+export type Verification = {
+  token: string;
+  status: "pending" | "completed" | "expired" | "denied" | "failed" | "cancelled";
+  method: string;
+  expires_at: string;
+  remaining_attempts?: number;
+  error?: string;
+  say: string;
+};
+
+/** An approval an agent asked for. Without `id`, nothing was filed (see status). */
+export type Approval = {
+  id?: string;
+  status: "pending" | "approved" | "denied" | "cancelled" | "expired" | "used" | "not_needed" | "verify_first";
+  permission?: string;
+  resource?: string;
+  expires_at?: string;
+  say: string;
 };
 
 export type AgentSession = { id: string; task_id: string; verified: boolean; verified_at?: string; channel?: string };
@@ -62,7 +87,7 @@ export class ScuteClient {
       data = null;
     }
     if (!res.ok) {
-      throw new ScuteHarnessError(data?.error ?? `Scute answered ${res.status}`, res.status, data?.error_code);
+      throw new ScuteHarnessError(data?.error ?? data?.say ?? `Scute answered ${res.status}`, res.status, data?.error_code, data ?? undefined);
     }
     return data as T;
   }
@@ -75,7 +100,7 @@ export class ScuteClient {
     return `/v1/auth/${encodeURIComponent(this.config.appId)}`;
   }
 
-  // Your backend (secret key)
+  // Your backend (secret key): tasks
 
   mintTask(agent: string, body: Record<string, unknown>) {
     return this.call<TaskMinted>("POST", `${this.app}/authz/agents/${encodeURIComponent(agent)}/tasks`, body, this.config.secret);
@@ -88,24 +113,6 @@ export class ScuteClient {
       {},
       this.config.secret
     );
-  }
-
-  startChallenge(params: { userId: string; method: string; permission?: string }) {
-    return this.call<{ challenge: { token: string; status: string; method: string; expires_at: string } }>(
-      "POST",
-      `${this.auth}/challenges`,
-      {
-        purpose: "step_up",
-        method: params.method,
-        app_user_id: params.userId,
-        metadata: params.permission ? { authorizes_action: params.permission } : {},
-      },
-      this.config.secret
-    );
-  }
-
-  createRequest(userId: string, body: { action: string; resource?: string; reason?: string }) {
-    return this.call<{ id: string; status: string }>("POST", `${this.app}/authz/requests`, { user_id: userId, ...body }, this.config.secret);
   }
 
   // The agent (task token)
@@ -132,6 +139,26 @@ export class ScuteClient {
       { challenge },
       token
     );
+  }
+
+  startVerification(token: string, body: { method: string; permission?: string; session_id?: string }) {
+    return this.call<Verification>("POST", `${this.auth}/agent/verifications`, body, token);
+  }
+
+  verification(token: string, challenge: string) {
+    return this.call<Verification>("GET", `${this.auth}/agent/verifications/${encodeURIComponent(challenge)}`, undefined, token);
+  }
+
+  submitCode(token: string, challenge: string, code: string) {
+    return this.call<Verification>("POST", `${this.auth}/agent/verifications/${encodeURIComponent(challenge)}/code`, { code }, token);
+  }
+
+  requestApproval(token: string, body: { action: string; resource?: Resource; reason?: string; context?: Record<string, unknown> }) {
+    return this.call<Approval>("POST", `${this.auth}/agent/approvals`, body, token);
+  }
+
+  approval(token: string, id: string) {
+    return this.call<Approval>("GET", `${this.auth}/agent/approvals/${encodeURIComponent(id)}`, undefined, token);
   }
 
   endSession(token: string, sessionId: string) {

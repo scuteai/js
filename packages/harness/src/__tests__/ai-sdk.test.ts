@@ -193,3 +193,55 @@ describe("Vercel AI SDK v7", () => {
     expect((model.doGenerateCalls[0].tools ?? []).map((t: { name: string }) => t.name)).toEqual(["read_invoice"]);
   });
 });
+
+describe("human tools in the AI SDK loop", () => {
+  it("lets the model verify the person itself, then do the action", async () => {
+    const { jsonSchema } = await import("ai");
+    const scute = fakeScute({
+      decide: (body) =>
+        body.challenge === "ch_ok"
+          ? { decision: "allow" }
+          : { decision: "allow_with_step_up", step_up: { method: "any", authorizes_action: "invoice:refund" }, explanation: "Refunds need a fresh verification." },
+    });
+    const run = createHarness({ ...base, fetch: scute.fetch }).run({ actsFor: "user1" });
+    const { tools, refund } = invoiceTools();
+    const model = new MockLanguageModelV4({
+      doGenerate: [
+        callTool("refund_invoice", { invoice_id: "INV-1", amount: 90 }, "c1"),
+        callTool("scute_verify_person", { method: "email_otp" }, "c2"),
+        callTool("scute_submit_code", { code: "123 456" }, "c3"),
+        callTool("refund_invoice", { invoice_id: "INV-1", amount: 90 }, "c4"),
+        say("Done, refunded."),
+      ],
+    });
+
+    const result = await generateText({
+      model,
+      prompt: "Refund INV-1, 90",
+      tools: { ...run.tools(tools), ...run.humanTools(jsonSchema) },
+      toolApproval: run.toolApproval,
+      prepareStep: run.prepareStep,
+      stopWhen: isStepCount(10),
+    });
+
+    expect(result.text).toBe("Done, refunded.");
+    expect(refund).toHaveBeenCalledTimes(1);
+    expect(prompt(model, 1)).toContain("Verify them with scute_verify_person, then try again.");
+    expect(prompt(model, 2)).toContain("I've emailed a code to a***@example.com. What's the code?");
+    expect(prompt(model, 3)).toContain("Thanks, you're verified.");
+    expect(scute.paths("/v1/auth/app1/agent/verifications")[0].body).toMatchObject({ method: "email_otp", permission: "invoice:refund" });
+    expect((model.doGenerateCalls[0].tools ?? []).map((t: { name: string }) => t.name)).toEqual(
+      expect.arrayContaining(["refund_invoice", "scute_verify_person", "scute_submit_code", "scute_whoami"])
+    );
+  });
+
+  it("answers the model plainly when something is missing", async () => {
+    const { jsonSchema } = await import("ai");
+    const run = createHarness({ ...base, fetch: fakeScute().fetch }).run({ actsFor: "user1" });
+    const t = run.humanTools((s) => jsonSchema(s));
+
+    expect(await t.scute_submit_code.execute({ code: "1" })).toEqual({ error: "no_verification", say: "Let me send you a verification first." });
+    expect(await t.scute_verify_person.execute({})).toMatchObject({ error: "method_required" });
+    expect(await t.scute_whoami.execute()).toMatchObject({ acts_for: "user1", could_with_more_access: ["invoice:read", "invoice:refund"] });
+  });
+});
