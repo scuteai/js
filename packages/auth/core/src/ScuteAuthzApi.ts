@@ -11,6 +11,7 @@ export type AuthzResource =
 
 export type AuthzDecision = {
   decision: "allow" | "deny" | "allow_with_step_up";
+  /** true only for "allow". A step-up answer is false until verified. */
   allowed: boolean;
   reason: string;
   permission?: string;
