@@ -6,6 +6,7 @@ import { useSessions } from "../useSessions";
 import { useAlternatePhones } from "../useAlternatePhones";
 import { useSecureAccount } from "../useSecureAccount";
 import { ScuteAuthGate } from "../ScuteAuthGate";
+import { useElementAccessRequests, useElementDecisionLog, useElementUserRoles } from "../useAuthzElements";
 
 describe("@scute/auth-ui-react public surface", () => {
   it("exports exactly the headless hooks and the gate component", () => {
@@ -13,6 +14,9 @@ describe("@scute/auth-ui-react public surface", () => {
       [
         "ScuteAuthGate",
         "useAlternatePhones",
+        "useElementAccessRequests",
+        "useElementDecisionLog",
+        "useElementUserRoles",
         "useScuteAuthFlow",
         "useSecureAccount",
         "useSessions",
@@ -28,5 +32,8 @@ describe("@scute/auth-ui-react public surface", () => {
     expect(pkg.useAlternatePhones).toBe(useAlternatePhones);
     expect(pkg.useSecureAccount).toBe(useSecureAccount);
     expect(pkg.ScuteAuthGate).toBe(ScuteAuthGate);
+    expect(pkg.useElementUserRoles).toBe(useElementUserRoles);
+    expect(pkg.useElementAccessRequests).toBe(useElementAccessRequests);
+    expect(pkg.useElementDecisionLog).toBe(useElementDecisionLog);
   });
 });

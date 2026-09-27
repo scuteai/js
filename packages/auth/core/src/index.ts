@@ -2,6 +2,7 @@ import ScuteClient, { createClient } from "./ScuteClient";
 import ScuteAdminApi from "./ScuteAdminApi";
 import ScuteVerifyApi from "./ScuteVerifyApi";
 import ScuteAuthzApi from "./ScuteAuthzApi";
+import ScuteElementsApi from "./ScuteElementsApi";
 import ScuteBrowserCookieStorage from "./lib/ScuteBrowserCookieStorage";
 import { ScuteCookieStorage } from "./lib/ScuteStorage";
 
@@ -11,12 +12,19 @@ export {
   ScuteAdminApi,
   ScuteVerifyApi,
   ScuteAuthzApi,
+  ScuteElementsApi,
   ScuteClient,
   createClient,
   ScuteCookieStorage,
   ScuteBrowserCookieStorage,
 };
 
+export type {
+  ElementUser,
+  ElementRole,
+  ElementDecision,
+  ScuteElementsApiConfig,
+} from "./ScuteElementsApi";
 export type {
   AuthzAccessRequest,
   AuthzAccessRequestInput,

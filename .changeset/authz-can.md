@@ -1,6 +1,7 @@
 ---
 "@scute/js-core": minor
 "@scute/react-hooks": minor
+"@scute/auth-ui-react": minor
 ---
 
 Authorization for your app's users.
@@ -11,3 +12,4 @@ Authorization for your app's users.
 - Access requests: users call `scute.authz.requestAccess`, `myRequests`, `cancelRequest`, and reviewers `reviews`, `approveRequest`, `denyRequest`; the backend has `authzRequests`, `authzCreateRequest`, `authzDecideRequest`, and passes `approval` on `authzCheck` for permissions that need one.
 - React: `useCan(action, resource?)` (`allowed`, `needsStepUp`, `needsApproval`, `decision`) and `usePermissions()` (`has(permission)`).
 - `allowed` is true only for a plain `allow`: a step-up or approval answer is not allowed yet.
+- Embeddable admin screens: `ScuteElementsApi` (browser, with a short-lived element token your backend mints, never the app secret) and headless hooks in `@scute/auth-ui-react`: `useElementUserRoles`, `useElementAccessRequests` (`kind: "operation"` for approvals) and `useElementDecisionLog`. The token decides which users are visible and which roles may be granted.
