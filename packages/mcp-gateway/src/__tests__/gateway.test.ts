@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createGateway, type GatewayConfig } from "../gateway";
 import { formatSse, parseSse } from "../sse";
 
-const subtle = webcrypto.subtle;
+const subtle = (webcrypto as unknown as Crypto).subtle;
 const API = "https://api.test";
 const ISSUER = `${API}/v1/oauth/app1`;
 const RESOURCE = "https://mcp.test/mcp";
@@ -184,6 +184,49 @@ describe("MCP gateway", () => {
     expect(exchanges).toHaveLength(1);
     expect(exchanges[0].headers.get("authorization")).toBe("Bearer sk_test");
     expect(String(exchanges[0].body)).toContain("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Atoken-exchange");
+  });
+
+  it("refuses a foreign Host or Origin (DNS rebinding)", async () => {
+    const { gateway, token } = await setup();
+    const t = await token();
+    for (const headers of [{ host: "evil.example.com" }, { origin: "http://evil.example.com" }] as Record<string, string>[]) {
+      const res = await gateway.handle(new Request(RESOURCE, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${t}`, ...headers },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }) }));
+      expect(res.status).toBe(403);
+    }
+    const ok = await gateway.handle(new Request(RESOURCE, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${t}`, origin: "https://mcp.test" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }) }));
+    expect(ok.status).toBe(200);
+  });
+
+  it("streams a tool call's events as they come (the upstream may ask the client something first)", async () => {
+    const { gateway, token } = await setup();
+    let release!: () => void;
+    const released = new Promise<void>((r) => { release = r; });
+    const enc = new TextEncoder();
+    const upstreamFetch = gateway.config.fetch!;
+    (gateway as unknown as { fetchImpl: typeof fetch }).fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) !== UPSTREAM) return upstreamFetch(input, init);
+      const body = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          controller.enqueue(enc.encode(formatSse([{ event: "message", data: JSON.stringify({ jsonrpc: "2.0", id: 99, method: "sampling/createMessage", params: {} }) }])));
+          await released; // the upstream waits for the client's answer
+          controller.enqueue(enc.encode(formatSse([{ event: "message", data: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: "done" }] } }) }])));
+          controller.close();
+        },
+      });
+      return new Response(body, { headers: { "content-type": "text/event-stream" } });
+    }) as typeof fetch;
+
+    const res = await gateway.handle(new Request(RESOURCE, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${await token()}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "read_invoice", arguments: {} } }) }));
+    const reader = res.body!.getReader();
+    const first = new TextDecoder().decode((await reader.read()).value);
+    expect(first).toContain("sampling/createMessage");
+    release();
+    let rest = "";
+    for (let r = await reader.read(); !r.done; r = await reader.read()) rest += new TextDecoder().decode(r.value);
+    expect(JSON.parse(parseSse(rest)[0].data).result.content[0].text).toBe("done");
   });
 
   it("tells the model when Scute can't start a task", async () => {

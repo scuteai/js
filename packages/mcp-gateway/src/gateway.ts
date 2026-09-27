@@ -30,6 +30,13 @@ export type GatewayConfig = {
   resourceName?: string;
   /** Tell the model to use scute_verify_person and friends (when the upstream offers them). */
   humanTools?: boolean;
+  /**
+   * DNS rebinding protection (MCP 2025-11-25): requests must come to one of
+   * these hosts, and an Origin header, when sent, must be one of these
+   * origins. Default: the resource's own host and origin. "*" turns a check off.
+   */
+  allowedHosts?: string[] | "*";
+  allowedOrigins?: string[] | "*";
   fetch?: typeof fetch;
 };
 
@@ -118,6 +125,7 @@ export class McpGateway {
       const path = new URL(req.url).pathname;
       if (req.method === "GET" && this.isMetadataPath(path)) return json(await this.resourceMetadata());
       if (path !== this.resourceUrl.pathname) return new Response("Not found", { status: 404 });
+      if (!this.trustedOrigin(req)) return json({ error: "forbidden", error_description: "Unexpected Host or Origin" }, 403);
 
       const caller = await this.authenticate(req);
       if (caller instanceof Response) return caller;
@@ -128,6 +136,16 @@ export class McpGateway {
       return json({ jsonrpc: "2.0", id: null, error: { code: -32603, message: `Gateway error: ${(e as Error).message}` } }, 502);
     }
   };
+
+  private trustedOrigin(req: Request): boolean {
+    const hosts = this.config.allowedHosts ?? [this.resourceUrl.host];
+    const origins = this.config.allowedOrigins ?? [this.resourceUrl.origin];
+    const host = req.headers.get("host") ?? new URL(req.url).host;
+    if (hosts !== "*" && !hosts.includes(host)) return false;
+    const origin = req.headers.get("origin");
+    if (origin && origins !== "*" && !origins.includes(origin)) return false;
+    return true;
+  }
 
   // ── Discovery and sign-in ─────────────────────────────────────────────────
 
@@ -283,12 +301,12 @@ export class McpGateway {
 
     const trace = req.headers.get("traceparent");
     const params = { ...msg.params, arguments: verdict.args, _meta: { ...(msg.params?._meta ?? {}), ...(trace ? { traceparent: trace } : {}) } };
-    const upstream = await this.forward(req, JSON.stringify({ ...msg, params }), true);
+    const upstream = await this.forward(req, JSON.stringify({ ...msg, params }));
     return this.rewrite(upstream, msg.id, async (result) => (await session.run.after(name, verdict.args, result)).result);
   }
 
   private async toolsList(req: Request, msg: RpcMessage, text: string, caller: Caller): Promise<Response> {
-    const upstream = await this.forward(req, text, true);
+    const upstream = await this.forward(req, text);
     return this.rewrite(upstream, msg.id, async (result) => {
       const r = result as { tools?: McpTool[] } | undefined;
       if (!r || !Array.isArray(r.tools)) return result;
@@ -332,7 +350,7 @@ export class McpGateway {
   // ── Upstream ──────────────────────────────────────────────────────────────
 
   /** Forward to the upstream MCP server with the gateway's own credentials (never the user's token). */
-  private async forward(req: Request, body: string | undefined, buffer = false): Promise<Response> {
+  private async forward(req: Request, body: string | undefined): Promise<Response> {
     const headers = new Headers(this.config.upstream.headers ?? {});
     for (const name of FORWARD_HEADERS) {
       const v = req.headers.get(name);
@@ -344,27 +362,54 @@ export class McpGateway {
       const v = res.headers.get(name);
       if (v) out.set(name, v);
     }
-    if (!buffer) return new Response(res.body, { status: res.status, headers: out });
-    return new Response(await res.text(), { status: res.status, headers: out });
+    return new Response(res.body, { status: res.status, headers: out });
   }
 
-  /** Replace the result of the response to `id`, in a JSON or an SSE body. */
+  /**
+   * Replace the result of the response to `id`. SSE streams pass through
+   * event by event (the upstream may ask the client something, like sampling
+   * or elicitation, before it answers), and only the event carrying the
+   * response is changed. JSON bodies are complete, so they're read whole.
+   */
   private async rewrite(res: Response, id: RpcMessage["id"], change: (result: unknown) => Promise<unknown>): Promise<Response> {
     const type = res.headers.get("content-type") ?? "";
-    const text = await res.text();
     const headers = new Headers(res.headers);
     const fix = async (m: RpcMessage) => (m && m.id === id && "result" in m ? { ...m, result: await change(m.result) } : m);
-    if (type.includes("text/event-stream")) {
-      const events: SseEvent[] = [];
-      for (const ev of parseSse(text)) {
+
+    if (type.includes("text/event-stream") && res.body) {
+      const decoder = new TextDecoder();
+      const encoder = new TextEncoder();
+      let buffer = "";
+      const emit = async (raw: string, controller: TransformStreamDefaultController<Uint8Array>) => {
+        const [ev] = parseSse(raw);
+        if (!ev) return;
+        let out = `${raw}\n\n`;
         try {
-          events.push({ ...ev, data: JSON.stringify(await fix(JSON.parse(ev.data) as RpcMessage)) });
+          const msg = JSON.parse(ev.data) as RpcMessage;
+          if (msg && msg.id === id && "result" in msg) out = formatSse([{ ...ev, data: JSON.stringify(await fix(msg)) }]);
         } catch {
-          events.push(ev);
+          // not a JSON-RPC message: pass it on unchanged
         }
-      }
-      return new Response(formatSse(events), { status: res.status, headers });
+        controller.enqueue(encoder.encode(out));
+      };
+      const stream = res.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+        async transform(chunk, controller) {
+          buffer += decoder.decode(chunk, { stream: true }).replace(/\r\n/g, "\n");
+          let end: number;
+          while ((end = buffer.indexOf("\n\n")) !== -1) {
+            const raw = buffer.slice(0, end);
+            buffer = buffer.slice(end + 2);
+            await emit(raw, controller);
+          }
+        },
+        async flush(controller) {
+          if (buffer.trim()) await emit(buffer, controller);
+        },
+      }));
+      return new Response(stream, { status: res.status, headers });
     }
+
+    const text = await res.text();
     if (type.includes("json") && text) {
       try {
         return new Response(JSON.stringify(await fix(JSON.parse(text) as RpcMessage)), { status: res.status, headers });
