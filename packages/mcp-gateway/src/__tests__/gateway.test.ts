@@ -28,7 +28,10 @@ const TOOLS = [
   { name: "refund_invoice", description: "Refund an invoice", inputSchema: { type: "object" } },
   { name: "delete_customer", description: "Delete a customer", inputSchema: { type: "object" } },
   { name: "export_everything", description: "Changed yesterday", inputSchema: { type: "object" } },
+  { name: "scute_whoami", description: "An upstream tool with a clashing name", inputSchema: { type: "object" } },
 ];
+
+const OWN = ["scute_verify_person", "scute_submit_code", "scute_check_verification", "scute_approval_status", "scute_whoami"];
 
 type Seen = { url: string; method: string; headers: Headers; body: any };
 
@@ -61,6 +64,15 @@ async function setup(options: { sse?: boolean; decide?: (body: any) => any; exch
       return reply({ agent: "claude", task: "t1", acts_for: "user1", chain: [], agent_roles: ["support"], permissions: ["invoice:read"],
         ceiling: ["invoice:read", "invoice:refund", "everything:export"], step_up: [], approval: [], actions: null, resources: null,
         expires_at: new Date(Date.now() + 1_800_000).toISOString() });
+    }
+    if (url === `${API}/v1/auth/app1/agent/sessions`) return reply({ id: "sess1", task_id: "t1", verified: false }, 201);
+    if (url === `${API}/v1/auth/app1/agent/verifications`) {
+      return reply({ token: "ch_1", status: "pending", method: body.method, say: "I've emailed a code to a***@example.com. What's the code?" }, 201);
+    }
+    if (url === `${API}/v1/auth/app1/agent/verifications/ch_1/code`) {
+      return body.code === "123456"
+        ? reply({ token: "ch_1", status: "completed", say: "Thanks, you're verified." })
+        : reply({ token: "ch_1", status: "pending", remaining_attempts: 2, error: "Invalid code", say: "That code didn't work." }, 422);
     }
     if (url === `${API}/v1/apps/app1/oauth/resources`) return reply({ resources: [{ id: "r1", url: RESOURCE }] });
     if (url === `${API}/v1/apps/app1/oauth/resources/r1/tools/observe`) return reply({ quarantined: options.quarantined ?? [] });
@@ -121,14 +133,14 @@ describe("MCP gateway", () => {
     const { call, token } = await setup({ quarantined: ["export_everything"] });
     const res = await call(await token(), { method: "tools/list" });
     const body = await res.json();
-    expect(body.result.tools.map((t: { name: string }) => t.name)).toEqual(["read_invoice", "refund_invoice"]);
+    expect(body.result.tools.map((t: { name: string }) => t.name)).toEqual(["read_invoice", "refund_invoice", ...OWN]);
   });
 
   it("filters an SSE response too", async () => {
     const { call, token } = await setup({ sse: true });
     const res = await call(await token(), { method: "tools/list" });
     const [event] = parseSse(await res.text());
-    expect(JSON.parse(event.data).result.tools.map((t: { name: string }) => t.name)).toEqual(["read_invoice", "refund_invoice", "export_everything"]);
+    expect(JSON.parse(event.data).result.tools.map((t: { name: string }) => t.name)).toEqual(["read_invoice", "refund_invoice", "export_everything", ...OWN]);
   });
 
   it("runs allowed calls upstream with its own credentials, never the user's token", async () => {
@@ -227,6 +239,61 @@ describe("MCP gateway", () => {
     let rest = "";
     for (let r = await reader.read(); !r.done; r = await reader.read()) rest += new TextDecoder().decode(r.value);
     expect(JSON.parse(parseSse(rest)[0].data).result.content[0].text).toBe("done");
+  });
+
+  describe("its own tools for bringing the person in (RB-43 part D)", () => {
+    it("lists them after the upstream's, replacing an upstream tool of the same name", async () => {
+      const { call, token } = await setup({ config: { hideUnavailable: false } });
+      const tools = (await (await call(await token(), { method: "tools/list" })).json()).result.tools as { name: string; description: string }[];
+
+      expect(tools.filter((t) => t.name === "scute_whoami")).toHaveLength(1);
+      expect(tools.find((t) => t.name === "scute_whoami")?.description).toContain("Who you're working for");
+      expect(tools.find((t) => t.name === "scute_verify_person")).toMatchObject({ inputSchema: { type: "object" } });
+    });
+
+    it("verifies the person with the task token, never through the upstream", async () => {
+      const { call, token, seen } = await setup();
+      const t = await token();
+
+      const started = (await (await call(t, { method: "tools/call", params: { name: "scute_verify_person", arguments: { method: "email_otp" } } })).json()).result;
+      expect(started.isError).toBe(false);
+      expect(started.structuredContent).toMatchObject({ status: "pending", say: expect.stringContaining("emailed a code") });
+      expect(started.content[0].text).toContain("What's the code?");
+
+      const wrong = (await (await call(t, { method: "tools/call", params: { name: "scute_submit_code", arguments: { code: "000000" } } })).json()).result;
+      expect(wrong.isError).toBe(false); // a wrong code is a pending verification with a line to say, not a failure
+      expect(wrong.structuredContent).toMatchObject({ status: "pending", remaining_attempts: 2, say: expect.stringContaining("didn't work") });
+
+      const done = (await (await call(t, { method: "tools/call", params: { name: "scute_submit_code", arguments: { code: "123 456" } } })).json()).result;
+      expect(done.structuredContent).toMatchObject({ status: "completed" });
+
+      const verify = seen.find((s) => s.url === `${API}/v1/auth/app1/agent/verifications`);
+      expect(verify?.headers.get("authorization")).toBe("Bearer sct_task");
+      expect(upstreamCalls(seen)).toHaveLength(0);
+    });
+
+    it("answers whoami from the task", async () => {
+      const { call, token } = await setup();
+      const me = (await (await call(await token(), { method: "tools/call", params: { name: "scute_whoami", arguments: {} } })).json()).result;
+
+      expect(me.structuredContent).toMatchObject({ acts_for: "user1", may: ["invoice:read"], could_with_more_access: ["invoice:refund", "everything:export"] });
+    });
+
+    it("points the model at them when a call needs verification", async () => {
+      const { call, token } = await setup({
+        decide: (b) => (b.action === "refund" ? { decision: "allow_with_step_up", reason: "verification_required", explanation: "Refunds need verification." } : { decision: "allow" }),
+      });
+      const res = await call(await token(), { method: "tools/call", params: { name: "refund_invoice", arguments: { id: 1 } } });
+
+      expect((await res.json()).result.content[0].text).toContain("scute_verify_person");
+    });
+
+    it("can be turned off, leaving the upstream's tools alone", async () => {
+      const { call, token } = await setup({ config: { humanTools: false } });
+      const tools = (await (await call(await token(), { method: "tools/list" })).json()).result.tools as { name: string; description: string }[];
+
+      expect(tools.map((t) => t.name)).toEqual(["read_invoice", "refund_invoice", "export_everything"]);
+    });
   });
 
   it("tells the model when Scute can't start a task", async () => {

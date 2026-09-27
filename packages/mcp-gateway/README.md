@@ -44,6 +44,20 @@ createServer(nodeListener(gateway.handle)).listen(8787);
 
 Map scopes to permissions on the MCP server in Scute (for example `tools:write -> invoice:refund`). When a call needs a scope the token doesn't have, the gateway answers `403` with `WWW-Authenticate: Bearer error="insufficient_scope"`, and the client asks the user again with more scope.
 
+## Bringing the person in
+
+Next to your server's tools, the gateway lists its own tools and answers them itself (never forwarding them to your server). Each one works with the signed-in person's task, and every answer has a `say` line for the model to pass on:
+
+- `scute_verify_person`: send them a code or a push (method: `email_otp`, `sms_otp`, `totp`, `entra_push`; change the list with `verificationMethods`)
+- `scute_submit_code`: pass on the code they read out
+- `scute_check_verification`: check a push or a link
+- `scute_approval_status`: check a reviewer's answer
+- `scute_whoami`: who the task works for, what it may do, and what needs verification or approval
+
+When a tool call needs verification, the model is told to use `scute_verify_person` and then try again. If your server has a tool with one of these names, the gateway's version replaces it. Turn them all off with `humanTools: false`.
+
+Signing in isn't a tool: the MCP client signs the person in when it connects (OAuth), and asks for more access when a tool needs it (`insufficient_scope`).
+
 ## Notes
 
 - Tool pinning checks the definitions it has seen in `tools/list`. Keep pinning on (`pinning: true`, the default) and review held tools in Scute.
