@@ -14,6 +14,8 @@ const RANK: Record<DecisionKind, number> = {
 
 export const rank = (kind: DecisionKind) => RANK[kind];
 
+export const knownKind = (kind: unknown): kind is DecisionKind => typeof kind === "string" && kind in RANK;
+
 export const stricter = (a: Decision, b: Decision) => (rank(b.kind) > rank(a.kind) ? b : a);
 
 /** Did this verdict let the tool run? */
@@ -23,6 +25,8 @@ export class Call implements ToolCall {
   args: Args;
   /** The mode of the guard looking at the call right now. */
   mode: Mode = "enforce";
+  /** No enforced guard so far stops the call. */
+  clear = true;
 
   constructor(
     readonly run: Run,

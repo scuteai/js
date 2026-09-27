@@ -32,21 +32,25 @@ function fromEngine(engine: EngineDecision): Decision {
  * Scute's engine decides: the agent's roles, the person it works for
  * (object roles, conditions, verification, approvals) and the task, all
  * three. Tools with no permission (`tools: { name: false }`) pass through.
+ * Runs after the other guards.
  */
 export function permissions(options: PermissionsOptions = {}): Guard {
   return {
     name: "permissions",
     mode: options.mode,
+    // Last, so an approval or a verification is spent only on a call that runs.
+    runsLast: true,
     async before(call) {
       if (!call.permission || !call.spec.action) return;
       const context = options.context?.(call);
-      let engine = await call.run.engineCheck(call, context);
+      const proofs = call.clear && call.mode === "enforce";
+      let engine = await call.run.engineCheck(call, context, { proofs });
       if (engine.decision !== "allow_with_approval") return fromEngine(engine);
 
       if (options.fileRequests === false || call.mode !== "enforce") return fromEngine(engine);
       const request = await call.run.requestApproval(call);
       // Approved since the last try: check again with it, which spends it.
-      if (request?.status === "approved") engine = await call.run.engineCheck(call, context);
+      if (request?.status === "approved" && proofs) engine = await call.run.engineCheck(call, context, { proofs });
       const decision = fromEngine(engine);
       if (decision.approve && request) {
         decision.approve.requestId = request.id;

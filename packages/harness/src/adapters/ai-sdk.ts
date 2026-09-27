@@ -43,7 +43,7 @@ export function aiSdkTools<T extends Record<string, any>>(run: Run, tools: T): T
           messages: options.messages ?? [],
           approvedByUser: userApproved(options.messages, options.toolCallId),
         };
-        const verdict = run.take(options.toolCallId) ?? (await run.check(name, input, opts));
+        const verdict = run.take(options.toolCallId, name, input) ?? (await run.check(name, input, opts));
         if (!runs(verdict)) return { error: verdict.message, decision: verdict.kind, reason: verdict.decision.reason };
         const result = await execute(verdict.args, options);
         // Streaming tools: counted, but their parts reach the model as they come.
@@ -59,22 +59,39 @@ export function aiSdkTools<T extends Record<string, any>>(run: Run, tools: T): T
   return out as T;
 }
 
+/**
+ * A tool's own `needsApproval` (deprecated in v7, still honored by us): a
+ * generic `toolApproval` function replaces the SDK's own reading of it, so
+ * the harness has to ask it on the tool's behalf.
+ */
+async function toolNeedsApproval(
+  tool: unknown,
+  input: unknown,
+  options: { toolCallId: string; messages?: unknown[] }
+): Promise<boolean> {
+  const needs = (tool as { needsApproval?: unknown } | undefined)?.needsApproval;
+  if (typeof needs === "function") return !!(await needs(input, { toolCallId: options.toolCallId, messages: options.messages ?? [] }));
+  return needs === true;
+}
+
 export function aiSdkToolApproval(run: Run) {
   return async (options: {
     toolCall: { toolName: string; toolCallId: string; input: unknown };
+    tools?: Record<string, unknown>;
     messages?: unknown[];
   }): Promise<AiSdkApprovalStatus> => {
     const { toolCall } = options;
     // The harness's own tools for human steps aren't actions to guard.
     if (run.humanToolNames.includes(toolCall.toolName)) return undefined;
-    const verdict = await run.check(toolCall.toolName, (toolCall.input ?? {}) as Record<string, unknown>, {
-      id: toolCall.toolCallId,
-      messages: options.messages ?? [],
-    });
+    const input = (toolCall.input ?? {}) as Record<string, unknown>;
+    const verdict = await run.check(toolCall.toolName, input, { id: toolCall.toolCallId, messages: options.messages ?? [] });
     switch (verdict.kind) {
       case "proceed":
       case "transform":
-        run.keep(verdict);
+        if (await toolNeedsApproval(options.tools?.[toolCall.toolName], input, { toolCallId: toolCall.toolCallId, messages: options.messages })) {
+          return { type: "user-approval" };
+        }
+        run.keep(verdict, input);
         return undefined;
       case "verify":
         // With the human tools, the model verifies the person itself.

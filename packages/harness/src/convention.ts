@@ -19,17 +19,10 @@ const isKey = (v: unknown): v is string | number =>
  */
 export function toolPermission(name: string): string {
   const w = words(name);
-  if (w.length < 2) return w.join("_");
+  // A name with no letters or digits still gets checked (and denied as unknown), never skipped.
+  if (!w.length) return name || "unnamed_tool";
+  if (w.length < 2) return w[0];
   return `${w.slice(1).join("_")}:${w[0]}`;
-}
-
-function plainArgs(args: Args, skip?: string) {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(args ?? {})) {
-    if (k === skip) continue;
-    if (typeof v === "string" || typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v))) out[k] = v;
-  }
-  return out;
 }
 
 export function toolSpec(name: string, tools: ToolsConfig | undefined, defaultTier: Tier): ToolSpec {
@@ -55,7 +48,7 @@ export function toolSpec(name: string, tools: ToolsConfig | undefined, defaultTi
       if (!resourceType) return undefined;
       const keyArg = config.key ?? [`${resourceType}_id`, `${camel(resourceType)}Id`, "id"].find((k) => isKey(args?.[k]));
       const key = keyArg !== undefined && isKey(args?.[keyArg]) ? String(args[keyArg]) : undefined;
-      const attributes = config.attributes ? config.attributes(args) : plainArgs(args, keyArg);
+      const attributes = config.attributes?.(args);
       const resource: Resource = { type: resourceType };
       if (key) resource.key = key;
       if (attributes && Object.keys(attributes).length) resource.attributes = attributes;

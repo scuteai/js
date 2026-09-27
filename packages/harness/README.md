@@ -75,8 +75,10 @@ Every guard runs in a mode: `enforce`, `monitor` (records and calls
 ## Tools map to permissions by name
 
 `refund_invoice` needs `invoice:refund` on the invoice named by
-`invoice_id` (or `invoiceId`, or `id`); plain arguments become attributes
-for policy conditions (`resource.amount < 500`). Override per tool:
+`invoice_id` (or `invoiceId`, or `id`). The call's arguments reach the
+engine as `context.args` (`context.args.amount < 500`); the object's own
+attributes come from what Scute stores for it, which the model can't
+override. Override per tool:
 
 ```ts
 tools: {
@@ -110,16 +112,25 @@ tools: {
   call `run.confirm(tool, args)` when they confirm, and that exact call
   goes through once.
 - **Reviewer approval.** A permission that requires approval files a Scute
-  access request for the exact operation, tagged with the agent and task
-  (`verdict.say`: "I've asked for approval..."); the call goes through once
-  a reviewer approves it. `run.approvalStatus(id)` checks on it.
+  access request for the exact call (its arguments go with it and reviewers
+  see them), tagged with the agent and task (`verdict.say`: "I've asked for
+  approval..."). Only that same call goes through once it's approved; a call
+  with other arguments is a new request. Approvals and verifications are
+  spent only on a call no other guard stops. `run.approvalStatus(id)` checks.
 
 ## Runs and state
 
+Checks within one run go one at a time, so budgets hold when the model
+asks for several tools at once. Streaming tools (an `execute` that yields)
+are counted but their parts reach the model as they come, without the
+after-guards. Grounding needs the conversation: the AI SDK adapter passes
+it; with `run.check()` pass `messages`.
+
 A run is one job: a short-lived Scute task (token minted on first use,
 never shown to the model), its session, and what guards remember. Reuse
-`id` to resume across requests; in serverless apps pass a shared `store`
-(`{ get, set }` over Redis, KV or a table). `run.complete()` or
+`id` (with the same `actsFor`) to resume across requests; in serverless
+apps pass a shared `store` (`{ get, set }` over Redis, KV or a table). A
+task revoked in Scute ends the run for good. `run.complete()` or
 `run.revoke()` ends the task; suspending the agent in Scute ends them all.
 An agent process without the secret key can run on a task token your
 backend minted: `harness.run({ token })`.

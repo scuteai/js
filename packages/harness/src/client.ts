@@ -53,6 +53,8 @@ export type Verification = {
 /** An approval an agent asked for. Without `id`, nothing was filed (see status). */
 export type Approval = {
   id?: string;
+  /** The exact call the approval is for. */
+  details?: Record<string, unknown>;
   status: "pending" | "approved" | "denied" | "cancelled" | "expired" | "used" | "not_needed" | "verify_first";
   permission?: string;
   resource?: string;
@@ -123,7 +125,15 @@ export class ScuteClient {
 
   check(
     token: string,
-    body: { action: string; resource?: Resource; context?: Record<string, unknown>; challenge?: string; approval?: string; session_id?: string }
+    body: {
+      action: string;
+      resource?: Resource;
+      context?: Record<string, unknown>;
+      challenge?: string;
+      approval?: string;
+      details?: Record<string, unknown>;
+      session_id?: string;
+    }
   ) {
     return this.call<EngineDecision>("POST", `${this.auth}/agent/check`, body, token);
   }
@@ -153,7 +163,10 @@ export class ScuteClient {
     return this.call<Verification>("POST", `${this.auth}/agent/verifications/${encodeURIComponent(challenge)}/code`, { code }, token);
   }
 
-  requestApproval(token: string, body: { action: string; resource?: Resource; reason?: string; context?: Record<string, unknown> }) {
+  requestApproval(
+    token: string,
+    body: { action: string; resource?: Resource; reason?: string; context?: Record<string, unknown>; details?: Record<string, unknown> }
+  ) {
     return this.call<Approval>("POST", `${this.auth}/agent/approvals`, body, token);
   }
 

@@ -13,13 +13,9 @@ describe("naming convention", () => {
     expect(toolPermission("search")).toBe("search");
   });
 
-  it("finds the object and attributes in the arguments", () => {
+  it("finds the object in the arguments, and never takes its attributes from them", () => {
     const h = createHarness({ ...base, fetch: fakeScute().fetch });
-    expect(h.spec("refund_invoice").resource({ invoice_id: 42, amount: 90, note: { x: 1 } })).toEqual({
-      type: "invoice",
-      key: "42",
-      attributes: { amount: 90 },
-    });
+    expect(h.spec("refund_invoice").resource({ invoice_id: 42, amount: 90, note: { x: 1 } })).toEqual({ type: "invoice", key: "42" });
     expect(h.spec("reset_user_mfa").resource({ userMfaId: "u1" })).toEqual({ type: "user_mfa", key: "u1" });
     expect(h.spec("read_invoice").resource({ id: "7" })).toEqual({ type: "invoice", key: "7" });
   });
@@ -28,10 +24,17 @@ describe("naming convention", () => {
     const h = createHarness({
       ...base,
       fetch: fakeScute().fetch,
-      tools: { send_money: { permission: "payment:create", tier: "high", key: "to" }, get_weather: false },
+      tools: {
+        send_money: { permission: "payment:create", tier: "high", key: "to", attributes: (a) => ({ currency: a.currency }) },
+        get_weather: false,
+      },
     });
     expect(h.spec("send_money")).toMatchObject({ permission: "payment:create", action: "create", resourceType: "payment", tier: "high" });
-    expect(h.spec("send_money").resource({ to: "acct9", amount: 5 })).toEqual({ type: "payment", key: "acct9", attributes: { amount: 5 } });
+    expect(h.spec("send_money").resource({ to: "acct9", amount: 5, currency: "EUR" })).toEqual({
+      type: "payment",
+      key: "acct9",
+      attributes: { currency: "EUR" },
+    });
     expect(h.spec("get_weather").permission).toBeNull();
   });
 });
@@ -47,10 +50,12 @@ describe("permissions guard", () => {
     expect(b.kind).toBe("proceed");
     expect(scute.paths(MINT)).toHaveLength(1);
     expect(scute.paths(MINT)[0].body).toMatchObject({ acts_for: "user1", actions: ["invoice:refund"], ref: "T-9" });
-    expect(scute.paths(CHECK)[0]).toMatchObject({
+    const refund = scute.paths(CHECK).find((c) => c.body.action === "refund")!;
+    expect(refund).toMatchObject({
       auth: "Bearer sct_token1",
-      body: { action: "refund", resource: { type: "invoice", key: "42", attributes: { amount: 90 } } },
+      body: { action: "refund", resource: { type: "invoice", key: "42" }, context: { args: { invoice_id: 42, amount: 90 } } },
     });
+    expect(refund.body.resource).not.toHaveProperty("attributes");
   });
 
   it("maps engine answers to decisions and tells the model what to do", async () => {
@@ -156,8 +161,9 @@ describe("permissions guard", () => {
     expect(pending.say).toBe("I've asked for approval. I'll let you know when there's an answer.");
     expect(scute.paths("/v1/auth/app1/agent/approvals")[0].body).toMatchObject({
       action: "refund",
-      resource: { type: "invoice", key: "42", attributes: { amount: 900 } },
+      resource: { type: "invoice", key: "42" },
       reason: "refund_invoice (invoice_id 42, amount 900)",
+      details: { invoice_id: 42, amount: 900 },
     });
     expect((await run.approvalStatus("req1")).say).toBe("Still waiting.");
 

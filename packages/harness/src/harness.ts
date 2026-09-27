@@ -1,6 +1,6 @@
 import { ScuteClient } from "./client";
 import { toolSpec } from "./convention";
-import { Call, modelMessage, rank, runs } from "./decisions";
+import { Call, knownKind, modelMessage, rank, runs } from "./decisions";
 import { permissions } from "./guards/permissions";
 import { Run, type RunOptions } from "./run";
 import { memoryStore } from "./store";
@@ -46,6 +46,8 @@ export class Harness {
   readonly store: Store;
   readonly client: ScuteClient;
   private readonly specs = new Map<string, ToolSpec>();
+  private readonly ordered: Guard[];
+  private readonly locks = new Map<string, Promise<unknown>>();
 
   constructor(private readonly config: HarnessConfig) {
     const appId = config.appId ?? env("SCUTE_APP_ID");
@@ -57,6 +59,8 @@ export class Harness {
     this.agent = config.agent;
     this.mode = config.mode ?? "enforce";
     this.guards = config.guards ?? [permissions()];
+    // Guards that spend single-use proofs go last, in their listed order.
+    this.ordered = [...this.guards.filter((g) => !g.runsLast), ...this.guards.filter((g) => g.runsLast)];
     this.store = config.store ?? memoryStore();
     this.client = new ScuteClient({
       appId,
@@ -85,24 +89,31 @@ export class Harness {
     return guard.mode ?? this.mode;
   }
 
+  /** A guard's answer, checked: anything that isn't a known decision counts as deny. */
+  private async ask(fn: () => Decision | void | Promise<Decision | void>, failMessage: string) {
+    try {
+      const decision = (await fn()) || PROCEED;
+      if (!knownKind(decision.kind)) {
+        return { decision: { kind: "deny", reason: "invalid_decision", message: failMessage } as Decision, error: new TypeError(`Unknown decision kind: ${String(decision.kind)}`) };
+      }
+      return { decision, error: undefined };
+    } catch (e) {
+      return { decision: { kind: "deny", reason: "guard_error", message: failMessage } as Decision, error: e };
+    }
+  }
+
   /** @internal before-guards, strictest enforced decision wins. */
   async evaluate(call: Call): Promise<Verdict> {
     const started = now();
     const results: GuardResult[] = [];
     let winner: Decision & { guard?: string } = PROCEED;
 
-    for (const guard of this.guards) {
+    for (const guard of this.ordered) {
       if (!guard.before) continue;
       const mode = this.modeOf(guard);
       call.mode = mode;
-      let decision: Decision;
-      let error: unknown;
-      try {
-        decision = (await guard.before(call)) || PROCEED;
-      } catch (e) {
-        error = e;
-        decision = { kind: "deny", reason: "guard_error", message: "This action couldn't be checked safely right now." };
-      }
+      call.clear = rank(winner.kind) <= rank("transform");
+      const { decision, error } = await this.ask(() => guard.before!(call), "This action couldn't be checked safely right now.");
       results.push(error === undefined ? { guard: guard.name, mode, decision } : { guard: guard.name, mode, decision, error });
 
       if (mode !== "enforce") {
@@ -130,18 +141,14 @@ export class Harness {
     let current = result;
     let winner: Decision & { guard?: string } = PROCEED;
 
-    for (const guard of this.guards) {
+    for (const guard of this.ordered) {
       if (!guard.after) continue;
       const mode = this.modeOf(guard);
       call.mode = mode;
-      let decision: Decision;
-      let error: unknown;
-      try {
-        decision = (await guard.after(call, current)) || PROCEED;
-      } catch (e) {
-        error = e;
-        decision = { kind: "deny", reason: "guard_error", message: "This result couldn't be checked safely, so it was withheld." };
-      }
+      const { decision, error } = await this.ask(
+        () => guard.after!(call, current),
+        "This result couldn't be checked safely, so it was withheld."
+      );
       results.push(error === undefined ? { guard: guard.name, mode, decision } : { guard: guard.name, mode, decision, error });
 
       if (mode !== "enforce") {
@@ -191,11 +198,24 @@ export class Harness {
     }
   }
 
-  /** @internal hourly execution log, per agent and person. */
+  /**
+   * @internal hourly execution log, per agent and person. Updates to one key
+   * are serialized in this process; across processes the store decides (use
+   * one with atomic writes for hard limits).
+   */
   async recordExecution(key: string, tier: Tier) {
-    const recent = await this.executions(key, 3600_000);
-    recent.push({ at: Date.now(), tier });
-    await this.store.set(key, JSON.stringify(recent), 3600);
+    const previous = this.locks.get(key) ?? Promise.resolve();
+    const next = previous.then(async () => {
+      const recent = await this.executions(key, 3600_000);
+      recent.push({ at: Date.now(), tier });
+      await this.store.set(key, JSON.stringify(recent), 3600);
+    });
+    const settled = next.catch(() => undefined);
+    this.locks.set(key, settled);
+    settled.then(() => {
+      if (this.locks.get(key) === settled) this.locks.delete(key);
+    });
+    return next;
   }
 
   /** @internal */
