@@ -49,6 +49,17 @@ export function fakeScute(
       );
     }
     if (method === "POST" && /\/tasks\/[^/]+\/(complete|revoke)$/.test(path)) return json({ status: "done" });
+    if (method === "GET" && path === "/v1/auth/app1/agent/properties/stripe") {
+      if (!task) return json({ error: "Task token missing" }, 401);
+      return json({ name: "stripe", value: "sk_live_123" });
+    }
+    if (method === "GET" && path === "/v1/auth/app1/agent/properties/locked") {
+      return json({ error: "support-bot isn't allowed to use locked.", error_code: "agent_not_listed" }, 403);
+    }
+    if (method === "POST" && path === "/v1/auth/app1/agent/properties/mandates/sign") {
+      if (!task) return json({ error: "Task token missing" }, 401);
+      return json(body.claims ? { jws: "h.b.s", alg: "ES256", kid: "prop_1" } : { signature: "c2ln", alg: "ES256", kid: "prop_1" });
+    }
     if (method === "GET" && path === "/v1/auth/app1/agent/whoami") {
       if (!task) return json({ error: "Task token missing" }, 401);
       return json({

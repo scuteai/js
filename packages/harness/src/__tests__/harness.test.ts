@@ -367,4 +367,25 @@ describe("combining guards", () => {
     expect(() => createHarness({ agent: "", appId: "a" })).toThrow(/agent/);
     expect(() => createHarness({ agent: "x" })).toThrow(/SCUTE_APP_ID/);
   });
+
+  describe("properties (RB-42)", () => {
+    it("reads a secret and signs with the task token", async () => {
+      const scute = fakeScute();
+      const run = createHarness({ ...base, fetch: scute.fetch }).run({ actsFor: "user1" });
+
+      expect(await run.property("stripe")).toBe("sk_live_123");
+      expect(await run.sign("mandates", { claims: { amount: 4200 } })).toMatchObject({ jws: "h.b.s", kid: "prop_1" });
+      expect(await run.sign("mandates", { data: "aGVsbG8" })).toMatchObject({ signature: "c2ln" });
+
+      const reads = scute.seen.filter((s) => s.path.startsWith("/v1/auth/app1/agent/properties/"));
+      expect(reads.every((s) => s.auth?.startsWith("Bearer sct_"))).toBe(true);
+      expect(scute.seen.find((s) => s.path.endsWith("/mandates/sign"))?.body).toEqual({ claims: { amount: 4200 } });
+    });
+
+    it("surfaces a refusal", async () => {
+      const run = createHarness({ ...base, fetch: fakeScute().fetch }).run({ actsFor: "user1" });
+
+      await expect(run.property("locked")).rejects.toMatchObject({ status: 403, code: "agent_not_listed" });
+    });
+  });
 });

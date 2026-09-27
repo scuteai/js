@@ -220,6 +220,27 @@ export class Run {
     return this.me;
   }
 
+  /**
+   * A secret the app keeps in Scute (RB-42), read at call time inside a
+   * tool. Only listed agents can read it, only while the task is live (and
+   * allowed the property's permission, when it names one). Use it, don't
+   * return it: never put it in the model's context.
+   *
+   *     execute: async (args) => stripe(await run.property("stripe")).refunds.create(args)
+   */
+  async property(name: string): Promise<string> {
+    return (await this.agent((t) => this.harness.client.property(t, name))).value;
+  }
+
+  /**
+   * Sign with one of the app's key pairs (RB-42): claims come back as a
+   * compact JWS, bytes (base64url) as a signature. The private key never
+   * leaves Scute; the public keys are at /v1/auth/:app_id/properties/:name/jwks.json.
+   */
+  sign(name: string, input: { claims: Record<string, unknown> } | { data: string }) {
+    return this.agent((t) => this.harness.client.signWithProperty(t, name, input));
+  }
+
   /** The job is done: close the task (and its session). */
   complete() {
     return this.close("complete");
