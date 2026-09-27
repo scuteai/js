@@ -41,18 +41,21 @@ export function useCan(
 ): UseCanResult {
   const scute = useScuteClient();
   const { isAuthenticated, user } = useAuth();
-  const [decision, setDecision] = useState<AuthzDecision | null>(null);
+  // Each answer remembers what it was for, so a check for new inputs never
+  // shows the previous inputs' answer while it's in flight.
+  const [answer, setAnswer] = useState<{ key: string; decision: AuthzDecision | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ScuteError>(null);
   const request = useRef(0);
   const enabled = options.enabled !== false;
   const resourceKey = keyOf(resource);
   const contextKey = options.context ? JSON.stringify(options.context) : "";
+  const inputsKey = JSON.stringify([action, resourceKey, contextKey, user?.id ?? null]);
 
   const run = useCallback(async () => {
     const id = ++request.current;
     if (!enabled || !isAuthenticated) {
-      setDecision(null);
+      setAnswer(null);
       setError(null);
       setLoading(false);
       return;
@@ -60,7 +63,7 @@ export function useCan(
     setLoading(true);
     const { data, error: err } = await scute.authz.can(action, resource, options.context);
     if (id !== request.current) return; // a newer check started
-    setDecision(err ? null : data);
+    setAnswer({ key: inputsKey, decision: err ? null : data });
     setError(err ? { message: err.message, code: (err as any).code } : null);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,6 +72,8 @@ export function useCan(
   useEffect(() => {
     void run();
   }, [run]);
+
+  const decision = answer && answer.key === inputsKey ? answer.decision : null;
 
   return {
     allowed: decision?.decision === "allow",
@@ -99,15 +104,16 @@ export type UsePermissionsResult = {
 export function usePermissions(resource?: string): UsePermissionsResult {
   const scute = useScuteClient();
   const { isAuthenticated, user } = useAuth();
-  const [permissions, setPermissions] = useState<AuthzPermissions | null>(null);
+  const [answer, setAnswer] = useState<{ key: string; permissions: AuthzPermissions | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ScuteError>(null);
   const request = useRef(0);
+  const inputsKey = JSON.stringify([resource ?? null, user?.id ?? null]);
 
   const run = useCallback(async () => {
     const id = ++request.current;
     if (!isAuthenticated) {
-      setPermissions(null);
+      setAnswer(null);
       setError(null);
       setLoading(false);
       return;
@@ -115,10 +121,13 @@ export function usePermissions(resource?: string): UsePermissionsResult {
     setLoading(true);
     const { data, error: err } = await scute.authz.permissions(resource);
     if (id !== request.current) return;
-    setPermissions(err ? null : data);
+    setAnswer({ key: inputsKey, permissions: err ? null : data });
     setError(err ? { message: err.message, code: (err as any).code } : null);
     setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scute, resource, isAuthenticated, user?.id]);
+
+  const permissions = answer && answer.key === inputsKey ? answer.permissions : null;
 
   useEffect(() => {
     void run();
