@@ -1,0 +1,418 @@
+import { ScuteHarnessError, type Whoami } from "./client";
+import { resourceRef } from "./convention";
+import { Call, describeCall, runs } from "./decisions";
+import { aiSdkPrepareStep, aiSdkToolApproval, aiSdkTools, type AiSdkApprovalStatus } from "./adapters/ai-sdk";
+import type { Harness } from "./harness";
+import type { Args, EngineDecision, Tier, ToolCall, Verdict } from "./types";
+
+export type RunOptions = {
+  /**
+   * Where this run's state lives (task token, verifications, approvals,
+   * counters). Reuse one id per conversation or call so a later request
+   * picks up where the last one stopped.
+   */
+  id?: string;
+  /** The app user the agent works for. Omit for an agent working on its own. */
+  actsFor?: string;
+  /** Narrow the task: permission slugs, objects ("invoice:42" or "invoice"), lifetime, your reference. */
+  task?: { actions?: string[]; resources?: string[]; ttl?: number; ref?: string };
+  /** Who asked, when it isn't the person the agent acts for (a helpdesk caller). */
+  requester?: { email?: string; phone?: string; app_user_id?: string; name?: string };
+  /** The run that started this one (orchestrator to sub-agent). The child can't outlive it. */
+  parent?: Run;
+  /** A task token minted elsewhere (your backend), for an agent that runs without the secret key. */
+  token?: string;
+  /** Session details for voice and chat channels. */
+  session?: { channel?: string; externalRef?: string; caller?: Record<string, unknown> };
+  /** Sent with every check, for policy conditions on `context.*`. */
+  context?: Record<string, unknown>;
+};
+
+type RunState = {
+  token?: string;
+  taskId?: string;
+  expiresAt?: string;
+  actsFor?: string | null;
+  minted?: boolean;
+  closed?: boolean;
+  sessionId?: string;
+  verifiedAt?: number;
+  pending?: { token: string; permission?: string };
+  /** permission -> completed challenge token */
+  challenges: Record<string, string>;
+  /** "permission|object" -> access request id */
+  approvals: Record<string, string>;
+  calls: number;
+  usd: number;
+};
+
+type CheckOptions = { id?: string; messages?: unknown[]; approvedByUser?: boolean };
+
+const HOUR = 3600_000;
+
+export const randomId = () =>
+  (globalThis as any).crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+
+const approvalKey = (call: ToolCall) => `${call.permission}|${resourceRef(call.resource)}`;
+
+/** One job an agent does: a Scute task, its session, and what the guards remember about it. */
+export class Run {
+  readonly id: string;
+  private state?: RunState;
+  private loading?: Promise<RunState>;
+  private minting?: Promise<string>;
+  private opening?: Promise<string>;
+  private me?: Promise<Whoami>;
+  private kept = new Map<string, Verdict>();
+  private grounded = new Set<string>();
+  private identified = new Set<string>();
+  /** Tool names seen through tools(); prepareStep narrows these. */
+  toolNames: string[] = [];
+
+  constructor(readonly harness: Harness, readonly options: RunOptions = {}) {
+    this.id = options.id ?? randomId();
+  }
+
+  private get key() {
+    return `scute:run:${this.harness.agent}:${this.id}`;
+  }
+
+  private async load(): Promise<RunState> {
+    if (this.state) return this.state;
+    this.loading ??= (async () => {
+      const raw = await this.harness.store.get(this.key);
+      this.state = raw ? (JSON.parse(raw) as RunState) : { challenges: {}, approvals: {}, calls: 0, usd: 0 };
+      return this.state;
+    })();
+    return this.loading;
+  }
+
+  private async save() {
+    const s = await this.load();
+    const until = s.expiresAt ? Math.ceil((Date.parse(s.expiresAt) - Date.now()) / 1000) : 0;
+    // Keep state a day past the task, so a conversation resumed later still has its counters.
+    await this.harness.store.set(this.key, JSON.stringify(s), Math.max(until, 0) + 86400);
+  }
+
+  /** A copy of what this run remembers (task, verification, counters). */
+  async snapshot(): Promise<Readonly<RunState>> {
+    return JSON.parse(JSON.stringify(await this.load()));
+  }
+
+  // ── Task ──
+
+  /** The task token, starting the task on first use. */
+  async token(): Promise<string> {
+    if (this.options.token) return this.options.token;
+    const s = await this.load();
+    if (s.closed) throw new ScuteHarnessError("This run's task is closed; start a new run", 409, "task_closed");
+    if (s.token && !(s.expiresAt && Date.parse(s.expiresAt) <= Date.now() + 5000)) return s.token;
+    this.minting ??= this.mint().finally(() => {
+      this.minting = undefined;
+    });
+    return this.minting;
+  }
+
+  private async mint(): Promise<string> {
+    const { harness, options } = this;
+    if (!harness.client.canManage) {
+      throw new ScuteHarnessError(
+        "A run needs SCUTE_SECRET to start a task, or a task token (run({ token })) minted by your backend",
+        401,
+        "no_credentials"
+      );
+    }
+    const parent = options.parent ? await options.parent.taskId() : undefined;
+    const minted = await harness.client.mintTask(harness.agent, {
+      acts_for: options.actsFor,
+      actions: options.task?.actions,
+      resources: options.task?.resources,
+      ttl_seconds: options.task?.ttl,
+      ref: options.task?.ref,
+      requester: options.requester,
+      parent_task_id: parent,
+    });
+    const s = await this.load();
+    Object.assign(s, {
+      token: minted.token,
+      taskId: minted.id,
+      expiresAt: minted.expires_at,
+      actsFor: minted.acts_for ?? null,
+      minted: true,
+      sessionId: undefined,
+    });
+    this.me = undefined;
+    await this.save();
+    return minted.token;
+  }
+
+  async taskId(): Promise<string> {
+    if (this.options.token) return (await this.whoami()).task;
+    await this.token();
+    return (await this.load()).taskId!;
+  }
+
+  /** Who the agent works for, what the task allows and its ceiling. Cached per run. */
+  whoami(): Promise<Whoami> {
+    this.me ??= this.token().then((t) => this.harness.client.whoami(t));
+    this.me.catch(() => {
+      this.me = undefined;
+    });
+    return this.me;
+  }
+
+  private async actsFor(): Promise<string | undefined> {
+    if (this.options.actsFor) return this.options.actsFor;
+    const s = await this.load();
+    if (s.actsFor) return s.actsFor;
+    return (await this.whoami()).acts_for ?? undefined;
+  }
+
+  /** The job is done: close the task (and its session). */
+  complete() {
+    return this.close("complete");
+  }
+
+  /** Stop this run now: the task token stops working everywhere. */
+  revoke() {
+    return this.close("revoke");
+  }
+
+  private async close(verb: "complete" | "revoke") {
+    const s = await this.load();
+    if (s.sessionId && s.token) await this.harness.client.endSession(s.token, s.sessionId).catch(() => undefined);
+    if (s.taskId) await this.harness.client.closeTask(this.harness.agent, s.taskId, verb);
+    s.closed = true;
+    await this.save();
+  }
+
+  // ── Session and verification ──
+
+  /** The run's session (created on first use). Verification and "trust for this task" live on it. */
+  async session(): Promise<string> {
+    const s = await this.load();
+    if (s.sessionId) return s.sessionId;
+    this.opening ??= (async () => {
+      const token = await this.token();
+      const created = await this.harness.client.createSession(token, {
+        channel: this.options.session?.channel ?? "chat",
+        external_ref: this.options.session?.externalRef ?? this.id,
+        caller: this.options.session?.caller,
+      });
+      s.sessionId = created.id;
+      await this.save();
+      return created.id;
+    })().finally(() => {
+      this.opening = undefined;
+    });
+    return this.opening;
+  }
+
+  /**
+   * Send the person a verification (push, passkey, OTP) for this run. Pass
+   * the verdict that asked for it, or a method and permission. Needs the
+   * secret key; completing it is completeVerification().
+   */
+  async startVerification(options: { verdict?: Pick<Verdict, "decision">; method?: string; permission?: string } = {}) {
+    const userId = await this.actsFor();
+    if (!userId) throw new ScuteHarnessError("This run acts for nobody, so there's no one to verify", 409, "needs_human");
+    const asked = options.verdict?.decision.verify;
+    const permission = options.permission ?? asked?.permission;
+    const methods = [options.method, asked?.method, ...(asked?.methods ?? [])].filter((m): m is string => !!m && m !== "any");
+    if (!methods.length) throw new ScuteHarnessError("Pick a verification method (e.g. entra_push, email_otp, sms_otp)", 422, "method_required");
+    const { challenge } = await this.harness.client.startChallenge({ userId, method: methods[0], permission });
+    const s = await this.load();
+    s.pending = { token: challenge.token, permission };
+    await this.save();
+    return challenge;
+  }
+
+  /**
+   * The person finished a verification. Scute checks it's theirs, completed
+   * and fresh, marks the session verified, and the next check of that
+   * permission goes through.
+   */
+  async completeVerification(challengeToken?: string) {
+    const s = await this.load();
+    const token = challengeToken ?? s.pending?.token;
+    if (!token) throw new ScuteHarnessError("No verification to complete", 422, "no_challenge");
+    await this.harness.client.verifySession(await this.token(), await this.session(), token);
+    s.verifiedAt = Date.now();
+    const permission = s.pending?.token === token ? s.pending.permission : undefined;
+    if (permission) s.challenges[permission] = token;
+    s.pending = undefined;
+    await this.save();
+  }
+
+  /** When the person last verified in this run (ms), if they have. */
+  async verifiedAt(): Promise<number | undefined> {
+    return (await this.load()).verifiedAt;
+  }
+
+  // ── Engine ──
+
+  /** Ask Scute about a call (agent roles, the human, the task). Used by guards.permissions(). */
+  async engineCheck(call: ToolCall, context?: Record<string, unknown>): Promise<EngineDecision> {
+    const s = await this.load();
+    const permission = call.permission!;
+    const approval = s.approvals[approvalKey(call)];
+    const decision = await this.harness.client.check(await this.token(), {
+      action: call.spec.action!,
+      resource: call.resource,
+      context: { ...this.options.context, ...context },
+      challenge: s.challenges[permission],
+      approval,
+      session_id: s.sessionId,
+    });
+    if (decision.reason === "task_closed") {
+      s.closed = true;
+      await this.save();
+    } else if (approval && decision.decision === "allow") {
+      delete s.approvals[approvalKey(call)]; // spent
+      await this.save();
+    }
+    return decision;
+  }
+
+  /**
+   * File (or find) the access request a reviewer approves for this call.
+   * Scute returns the open one if it exists, so this is safe to repeat.
+   */
+  async requestApproval(call: ToolCall): Promise<{ id: string; status: string } | undefined> {
+    if (!this.harness.client.canManage || !call.permission) return undefined;
+    const userId = await this.actsFor();
+    if (!userId) return undefined;
+    const request = await this.harness.client.createRequest(userId, {
+      action: call.spec.action!,
+      resource: resourceRef(call.resource) || undefined,
+      reason: `${this.harness.agent} asked: ${describeCall(call)}`,
+    });
+    const s = await this.load();
+    s.approvals[approvalKey(call)] = request.id;
+    await this.save();
+    return request;
+  }
+
+  // ── Checking calls ──
+
+  /** Run the guards on a call before it happens. */
+  async check(tool: string, args: Args, options: CheckOptions = {}): Promise<Verdict> {
+    const call = new Call(this, options.id ?? randomId(), tool, args, this.harness.spec(tool), options.messages ?? [], !!options.approvedByUser);
+    return this.harness.evaluate(call);
+  }
+
+  /** Record a call that ran and run the after-guards on its result. Returns what the model should see. */
+  async after(tool: string, args: Args, result: unknown, options: CheckOptions = {}) {
+    const spec = this.harness.spec(tool);
+    const s = await this.load();
+    s.calls += 1;
+    await this.save();
+    await this.harness.recordExecution(await this.budgetKey(), spec.tier);
+    const call = new Call(this, options.id ?? randomId(), tool, args, spec, options.messages ?? [], !!options.approvedByUser);
+    return this.harness.evaluateAfter(call, result);
+  }
+
+  /** Guard a plain function: when a call doesn't run, it returns the message for the model instead. */
+  wrap<A extends Args, R>(tool: string, fn: (args: A) => R | Promise<R>) {
+    return async (args: A): Promise<R | string> => {
+      const verdict = await this.check(tool, args);
+      if (!runs(verdict)) return verdict.message ?? "Not allowed.";
+      const result = await fn(verdict.args as A);
+      return (await this.after(tool, verdict.args, result)).result as R;
+    };
+  }
+
+  /** @internal a proceed verdict from the approval step, reused when the tool executes. */
+  keep(verdict: Verdict) {
+    if (runs(verdict)) this.kept.set(verdict.callId, verdict);
+  }
+
+  /** @internal */
+  take(callId?: string): Verdict | undefined {
+    if (!callId) return undefined;
+    const v = this.kept.get(callId);
+    this.kept.delete(callId);
+    return v;
+  }
+
+  // ── Grounding, usage, budgets ──
+
+  /** Values you know are true for this run (the verified caller's email, an account id), for guards.grounding(). */
+  ground(...values: unknown[]) {
+    for (const v of values) if (v !== undefined && v !== null && v !== "") this.grounded.add(String(v).toLowerCase());
+  }
+
+  /** Who is asking, once you know (the verified caller's email or phone). For guards.requesterOnly(); also grounds them. */
+  identify(...values: unknown[]) {
+    for (const v of values) if (v !== undefined && v !== null && v !== "") this.identified.add(String(v).toLowerCase());
+  }
+
+  /** @internal the requester's details and what identify() added. */
+  identities(): string[] {
+    const requester = Object.values(this.options.requester ?? {}).filter(Boolean).map((v) => String(v).toLowerCase());
+    return Array.from(new Set([...requester, ...this.identified]));
+  }
+
+  /** @internal */
+  groundedValues(): string[] {
+    return Array.from(new Set([...this.grounded, ...this.identities()]));
+  }
+
+  /** Model spend for budgets (harness.model() will report this itself). */
+  async recordUsage(usage: { usd?: number }) {
+    const s = await this.load();
+    s.usd += usage.usd ?? 0;
+    await this.save();
+  }
+
+  /** @internal hourly budgets count per agent and person, across runs. */
+  async budgetKey() {
+    const who = this.options.actsFor ?? (await this.load()).actsFor ?? "none";
+    return `scute:hour:${this.harness.agent}:${who}`;
+  }
+
+  /** Executions in the last hour for this agent and person, by tier. */
+  async recentExecutions(): Promise<{ at: number; tier: Tier }[]> {
+    return this.harness.executions(await this.budgetKey(), HOUR);
+  }
+
+  /** True when a run budget (calls or spend, from guards.budget()) is used up. */
+  async budgetExhausted(): Promise<boolean> {
+    for (const guard of this.harness.guards) {
+      const exhausted = (guard as { exhausted?: (run: Run) => Promise<boolean> }).exhausted;
+      if (exhausted && (await exhausted(this))) return true;
+    }
+    return false;
+  }
+
+  /** Tools the task could ever use (its ceiling). Tools without a permission always count. */
+  async allowedTools(names: string[] = this.toolNames): Promise<string[]> {
+    const { ceiling } = await this.whoami();
+    return names.filter((n) => {
+      const permission = this.harness.spec(n).permission;
+      return !permission || ceiling.includes(permission);
+    });
+  }
+
+  // ── Vercel AI SDK (v7) ──
+
+  /** Wrap AI SDK tools: guards run before each call, after-guards on the result. */
+  tools<T extends Record<string, any>>(tools: T): T {
+    return aiSdkTools(this, tools);
+  }
+
+  /** For `toolApproval`: verify and confirm become 'user-approval'; deny and guide become 'denied' with the reason. */
+  get toolApproval(): (options: { toolCall: { toolName: string; toolCallId: string; input: unknown }; messages?: unknown[] }) => Promise<AiSdkApprovalStatus> {
+    return aiSdkToolApproval(this);
+  }
+
+  /** For `prepareStep`: hides tools outside the task's ceiling from the model. */
+  get prepareStep() {
+    return aiSdkPrepareStep(this);
+  }
+
+  /** For `stopWhen`: stops the loop when the run's call or spend budget is used up. */
+  get budgetExceeded() {
+    return async (_options?: unknown) => this.budgetExhausted();
+  }
+}

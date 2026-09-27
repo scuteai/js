@@ -36,6 +36,7 @@ jobs:
           pnpm --filter @scute/js-core exec tsc --noEmit
           pnpm --filter @scute/react-hooks exec tsc --noEmit
           pnpm --filter @scute/auth-ui-react typecheck
+          pnpm --filter @scute/harness typecheck
 
       - name: Test
         # The Playwright e2e suite needs a running API and example app; it
