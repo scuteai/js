@@ -1,0 +1,20 @@
+{
+  "name": "@scute/live-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Live tests for the Scute JS SDKs against a real Scute API. Run them from the repo root with `pnpm test:live`.",
+  "scripts": {
+    "test:live": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@scute/harness": "workspace:*",
+    "@scute/js-core": "workspace:*",
+    "@scute/mcp-gateway": "workspace:*",
+    "@scute/tsconfig": "workspace:*",
+    "@types/node": "^18.0.0",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.8"
+  }
+}

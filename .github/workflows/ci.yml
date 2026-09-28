@@ -37,6 +37,9 @@ jobs:
           pnpm --filter @scute/react-hooks exec tsc --noEmit
           pnpm --filter @scute/auth-ui-react typecheck
           pnpm --filter @scute/harness typecheck
+          # The live suite (packages/live) runs on demand against a real API
+          # (pnpm test:live); CI only keeps it compiling.
+          pnpm --filter @scute/live-tests typecheck
 
       - name: Test
         # The Playwright e2e suite needs a running API and example app; it

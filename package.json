@@ -6,6 +6,7 @@
     "dev": "pnpm turbo\\ run dev",
     "docs": "typedoc",
     "lint": "pnpm turbo\\ run lint",
+    "test:live": "turbo run build --filter=@scute/live-tests... && pnpm --filter @scute/live-tests test:live",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "turbo run": "turbo run --concurrency 30",
     "verdaccio-start": "pnpm verdaccio --config ./verdaccio.config.yaml"
