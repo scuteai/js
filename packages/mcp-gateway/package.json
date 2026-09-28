@@ -1,6 +1,6 @@
 {
   "name": "@scute/mcp-gateway",
-  "version": "0.2.0-next.1",
+  "version": "0.2.0-next.2",
   "description": "Put Scute in front of any MCP server: users sign in with your app, every tool call passes your agent guardrails, and changed tool definitions are held for review.",
   "license": "MIT",
   "keywords": [
