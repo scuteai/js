@@ -18,7 +18,7 @@ than `424242` in the output.
 | 2. Sign-in | email OTP (`signIn`, `verifyOtp`, `signInWithTokenPayload`), SMS OTP (`sendLoginOtp`), `getUser`, `refreshSession`, `listUserSessions`, `revokeSession`, admin `listUserSessions` / `revokeUserSession`, `signOut` |
 | 3. Tokens | the remote check (`getUser` with a good and a tampered token). Local JWKS verification of a session token is skipped: the SDKs have no API for it. Local verification is covered where the SDKs have it: `verifySnapshotToken` (tampered, expired, other app) and `@scute/mcp-gateway` `verifyAccessToken` (tampered, expired, other audience or issuer) |
 | 4. MFA | `enrollMfa` TOTP (the code computed from the secret, RFC 6238 with `node:crypto`), `verifyMfaEnrollment`, `listMfaMethods`, `getMfaStatus`, `generateBackupCodes`, a sign-in that then needs MFA finished in the browser's way, with no key: `getChallengeStatus`, `verifyMfaChallenge` (TOTP), and a backup code after `switchMfaMethod`; `removeMfaMethod` with the completed challenge. With `SCUTE_LIVE_SLOW=1` it also waits out the re-verify window (over 5 minutes), checks `needsReverification`, and removes the method with a completed challenge |
-| 5. Admin users | `createUser`, `getUser`, `getUserByIdentifier`, `listUsers`, `updateUser`, `deactivateUser`, `activateUser`, `deleteUser` |
+| 5. Admin users | `createUser`, `getUser`, `getUserByIdentifier` (the trimmed public lookup, with public sign-up on and off), `listUsers`, `updateUser`, `deactivateUser`, `activateUser`, `deleteUser`; an account after it's deleted: a fresh one on sign-in, previous accounts and merge, a deprovisioned user refused |
 | 6. Impersonation | `impersonateUser` (the `act` claim), `listImpersonations`, `beginImpersonation` / `getImpersonation` / `stopImpersonating` in the client, a "not while impersonating" permission denied inside the session (`authz.can`) and from the backend (`impersonationContext`), admin `stopImpersonating` |
 | 7. Authz | policy import (dry run, apply, idempotent), roles assigned and removed, `authzCheck`, `authzCheckBatch`, `authzUserPermissions`, `authzAuthorizedUsers`, `authzFilter`, a step-up redeemed (`authzStartStepUp`), `authz.can` / `canMany` / `permissions` / `reviews`, `authzSnapshot`, local decisions matching the server over a matrix (`ScuteLocalAuthz`, `decideLocally`), access requests (`requestAccess`, `myRequests`, `cancelRequest`, `authzRequests`, `authzCreateRequest`, `authzDecideRequest`, an approval spent once) |
 | 8. Agents | `@scute/harness`: register agents, mint a task (`run.whoami`, `run.taskId`), `run.check` allow and deny outside the task, step-up with human steps (`startVerification`, `submitCode` 424242), a reviewer approval for the exact call, `run.property` and `run.sign` (the JWS verified with the property's JWKS), a budget of 2 that pauses the agent on the 3rd action and closes the run, suspend and resume, `run.complete` |
@@ -45,23 +45,23 @@ it turns the check into a plain assertion. Everything else fails as usual,
 so a run is green except for regressions, and it ends by listing the known
 bugs that still reproduce.
 
-Still open (scute-api-v2 v23, js main):
+Still open (scute-api-v2 v24, js main):
 
 | | Bug | Evidence |
 | --- | --- | --- |
-| F8 | `POST /v1/auth/:app_id/otps/login` (`sendLoginOtp`, `signIn`) brings a deleted user back, with the old account's data | The deleted user's `GET /v1/:app_id/users/:id` goes from 404 to 200 (same id) after an OTP send to their email |
-| F9 | `ScuteClient.signUp` decides with `email_verified` / `phone_verified` from the identifier lookup, which doesn't answer them any more (F6), so an existing account gets a registration code instead of `IdentifierAlreadyExistsError` | `signUp(<a verified account's email>)` answers no error and sends a code |
-| F10 | `ScuteAdminApi.getUserByUserId` asks `GET /v1/auth/:app_id/users?user_id=`, which only takes an identifier | 400 `invalid_identifier` |
+| F9 | `ScuteClient.signUp` decides "already exists" from the identifier lookup's `email_verified` / `phone_verified`. The lookup answers them again (api#135), but an OTP sign-in never marks the email or phone verified (only magic links do), so in an OTP app an existing account gets a registration code instead of `IdentifierAlreadyExistsError` | After an email OTP sign-in the lookup answers `email_verified: false`, and `signUp(<that email>)` sends a code |
+| F10 | `ScuteAdminApi.getUserByUserId` asks `GET /v1/auth/:app_id/users?user_id=`, which only takes an identifier (DX-09) | 400 `invalid_identifier` |
 
-Fixed, and now asserted (api#134 on scute-api-v2 v23, js#41):
+Fixed, and now asserted (api#134 to #136 on scute-api-v2, js#41):
 
 - F1: the MFA step of a sign-in works without the API key (`getChallengeStatus`, `verifyMfaChallenge`, `switchMfaMethod`).
 - F2: `ScuteAdminApi.listUserSessions` and `revokeUserSession` work with the secret alone.
 - F3: the policy snapshot's `aud` and JWKS path use the public `app_...` id, so `verifySnapshotToken` passes with it.
 - F4: `signIn` right after construction waits for the app config.
 - F5: MFA status by phone and `scute_identify {phone}` answer 200.
-- F6: the identifier lookup answers only `id`, `status`, `webauthn_enabled` and the identifier; with public sign-up off an unknown identifier answers null and makes nobody; a deleted user stays deleted.
+- F6: the identifier lookup answers only `id`, `status`, `webauthn_enabled`, the verified flags and the identifier; with public sign-up off an unknown identifier answers null and makes nobody; a deleted user stays deleted.
 - F7: a refreshed access token names the public app id.
+- F8 (settled by the owner's decision, api#136): a deleted user who signs in again gets a fresh account with a new id, and the old one stays deleted (404). `GET /v1/:app_id/users/:id/previous_accounts` lists it and `POST /v1/:app_id/users/:id/merge {from}` moves its roles and data in (a second merge answers 422 `already_merged`); no SDK methods for these yet (DX-09). Someone deactivated and then deleted is refused at sign-in with 403 `account_deactivated`.
 
 ## Credentials
 
@@ -94,7 +94,7 @@ SCUTE_LIVE_SLOW=1 pnpm test:live  # also the tests that wait out real time windo
 pnpm --filter @scute/live-tests typecheck
 ```
 
-A run takes under a minute (82 tests: 77 pass, 3 pass as known bugs, 2
+A run takes under a minute (85 tests: 81 pass, 2 pass as known bugs, 2
 are skipped), or about six minutes with `SCUTE_LIVE_SLOW=1`. The TOTP
 steps wait for a fresh 30 second window, and the decision log is written by
 a background job, so it polls. The tests run in order in one file

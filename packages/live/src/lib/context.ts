@@ -45,6 +45,7 @@ export const PHASE = {
   oauth: 20,
   agents: 30,
   properties: 40,
+  merges: 45,
   roleAssignments: 50,
   roles: 60,
   resources: 70,
@@ -166,6 +167,24 @@ export class LiveContext {
       const { data } = await api.get<{ properties: { name: string }[] }>(`${api.appPath}/properties`);
       for (const p of data.properties ?? []) {
         if (p.name.startsWith(prefix)) await api.delete(`${api.appPath}/properties/${p.name}`, { expect: [204, 404] });
+      }
+    });
+    // Any account this run's identities got that a test didn't track (a sign-in can make a fresh one).
+    this.cleanup.add(PHASE.merges + 1, "delete this run's untracked users", async () => {
+      const mine = (u: { id: string; email?: string | null; phone?: string | null }) =>
+        (u.email ?? "").startsWith(`live-js-${this.runId}-`) || (u.phone ?? "").replace(/\D/g, "") === this.phone.replace(/\D/g, "");
+      for (const q of [`live-js-${this.runId}`, this.phone.replace(/\D/g, "")]) {
+        const { data } = await api.get<{ users: { id: string; email?: string | null; phone?: string | null }[] }>(`/v1/${this.env.appId}/users`, {
+          query: { q, limit: 100 },
+        });
+        for (const u of (data.users ?? []).filter(mine)) {
+          if (this.trackedUsers.has(String(u.id))) continue;
+          const { data: held } = await api.get<{ roles: { role: string }[] }>(`${api.appPath}/authz/users/${u.id}/roles`, { expect: [200, 404] });
+          for (const g of held?.roles ?? []) {
+            if (g.role.startsWith(prefix)) await api.delete(`${api.appPath}/authz/users/${u.id}/roles/${encodeURIComponent(g.role)}`, { expect: [204, 404] });
+          }
+          await api.delete(`/v1/${this.env.appId}/users/${u.id}`, { expect: [200, 404] });
+        }
       }
     });
     this.cleanup.add(PHASE.roles, "delete this run's roles", async () => {

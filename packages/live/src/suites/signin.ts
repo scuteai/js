@@ -105,12 +105,20 @@ export function signInSuite(get: () => LiveContext) {
 
     it("signUp refuses an identifier that already has an account (known bug F9: it sends a code instead)", async ({ skip, annotate }) => {
       const ctx = get();
-      const main = ctx.state.main ?? skip("needs the email sign-in (a verified account)");
+      const main = ctx.state.main ?? skip("needs the email sign-in (an account that proved its email)");
+      // What signUp decides with: the identifier lookup's email_verified.
+      const { data: lookup } = await ctx.api.get(`${ctx.api.authPath}/users`, { auth: "none", query: { identifier: main.identifier } });
       const result = await ctx.newClient().signUp(main.identifier);
       if (result.error && !(result.error instanceof IdentifierAlreadyExistsError)) noError(result.error, "signUp");
-      // F9: signUp decides with email_verified / phone_verified from the identifier lookup, which answers only
-      // id, status, webauthn_enabled and the identifier now, so it never sees an existing account.
-      await knownBug(annotate, FINDINGS.signUpCantSeeAccounts, !result.error, "signUp of a verified account answered no error and sent a registration code");
+      // F9: the lookup answers email_verified again (api#135), but an email OTP sign-in never marks the email
+      // verified (only magic links do), so in an OTP app signUp still can't see the account.
+      await knownBug(
+        annotate,
+        FINDINGS.signUpCantSeeAccounts,
+        !result.error,
+        `signUp of an account that signed in by email OTP sent a registration code; the lookup answers email_verified: ${String(lookup.user?.email_verified)}`
+      );
+      // Once fixed: result.error is an IdentifierAlreadyExistsError and no email_otp challenge was made for the user.
     });
   });
 

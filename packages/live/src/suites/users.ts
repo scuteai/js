@@ -68,15 +68,16 @@ export function usersSuite(get: () => LiveContext) {
       deleted = { id, email };
     });
 
-    it("the identifier lookup answers only what sign-in needs (getUserByIdentifier; fixed F6)", async ({ skip }) => {
+    it("the identifier lookup answers only what sign-in needs (getUserByIdentifier; F6, and F9's verified flags)", async ({ skip }) => {
       const ctx = get();
       const second = ctx.state.second ?? skip("needs the created user");
       const { user } = ok(await ctx.admin.getUserByIdentifier(second.email), "getUserByIdentifier");
       expect(String(user?.id)).toBe(second.id);
-      expect(Object.keys(user ?? {}).sort()).toEqual(["email", "id", "status", "webauthn_enabled"]);
+      const fields = ["email", "email_verified", "id", "phone_verified", "status", "webauthn_enabled"];
+      expect(Object.keys(user ?? {}).sort()).toEqual(fields);
       // The same without any credentials, as a browser asks.
       const { data } = await ctx.api.get(`${ctx.api.authPath}/users`, { auth: "none", query: { identifier: second.email } });
-      expect(Object.keys(data.user ?? {}).sort()).toEqual(["email", "id", "status", "webauthn_enabled"]);
+      expect(Object.keys(data.user ?? {}).sort()).toEqual(fields);
     });
 
     it("with public sign-up on, looking up an unknown identifier makes the user (what released SDKs' signIn needs)", async () => {
@@ -116,21 +117,6 @@ export function usersSuite(get: () => LiveContext) {
       const { user } = ok(await ctx.admin.getUserByIdentifier(gone.email), "getUserByIdentifier");
       expect(user ?? null, "a deleted user's identifier answers null").toBeNull();
       expect(failed(await ctx.admin.getUser(gone.id), "getUser of the deleted user").status).toBe(404);
-    });
-
-    it("a deleted user stays deleted when they sign in again (known bug F8: the OTP send brings them back)", async ({ skip, annotate }) => {
-      const ctx = get();
-      const gone = deleted ?? skip("needs the deleted user");
-      const sent = await ctx.newClient().sendLoginOtp(gone.email);
-      const after = await ctx.admin.getUser(gone.id);
-      // F8: POST /v1/auth/:app_id/otps/login find-or-creates, and a unique index sends it back to the deleted row,
-      // which it undeletes. (Cleanup deletes the user again.)
-      await knownBug(
-        annotate,
-        FINDINGS.otpSignInUndeletes,
-        !after.error,
-        `POST /otps/login answered ${sent.error ? statusOf(sent.error) : 200}, then GET /v1/:app_id/users/:id answered 200 (it was 404)`
-      );
     });
 
     it("gets a user's basic info by user id (getUserByUserId; known bug F10: 400)", async ({ skip, annotate }) => {
