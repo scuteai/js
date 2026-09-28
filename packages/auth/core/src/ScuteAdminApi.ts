@@ -27,6 +27,32 @@ import type {
 import type { AuthzFilter } from "./lib/authzFilter";
 
 /** A conversation on Scute's auth MCP server, as your backend sees it. */
+/** One edit to the policy, for a backtest (RB-45). */
+export type AuthzPolicyEdit =
+  | { op: "grant" | "revoke"; role: string; permission: string }
+  | { op: "set"; permission: string; enabled?: boolean; requires_verification?: boolean; requires_approval?: boolean; requester_only?: boolean };
+
+export type AuthzSuggestion = {
+  kind: "unused_grant" | "repeated_denies" | "always_approved";
+  title: string;
+  detail?: string;
+  evidence: Record<string, unknown>;
+  /** The change to backtest; missing when there's no single obvious change. */
+  change?: AuthzPolicyEdit[];
+};
+
+export type AuthzBacktest = {
+  days: number;
+  checked: number;
+  changed: number;
+  /** e.g. { "allow -> deny": 3 } */
+  summary: Record<string, number>;
+  people_affected: number;
+  examples: { at: string; user_id: string; permission: string; resource?: string; logged: string; before: string; after: string }[];
+  allow_sample_rate: number;
+  note: string;
+};
+
 /** RB-45: something an agent's safety rails caught, for a person to review. */
 export type AgentMonitorItem = {
   id: string;
@@ -643,6 +669,25 @@ class ScuteAdminApi extends ScuteBaseHttp {
       `${this._appsPath}/authz/snapshot`,
       this._authorizationHeader
     );
+  }
+
+  // ── Policy suggestions and backtests (RB-45) ──
+  //
+  // Scute proposes changes from the decision log, and a backtest shows what
+  // a change would have done to recent decisions. Nothing is ever applied.
+
+  /** Proposed changes from the last `days` of decisions (unused grants, repeated refusals, approvals always granted). */
+  async authzSuggestions(days = 30) {
+    const { data, error } = await this.get<{ suggestions: AuthzSuggestion[] }>(
+      `${this._appsPath}/authz/policy/suggestions?days=${encodeURIComponent(String(days))}`,
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.suggestions, error: null };
+  }
+
+  /** What a change would have done to recent decisions, replayed in memory. Nothing is applied. */
+  async authzBacktest(change: AuthzPolicyEdit[], options: { days?: number; limit?: number } = {}) {
+    return this.post<AuthzBacktest>(`${this._appsPath}/authz/policy/backtest`, { change, ...options }, this._authorizationHeader);
   }
 
   /** Access requests: list (optionally by status or user). */
