@@ -7,7 +7,7 @@ export { toolPermission } from "./convention";
 export { modelMessage, describeCall } from "./decisions";
 export { userApproved, type AiSdkApprovalStatus } from "./adapters/ai-sdk";
 export { HUMAN_TOOLS, type JsonSchemaFn } from "./adapters/human-tools";
-export { ScuteHarnessError, type Whoami, type TaskMinted, type AgentSession, type Verification, type Approval } from "./client";
+export { ScuteHarnessError, type Whoami, type TaskMinted, type AgentSession, type Verification, type Approval, type AgentPlan } from "./client";
 export type {
   AlertEvent,
   Args,

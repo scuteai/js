@@ -51,6 +51,14 @@ export type Verification = {
 };
 
 /** An approval an agent asked for. Without `id`, nothing was filed (see status). */
+/** A plan: several steps an agent asked to take, approved once (RB-45). */
+export type AgentPlan = {
+  id?: string;
+  status: "pending" | "approved" | "denied" | "cancelled" | "expired" | "used" | "not_needed";
+  say?: string;
+  steps: { permission: string; resource?: string; details?: Record<string, unknown>; needs: "none" | "approval" | "verify"; used?: boolean }[];
+};
+
 export type Approval = {
   id?: string;
   /** The exact call the approval is for. */
@@ -133,9 +141,38 @@ export class ScuteClient {
       approval?: string;
       details?: Record<string, unknown>;
       session_id?: string;
+      /** An approved plan's id: the step matching this exact call supplies the approval. */
+      plan?: string;
+      /** What a real call would get, without counting toward limits or spending proofs. */
+      dry_run?: boolean;
     }
   ) {
-    return this.call<EngineDecision>("POST", `${this.auth}/agent/check`, body, token);
+    return this.call<EngineDecision & { dry_run?: boolean }>("POST", `${this.auth}/agent/check`, body, token);
+  }
+
+  /** File every step the agent means to take, for one review. */
+  requestPlan(
+    token: string,
+    body: {
+      steps: { action: string; resource?: Resource; context?: Record<string, unknown>; details?: Record<string, unknown> }[];
+      reason?: string;
+    }
+  ) {
+    return this.call<AgentPlan>("POST", `${this.auth}/agent/plans`, body, token);
+  }
+
+  /** The agent's tools as { name, hash }; Scute flags one whose definition changes. */
+  reportTools(token: string, tools: { name: string; hash: string }[]) {
+    return this.call<{ known: number; new: string[]; changed: string[] }>("POST", `${this.auth}/agent/tools`, { tools }, token);
+  }
+
+  /** The agent called a decoy tool: Scute pauses it. */
+  decoy(token: string, tool: string) {
+    return this.call<{ paused: boolean; say?: string }>("POST", `${this.auth}/agent/decoys`, { tool }, token);
+  }
+
+  plan(token: string, id: string) {
+    return this.call<AgentPlan>("GET", `${this.auth}/agent/plans/${encodeURIComponent(id)}`, undefined, token);
   }
 
   // RB-42: properties (named secrets and key pairs) a tool uses at call time.

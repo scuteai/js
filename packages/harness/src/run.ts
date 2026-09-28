@@ -1,4 +1,4 @@
-import { ScuteHarnessError, type Approval, type Verification, type Whoami } from "./client";
+import { ScuteHarnessError, type AgentPlan, type Approval, type Verification, type Whoami } from "./client";
 import { resourceRef } from "./convention";
 import { Call, describeCall, runs } from "./decisions";
 import { aiSdkPrepareStep, aiSdkToolApproval, aiSdkTools, type AiSdkApprovalStatus } from "./adapters/ai-sdk";
@@ -43,6 +43,8 @@ type RunState = {
   challenges: Record<string, string>;
   /** "permission|object" -> the access request filed for one exact call */
   approvals: Record<string, { id: string; call: string }>;
+  /** The plan this run filed (RB-45): its approved steps run once each. */
+  planId?: string;
   /** Calls the person confirmed in your UI (tool + arguments), each good once. */
   confirmed?: string[];
   calls: number;
@@ -396,6 +398,7 @@ export class Run {
     const permission = call.permission!;
     const filed = s.approvals[approvalKey(call)];
     const approval = options.proofs && filed?.call === fingerprint(call.tool, call.args) ? filed.id : undefined;
+    const plan = options.proofs && !approval ? s.planId : undefined;
     const decision = await this.agent((token) =>
       this.harness.client.check(token, {
         action: call.spec.action!,
@@ -403,7 +406,8 @@ export class Run {
         context: { ...this.options.context, ...context, args: call.args },
         challenge: options.proofs ? s.challenges[permission] : undefined,
         approval,
-        details: approval ? call.args : undefined,
+        plan,
+        details: approval || plan ? call.args : undefined,
         session_id: s.sessionId,
       })
     );
@@ -439,6 +443,78 @@ export class Run {
     s.approvals[approvalKey(call)] = { id: approval.id, call: fingerprint(call.tool, call.args) };
     await this.save();
     return approval;
+  }
+
+  /**
+   * File a plan: every call the agent means to make, for one review. Once a
+   * reviewer approves it, each call that needed approval runs once, with
+   * exactly these arguments, through the usual checks (RB-45).
+   */
+  async requestPlan(calls: { tool: string; args: Args }[], reason?: string): Promise<AgentPlan> {
+    const steps = calls
+      .map(({ tool, args }) => new Call(this, randomId(), tool, args, this.harness.spec(tool), [], false))
+      .filter((call) => call.permission && call.spec.action)
+      .map((call) => ({ action: call.spec.action!, resource: call.resource, context: { ...this.options.context, args: call.args }, details: call.args }));
+    const plan = await this.agent((token) => this.harness.client.requestPlan(token, { steps, reason }));
+    if (plan.id) {
+      const s = await this.load();
+      s.planId = plan.id;
+      await this.save();
+    }
+    return plan;
+  }
+
+  /**
+   * Report the tools this agent has, so Scute notices when one changes
+   * later (tool drift, a known prompt injection route). Pass what the model
+   * sees: name, description and input schema. Only a hash of each leaves
+   * this process. The first report is the baseline.
+   */
+  async reportTools(definitions: { name: string; description?: string; inputSchema?: unknown }[]) {
+    const tools = await Promise.all(
+      definitions.map(async (d) => ({ name: d.name, hash: await definitionHash(d) }))
+    );
+    return this.agent((token) => this.harness.client.reportTools(token, tools));
+  }
+
+  /**
+   * @internal guards.decoy: the agent called a decoy tool. Scute pauses it,
+   * so the run is over; it closes here even if the report fails.
+   */
+  async reportDecoy(tool: string) {
+    try {
+      return await this.agent((token) => this.harness.client.decoy(token, tool));
+    } finally {
+      const s = await this.load();
+      s.closed = true;
+      await this.save();
+    }
+  }
+
+  /** Where this run's plan stands, and which steps ran. */
+  async planStatus(): Promise<AgentPlan | undefined> {
+    const s = await this.load();
+    if (!s.planId) return undefined;
+    return this.agent((token) => this.harness.client.plan(token, s.planId!));
+  }
+
+  /**
+   * What Scute would answer for this call right now, without counting it
+   * toward budgets or spending a verification or approval (a dry run).
+   */
+  async preview(tool: string, args: Args): Promise<EngineDecision> {
+    const call = new Call(this, randomId(), tool, args, this.harness.spec(tool), [], false);
+    if (!call.permission || !call.spec.action) return { decision: "allow", allowed: true, reason: "no_permission" } as EngineDecision;
+    return this.agent((token) =>
+      this.harness.client.check(token, {
+        action: call.spec.action!,
+        resource: call.resource,
+        context: { ...this.options.context, args: call.args },
+        details: call.args,
+        session_id: undefined,
+        dry_run: true,
+      })
+    );
   }
 
   /** Where an approval this run filed stands, with a `say` line. */
@@ -596,4 +672,17 @@ export class Run {
   get budgetExceeded() {
     return async (_options?: unknown) => this.budgetExhausted();
   }
+}
+
+/** SHA-256 of a tool definition, with object keys sorted so the order doesn't matter. */
+async function definitionHash(definition: { name: string; description?: string; inputSchema?: unknown }): Promise<string> {
+  const canonical = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(canonical)
+      : value && typeof value === "object"
+        ? Object.fromEntries(Object.keys(value as Record<string, unknown>).sort().map((k) => [k, canonical((value as Record<string, unknown>)[k])]))
+        : value;
+  const bytes = new TextEncoder().encode(JSON.stringify(canonical({ name: definition.name, description: definition.description ?? "", inputSchema: definition.inputSchema ?? null })));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
