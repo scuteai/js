@@ -113,7 +113,13 @@ async function ScuteEdgeApiHandler(
   );
   const headers = req.headers;
 
-  const scute = createPagesEdgeRuntimeClient({ request: req }, config);
+  // Collects the session cookies the client writes; they are copied onto
+  // the returned response below so they reach the browser.
+  const cookieSink = { headers: new Headers() };
+  const scute = createPagesEdgeRuntimeClient(
+    { request: req, response: cookieSink },
+    config
+  );
   const response = await internalHandler(scute, {
     url,
     method,
@@ -123,8 +129,25 @@ async function ScuteEdgeApiHandler(
     headers,
   });
 
+  for (const cookie of splitCookiesString(
+    cookieSink.headers.get("set-cookie") ?? ""
+  )) {
+    response.headers.append("set-cookie", cookie);
+  }
+
   return response;
 }
+
+const isNodeResponse = (value: unknown): value is NextApiResponse =>
+  !!value &&
+  typeof (value as NextApiResponse).setHeader === "function" &&
+  typeof (value as NextApiResponse).end === "function";
+
+const isFetchEvent = (value: unknown): value is NextFetchEvent =>
+  !!value && typeof (value as NextFetchEvent).waitUntil === "function";
+
+const isNextRequest = (value: unknown): value is NextRequest =>
+  !!value && typeof (value as NextRequest).nextUrl !== "undefined";
 
 export function ScuteHandler(
   context: RouteHandlerContext,
@@ -139,29 +162,19 @@ export function ScuteHandler(
   res: NextApiResponse,
   config?: ScuteNextjsClientConfig
 ): ReturnType<typeof ScuteNodeApiHandler>;
-export function ScuteHandler() {
-  const args = Array.from(arguments);
-  const config =
-    args.length > 1
-      ? ((args[1] as NextApiResponse)._write ||
-          (args[1] as NextFetchEvent).waitUntil) &&
-        args.length === 2
-        ? undefined // 2 arguments, no config
-        : args.pop() // the last is config
-      : undefined;
+export function ScuteHandler(...args: any[]) {
+  const [first, second, third] = args;
 
-  if (args.length === 1) {
-    if (typeof (args[0] as NextRequest).nextUrl !== "undefined") {
-      return ScuteEdgeApiHandler(args[0], config);
-    } else {
-      return (req: NextRequest) => ScuteRouteHandler(req, args[0], config);
-    }
-  } else if (args.length > 1) {
-    if ((args[1] as NextFetchEvent).waitUntil) {
-      // pages api (edge)
-      return ScuteEdgeApiHandler(args[0], config);
-    }
-    // pages api (node)
-    return ScuteNodeApiHandler(args[0], args[1], config);
+  if (isNodeResponse(second)) {
+    // pages api (node): (req, res, config?)
+    return ScuteNodeApiHandler(first, second, third);
   }
+
+  if (isNextRequest(first)) {
+    // pages api (edge): (req, config?) or (req, event, config?)
+    return ScuteEdgeApiHandler(first, isFetchEvent(second) ? third : second);
+  }
+
+  // app router: (context, config?)
+  return (req: NextRequest) => ScuteRouteHandler(req, first, second);
 }

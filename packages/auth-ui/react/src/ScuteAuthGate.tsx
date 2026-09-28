@@ -1,11 +1,11 @@
-// @ts-nocheck
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useScuteAuthFlow, type AuthFlowView } from "./useScuteAuthFlow";
 
 export type ScuteAuthGateProps = {
   children: React.ReactNode;
-  /** Called when user becomes authenticated */
+  /** Called once each time the user becomes authenticated and the app is shown */
   onAuthenticated?: (user: any) => void;
   /** Custom render for each auth view. Return null to use defaults. */
   renderView?: (view: AuthFlowView, auth: ReturnType<typeof useScuteAuthFlow>) => React.ReactNode | null;
@@ -33,14 +33,28 @@ export type ScuteAuthGateProps = {
  */
 export function ScuteAuthGate({ children, onAuthenticated, renderView, appearance }: ScuteAuthGateProps) {
   const auth = useScuteAuthFlow();
+  const isOpen = auth.isAuthenticated && auth.view === "authenticated";
 
-  // Callback when authenticated
-  if (auth.isAuthenticated && auth.user && onAuthenticated) {
-    onAuthenticated(auth.user);
-  }
+  // Call onAuthenticated from an effect (not during render), once per
+  // transition to authenticated. The latest prop is read through a ref so an
+  // inline callback does not re-fire it.
+  const onAuthenticatedRef = useRef(onAuthenticated);
+  useEffect(() => {
+    onAuthenticatedRef.current = onAuthenticated;
+  });
+  const notifiedRef = useRef(false);
+  useEffect(() => {
+    if (!isOpen) {
+      notifiedRef.current = false;
+      return;
+    }
+    if (notifiedRef.current || !auth.user) return;
+    notifiedRef.current = true;
+    onAuthenticatedRef.current?.(auth.user);
+  }, [isOpen, auth.user]);
 
   // Authenticated — render app
-  if (auth.isAuthenticated && auth.view === "authenticated") {
+  if (isOpen) {
     return <>{children}</>;
   }
 
@@ -58,6 +72,7 @@ export function ScuteAuthGate({ children, onAuthenticated, renderView, appearanc
     <div
       data-scute-auth
       data-scute-theme={theme}
+      className={appearance?.className}
       style={{ "--scute-accent": accent } as React.CSSProperties}
     >
       <div data-scute-auth-container>

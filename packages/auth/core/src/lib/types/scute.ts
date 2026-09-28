@@ -83,6 +83,54 @@ export type ScuteTokenPayload = {
   access: string;
 };
 
+/**
+ * Who is really acting when someone is signed in as the user (support
+ * access). From the access token's `act` claim (RFC 8693).
+ */
+export type ScuteImpersonationActor = {
+  /** app_user: one of the app's users; operator: a Scute dashboard member; backend: named by your server. */
+  kind: "app_user" | "operator" | "backend";
+  sub?: string;
+  email?: string;
+  name?: string;
+};
+
+export type ScuteImpersonation = {
+  actor: ScuteImpersonationActor;
+  expiresAt: Date;
+};
+
+/** A session as the user, as the admin API reports it. */
+export type ScuteImpersonationRecord = {
+  session_id: UniqueIdentifier;
+  actor: ScuteImpersonationActor & { id?: string };
+  reason: string;
+  started_at: string;
+  expires_at: string;
+};
+
+/** What starting one returns: an access token as the user, never a refresh token. */
+export type ScuteImpersonationTokens = ScuteTokenPayload & {
+  session_id: UniqueIdentifier;
+  user_id: UniqueIdentifier;
+  impersonation: Omit<ScuteImpersonationRecord, "session_id">;
+};
+
+export type ScuteImpersonateParams = {
+  /** Why (shown in the user's audit trail). Required. */
+  reason: string;
+  /** Up to the app's maximum (default 60). */
+  minutes?: number;
+  /** One of the app's users who holds user:impersonate on this user. */
+  actorUserId?: UniqueIdentifier;
+  /** Or: the person, named by your backend. */
+  actor?: { email?: string; name?: string; id?: string };
+  /** A completed step-up challenge's token, when user:impersonate asks for one. */
+  challenge?: string;
+  /** An approved request's id, when user:impersonate needs approval. */
+  approval?: UniqueIdentifier;
+};
+
 export type ScuteSendMagicLinkResponse = {
   type: "magic_link";
   id: UniqueIdentifier;

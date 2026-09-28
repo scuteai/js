@@ -5,7 +5,7 @@ import {
   _ScuteAccessPayload,
   _ScuteMagicLinkTokenPayload,
 } from "./types/internal";
-import { ScuteUser } from "./types/scute";
+import type { ScuteImpersonation, ScuteImpersonationActor, ScuteUser } from "./types/scute";
 
 export const jwtDecode = _jwtDecode;
 
@@ -13,6 +13,20 @@ export const isBrowser = () =>
   typeof window !== "undefined" &&
   typeof window.document !== "undefined" &&
   typeof window.document.createElement !== "undefined";
+
+/**
+ * `window.localStorage`, or null when there is none or when reading it throws
+ * (storage blocked by the browser, sandboxed iframes, some privacy modes).
+ */
+export const getLocalStorage = (): Storage | null => {
+  try {
+    return typeof window !== "undefined" && window.localStorage
+      ? window.localStorage
+      : null;
+  } catch {
+    return null;
+  }
+};
 
 export const isMaybePhoneNumber = (phone: string) => {
   const phoneRegex = /^\+?[\d\s()-]*$/;
@@ -53,6 +67,44 @@ export function isValidDomain(hostname: string): boolean {
  * Checks if the webauthn is supported in the browser
  */
 export const isWebauthnSupported = () => isBrowser() && _isWebauthnSupported();
+
+/**
+ * RB-49: who is really acting, when this access token is a session someone
+ * started as the user. Reads the token without verifying it: fine for the
+ * UI, never for a decision.
+ */
+export const decodeImpersonation = (accessToken?: string | null): ScuteImpersonation | null => {
+  if (!accessToken) return null;
+  try {
+    const payload = jwtDecode<{ imp?: boolean; act?: ScuteImpersonationActor; exp?: number }>(accessToken);
+    if (payload.imp !== true || !payload.act || !payload.exp) return null;
+
+    return { actor: payload.act, expiresAt: new Date(payload.exp * 1000) };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * RB-49: the context to send with a server-side authorization check made for
+ * a request, so permissions marked "not while impersonating" are refused.
+ * Pass the claims of the access token you VERIFIED for this request.
+ *
+ *     await scute.admin.authzCheck({ userId, action: "close", resource: "account",
+ *                                    context: impersonationContext(claims) });
+ */
+export const impersonationContext = (claims?: { imp?: unknown; act?: unknown } | null): Record<string, unknown> =>
+  claims?.imp === true ? { impersonated: true, actor: claims.act ?? "unknown" } : {};
+
+/**
+ * True when an MFA change was refused because the user has to verify again:
+ * sign in again, or retry with a completed verification's token
+ * (`challenge`). Removing a method, new backup codes, and adding another
+ * method need it once the sign-in is older than the app's
+ * mfa_reverify_minutes (default 10).
+ */
+export const needsReverification = (error: unknown): boolean =>
+  (error as { json?: { error_code?: string } } | null)?.json?.error_code === "verification_required";
 
 export const decodeAccessToken = (accessToken: string) => {
   try {
@@ -136,4 +188,33 @@ export const refreshTokenHeaders = (jwt: string | null): HeadersInit => {
   return {
     [_SCUTE_REFRESH_HEADER]: jwt,
   };
+};
+
+/**
+ * Returns `value` when it is an absolute http: or https: URL, otherwise
+ * undefined. Used for URLs the server hands back for the app to navigate to.
+ */
+export const httpUrlOrUndefined = (value: unknown): string | undefined => {
+  if (typeof value !== "string" || !value) return undefined;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:" ? value : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Removes Scute's one-time sign-in tokens from a URL: the magic-link token,
+ * the OAuth/SAML handoff token and the skip flag. Call it synchronously as
+ * soon as a token is read, before any await, so the token can't stay in
+ * browser history (or in referrers) if verification fails. SAML SSO and
+ * social OAuth both land with `sct_oauth`, so it matters for SSO too.
+ */
+export const scrubAuthTokensFromUrl = (href: string): string => {
+  const url = new URL(href);
+  for (const param of ["sct_magic", "sct_oauth", "sct_sk"]) {
+    url.searchParams.delete(param);
+  }
+  return url.toString();
 };

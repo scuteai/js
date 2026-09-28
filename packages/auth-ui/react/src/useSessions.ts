@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -83,6 +82,9 @@ export function useSessions(): UseSessionsResult {
         setSessions(res.data || []);
         setError(null);
       }
+    } catch (err) {
+      setError(errorMessageFor(err, "Failed to load sessions"));
+      setSessions([]);
     } finally {
       setLoading(false);
     }

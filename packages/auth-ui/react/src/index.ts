@@ -39,6 +39,16 @@ export type {
   UseSecureAccountResult,
 } from "./useSecureAccount";
 
+// Embeddable admin screens (element token): user roles, access requests, decision log
+export { useElementUserRoles, useElementAccessRequests, useElementDecisionLog } from "./useAuthzElements";
+export type {
+  ElementsSource,
+  ElementActionResult,
+  UseElementUserRolesResult,
+  UseElementAccessRequestsResult,
+  UseElementDecisionLogResult,
+} from "./useAuthzElements";
+
 // Pre-built gate component — drop-in auth
 export { ScuteAuthGate } from "./ScuteAuthGate";
 export type { ScuteAuthGateProps } from "./ScuteAuthGate";

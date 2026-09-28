@@ -1,7 +1,9 @@
 {
   "name": "@scute/react-hooks",
-  "version": "0.8.1",
-  "publishConfig": {},
+  "version": "0.9.0-next.1",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
@@ -16,7 +18,9 @@
     "tsup-build": "tsup src/index.ts --format cjs,esm --dts",
     "build": "pnpm tsup-build --dts-resolve",
     "dev": "pnpm tsup-build --watch",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@scute/js-core": "workspace:*"
@@ -27,11 +31,14 @@
   },
   "devDependencies": {
     "@scute/tsconfig": "workspace:*",
+    "@testing-library/react": "^16.3.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "jsdom": "^27",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "tsup": "^8.1.0",
-    "typescript": "4.9.5"
+    "typescript": "4.9.5",
+    "vitest": "^4.1.8"
   }
 }

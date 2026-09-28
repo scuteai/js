@@ -1,0 +1,60 @@
+{
+  "name": "@scute/mcp-gateway",
+  "version": "0.2.0-next.1",
+  "description": "Put Scute in front of any MCP server: users sign in with your app, every tool call passes your agent guardrails, and changed tool definitions are held for review.",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "oauth",
+    "agents",
+    "authorization",
+    "guardrails",
+    "scute"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scuteai/js.git",
+    "directory": "packages/mcp-gateway"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "scute-mcp-gateway": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/cli.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts src/cli.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@scute/harness": "workspace:*"
+  },
+  "devDependencies": {
+    "@scute/tsconfig": "workspace:*",
+    "@types/node": "^18.0.0",
+    "tsup": "^8.1.0",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.8"
+  }
+}

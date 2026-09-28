@@ -12,17 +12,24 @@ export abstract class ScuteStorage implements ScuteStorageInferface {
   abstract removeItem(key: string): Promisable<void>;
 }
 
-const memoryStorage = new Map<string, string>();
-export const ScuteMemoryStorage: ScuteStorage = {
-  async getItem(key) {
-    return memoryStorage.get(key) ?? null;
-  },
-  async setItem(key, value) {
-    memoryStorage.set(key, value);
-  },
-  async removeItem(key) {
-    memoryStorage.delete(key);
-  },
+/**
+ * In-memory storage. Every call returns a new, empty store, so each
+ * ScuteClient keeps its own tokens (two clients in one server process never
+ * see each other's session).
+ */
+export const createMemoryStorage = (): ScuteStorage => {
+  const memoryStorage = new Map<string, string>();
+  return {
+    async getItem(key) {
+      return memoryStorage.get(key) ?? null;
+    },
+    async setItem(key, value) {
+      memoryStorage.set(key, value);
+    },
+    async removeItem(key) {
+      memoryStorage.delete(key);
+    },
+  };
 };
 
 export abstract class ScuteCookieStorage extends ScuteStorage {
