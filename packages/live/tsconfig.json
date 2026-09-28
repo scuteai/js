@@ -1,0 +1,15 @@
+{
+  "extends": "@scute/tsconfig/base.json",
+  "include": ["src", "vitest.config.ts"],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "exclude": ["node_modules"]
+}
