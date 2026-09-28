@@ -1,4 +1,4 @@
-import { createHarness, modelMessage, type Guard, type Harness, type Mode, type Run, type Store, type ToolsConfig } from "@scute/harness";
+import { createHarness, HUMAN_TOOLS, modelMessage, type Guard, type Harness, type Mode, type Run, type Store, type ToolsConfig } from "@scute/harness";
 import { Jwks, verifyAccessToken, type AccessTokenClaims } from "./jwt";
 import { toolHash, type McpTool } from "./pins";
 import { formatSse, parseSse, type SseEvent } from "./sse";
@@ -28,8 +28,16 @@ export type GatewayConfig = {
   hideUnavailable?: boolean;
   /** Shown to MCP clients in the protected resource metadata. */
   resourceName?: string;
-  /** Tell the model to use scute_verify_person and friends (when the upstream offers them). */
+  /**
+   * The gateway's own tools for bringing the person in, next to the
+   * upstream's: scute_verify_person, scute_submit_code,
+   * scute_check_verification, scute_approval_status and scute_whoami. The
+   * model is told to use them when a call needs verification. Default true.
+   * (Signing in is the MCP connection's own OAuth flow, so it isn't a tool.)
+   */
   humanTools?: boolean;
+  /** Verification methods scute_verify_person offers. Default: email_otp, sms_otp, totp, entra_push. */
+  verificationMethods?: string[];
   /**
    * DNS rebinding protection (MCP 2025-11-25): requests must come to one of
    * these hosts, and an Origin header, when sent, must be one of these
@@ -271,6 +279,7 @@ export class McpGateway {
       return this.forward(req, text);
     }
     const msg = body as RpcMessage;
+    if (msg.method === "tools/call" && this.humanOn && HUMAN_TOOLS.includes(String(msg.params?.name))) return this.humanCall(msg, caller);
     if (msg.method === "tools/call") return this.toolsCall(req, msg, caller);
     if (msg.method === "tools/list") return this.toolsList(req, msg, text, caller);
     return this.forward(req, text);
@@ -296,7 +305,7 @@ export class McpGateway {
     if (verdict.kind !== "proceed" && verdict.kind !== "transform") {
       const needed = verdict.kind === "deny" && verdict.decision.reason === "outside_task" ? this.missingScope(session, name) : undefined;
       if (needed) return this.insufficientScope([...session.scopes, needed]);
-      return this.rpcResult(msg, toolError(modelMessage(verdict, { humanTools: this.config.humanTools })));
+      return this.rpcResult(msg, toolError(modelMessage(verdict, { humanTools: this.humanOn })));
     }
 
     const trace = req.headers.get("traceparent");
@@ -315,8 +324,10 @@ export class McpGateway {
         await this.reportTools(tools);
         tools = tools.filter((t) => !this.quarantined.has(t.name));
       }
+      // The gateway's own tools win over an upstream tool of the same name.
+      if (this.humanOn) tools = tools.filter((t) => !HUMAN_TOOLS.includes(t.name));
+      const session = this.config.hideUnavailable !== false || this.humanOn ? await this.session(caller).catch(() => undefined) : undefined;
       if (this.config.hideUnavailable !== false) {
-        const session = await this.session(caller).catch(() => undefined);
         const ceiling = session ? await session.run.whoami().then((w) => new Set(w.ceiling), () => undefined) : undefined;
         if (session && ceiling) {
           tools = tools.filter((t) => {
@@ -325,7 +336,41 @@ export class McpGateway {
           });
         }
       }
+      if (this.humanOn && session) {
+        const own = this.humanToolsFor(session);
+        tools = [...tools, ...Object.entries(own).map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema }))];
+      }
       return { ...r, tools };
+    });
+  }
+
+  // ── The gateway's own tools (RB-43 part D) ────────────────────────────────
+
+  private get humanOn(): boolean {
+    return this.config.humanTools !== false;
+  }
+
+  private humanToolsFor(session: Session) {
+    return session.run.humanTools((schema) => schema, { methods: this.config.verificationMethods });
+  }
+
+  /** Verify the person, pass on a code, check a push or an approval, whoami: answered here, never upstream. */
+  private async humanCall(msg: RpcMessage, caller: Caller): Promise<Response> {
+    let session: Session;
+    try {
+      session = await this.session(caller);
+    } catch (e) {
+      return this.rpcResult(msg, toolError(`Scute couldn't start a task for this client: ${(e as Error).message}`));
+    }
+    const tool = (this.humanToolsFor(session) as Record<string, { execute: (input: any) => Promise<Record<string, unknown>> }>)[
+      String(msg.params?.name)
+    ];
+    const args = msg.params?.arguments && typeof msg.params.arguments === "object" ? msg.params.arguments : {};
+    const out = await tool.execute(args);
+    return this.rpcResult(msg, {
+      content: [{ type: "text", text: typeof out.say === "string" ? `${out.say}\n\n${JSON.stringify(out)}` : JSON.stringify(out) }],
+      structuredContent: out,
+      isError: "error" in out,
     });
   }
 
