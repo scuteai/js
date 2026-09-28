@@ -137,6 +137,22 @@ Once it's approved, each step that needed approval runs once, with exactly those
 
 `run.preview(tool, args)` asks what a call would need right now (a dry run): it doesn't count toward budgets and doesn't use up a verification or approval.
 
+### Tool drift and decoys
+
+Report the tools the model sees, and Scute notices if one changes later (a changed description is a known prompt injection route):
+
+```ts
+await run.reportTools(tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })));
+```
+
+Only a hash of each definition leaves your process. The first report is the baseline.
+
+Decoy tools are tools no legitimate task calls. Offer them to the model like any other, and list them in `guards.decoy`. A call is refused, and Scute pauses the agent and alerts your team:
+
+```ts
+createHarness({ ..., guards: [guards.decoy(["export_all_customers"]), guards.permissions()] });
+```
+
 ## Runs and state
 
 Checks within one run go one at a time, so budgets hold when the model

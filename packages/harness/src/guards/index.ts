@@ -1,5 +1,6 @@
 import type { Decision, Guard, Mode, ToolCall } from "../types";
 import { content } from "./content";
+import { decoy } from "./decoy";
 import { grounding } from "./grounding";
 import { args, budget } from "./limits";
 import { approval, requesterOnly, verifyPerson } from "./people";
@@ -18,7 +19,7 @@ function define(
   return { name, mode: options.mode, before, after: options.after };
 }
 
-export const guards = { permissions, verifyPerson, approval, requesterOnly, grounding, args, budget, content, define };
+export const guards = { permissions, verifyPerson, approval, requesterOnly, grounding, args, budget, content, decoy, define };
 
 export type { PermissionsOptions } from "./permissions";
 export type { GroundingOptions } from "./grounding";

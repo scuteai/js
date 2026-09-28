@@ -464,6 +464,28 @@ export class Run {
     return plan;
   }
 
+  /**
+   * Report the tools this agent has, so Scute notices when one changes
+   * later (tool drift, a known prompt injection route). Pass what the model
+   * sees: name, description and input schema. Only a hash of each leaves
+   * this process. The first report is the baseline.
+   */
+  async reportTools(definitions: { name: string; description?: string; inputSchema?: unknown }[]) {
+    const tools = await Promise.all(
+      definitions.map(async (d) => ({ name: d.name, hash: await definitionHash(d) }))
+    );
+    return this.agent((token) => this.harness.client.reportTools(token, tools));
+  }
+
+  /** @internal guards.decoy: the agent called a decoy tool. Scute pauses it, so the run is over. */
+  async reportDecoy(tool: string) {
+    const result = await this.agent((token) => this.harness.client.decoy(token, tool));
+    const s = await this.load();
+    s.closed = true;
+    await this.save();
+    return result;
+  }
+
   /** Where this run's plan stands, and which steps ran. */
   async planStatus(): Promise<AgentPlan | undefined> {
     const s = await this.load();
@@ -645,4 +667,17 @@ export class Run {
   get budgetExceeded() {
     return async (_options?: unknown) => this.budgetExhausted();
   }
+}
+
+/** SHA-256 of a tool definition, with object keys sorted so the order doesn't matter. */
+async function definitionHash(definition: { name: string; description?: string; inputSchema?: unknown }): Promise<string> {
+  const canonical = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(canonical)
+      : value && typeof value === "object"
+        ? Object.fromEntries(Object.keys(value as Record<string, unknown>).sort().map((k) => [k, canonical((value as Record<string, unknown>)[k])]))
+        : value;
+  const bytes = new TextEncoder().encode(JSON.stringify(canonical({ name: definition.name, description: definition.description ?? "", inputSchema: definition.inputSchema ?? null })));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }

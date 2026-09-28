@@ -161,6 +161,16 @@ export class ScuteClient {
     return this.call<AgentPlan>("POST", `${this.auth}/agent/plans`, body, token);
   }
 
+  /** The agent's tools as { name, hash }; Scute flags one whose definition changes. */
+  reportTools(token: string, tools: { name: string; hash: string }[]) {
+    return this.call<{ known: number; new: string[]; changed: string[] }>("POST", `${this.auth}/agent/tools`, { tools }, token);
+  }
+
+  /** The agent called a decoy tool: Scute pauses it. */
+  decoy(token: string, tool: string) {
+    return this.call<{ paused: boolean; say?: string }>("POST", `${this.auth}/agent/decoys`, { tool }, token);
+  }
+
   plan(token: string, id: string) {
     return this.call<AgentPlan>("GET", `${this.auth}/agent/plans/${encodeURIComponent(id)}`, undefined, token);
   }

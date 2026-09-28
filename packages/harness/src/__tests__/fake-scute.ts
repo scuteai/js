@@ -113,6 +113,12 @@ export function fakeScute(
       const steps = (body.steps ?? []).map((s: any) => ({ permission: `${s.resource?.type ?? ""}:${s.action}`, needs: "approval", details: s.details }));
       return json({ id: "plan1", status: "pending", say: "I've asked for approval.", steps }, 201);
     }
+    if (method === "POST" && path === "/v1/auth/app1/agent/tools") {
+      return json({ known: (body.tools ?? []).length, new: [], changed: [] });
+    }
+    if (method === "POST" && path === "/v1/auth/app1/agent/decoys") {
+      return json({ paused: true, say: "I can't continue with this. A person will follow up." });
+    }
     if (method === "GET" && path === "/v1/auth/app1/agent/plans/plan1") {
       return json({ id: "plan1", status: state.requestStatus, steps: [] });
     }
