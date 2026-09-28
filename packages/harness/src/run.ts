@@ -407,7 +407,8 @@ export class Run {
         session_id: s.sessionId,
       })
     );
-    if (decision.reason === "task_closed") {
+    // budget_exceeded: Scute paused the agent and ended its tasks (RB-45).
+    if (decision.reason === "task_closed" || decision.reason === "budget_exceeded") {
       s.closed = true;
       await this.save();
     } else if (approval && decision.decision === "allow") {

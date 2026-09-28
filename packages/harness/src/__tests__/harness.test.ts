@@ -223,6 +223,17 @@ describe("runs", () => {
     expect((await run2.snapshot()).closed).toBe(true);
   });
 
+  it("close the run when Scute pauses the agent for going over its budget", async () => {
+    const paused = fakeScute({
+      decide: () => ({ decision: "deny", reason: "budget_exceeded", explanation: "Support bot went over its budget and was paused." }),
+    });
+    const run = createHarness({ ...base, fetch: paused.fetch }).run({ actsFor: "user1" });
+
+    expect((await run.check("read_invoice", { id: 1 })).kind).toBe("deny");
+    await expect(run.token()).rejects.toThrow(/task is closed/);
+    expect(paused.paths(MINT)).toHaveLength(1);
+  });
+
   it("use a task token from your backend without the secret", async () => {
     const scute = fakeScute();
     const run = createHarness({ agent: "support-bot", appId: "app1", baseUrl: "https://scute.test", fetch: scute.fetch }).run({
