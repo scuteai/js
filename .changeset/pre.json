@@ -11,11 +11,14 @@
     "@scute/eslint-config": "0.0.0",
     "@scute/harness": "0.1.0",
     "@scute/mcp-gateway": "0.1.0",
-    "@scute/tsconfig": "0.0.0"
+    "@scute/tsconfig": "0.0.0",
+    "@scute/live-tests": "0.0.0"
   },
   "changesets": [
     "admin-agent-conversations",
+    "admin-agent-monitoring",
     "admin-list-user-sessions",
+    "admin-previous-accounts",
     "auth-ui-built-and-typed",
     "authz-can",
     "authz-sweep",
@@ -30,6 +33,7 @@
     "mfa-reverify",
     "scrub-oauth-token",
     "sdk-hardening-v2",
+    "signin-app-data",
     "sso-required-error"
   ]
 }

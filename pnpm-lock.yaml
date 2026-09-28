@@ -65,10 +65,10 @@ importers:
   packages/auth-ui/react:
     dependencies:
       '@scute/js-core':
-        specifier: 0.10.0-next.1
+        specifier: 0.10.0-next.2
         version: link:../../auth/core
       '@scute/react-hooks':
-        specifier: 0.9.0-next.1
+        specifier: 0.9.0-next.2
         version: link:../../auth/react
     devDependencies:
       '@scute/tsconfig':

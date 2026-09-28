@@ -1,5 +1,14 @@
 # @scute/react
 
+## 0.9.0-next.2
+
+### Patch Changes
+
+- Updated dependencies [a795b88]
+- Updated dependencies [0b6ed39]
+- Updated dependencies [27c388c]
+  - @scute/js-core@0.10.0-next.2
+
 ## 0.9.0-next.1
 
 ### Patch Changes

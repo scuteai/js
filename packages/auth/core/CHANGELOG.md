@@ -1,5 +1,28 @@
 # @scute/js-core
 
+## 0.10.0-next.2
+
+### Minor Changes
+
+- a795b88: Agent monitoring from your backend:
+
+  - `admin.agentMonitor({ status, kind, agent })` lists what agents' safety rails caught (first use of a permission, a loop, a pause over budget).
+  - `admin.reviewAgentMonitorItem(id, { status, note })` acknowledges or flags an item.
+  - `admin.agentReport(slug, { from, to })` is the evidence report for a period.
+  - `admin.verifyDecisionLog({ from, to })` checks that the decision log hasn't been changed, cut or reordered.
+  - `admin.suspendAllAgents(reason)` stops every agent of the app at once.
+
+- 0b6ed39: - `admin.previousAccounts(userId)` lists a person's earlier, deleted accounts: someone deleted who signs in again now gets a fresh account.
+  - `admin.mergeUser(userId, fromId)` merges a deleted account into the live one. Roles, passkeys, MFA factors and data move over; history stays on the old account.
+  - `admin.getUserByUserId` reads the user with the secret key (it called a route that only takes an identifier and always failed). It's deprecated in favour of `admin.getUser`.
+  - `ScuteSessionType` lists every session type the API returns (otp, workspace, m2m, mfa, challenge, impersonation).
+
+### Patch Changes
+
+- 27c388c: - `signIn` waits for the app's settings before choosing how to sign in (like `signInOrUp`). Called right after the client was created, it used to throw a TypeError when the settings answered late.
+  - `signIn` and `signInOrUp` return the error when the app's settings can't load, instead of throwing or guessing the sign-in method.
+  - `admin.listUserSessions` and `admin.revokeUserSession` work with the app's secret key alone (the API change is on the v2 API).
+
 ## 0.10.0-next.1
 
 ### Minor Changes
