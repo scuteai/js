@@ -7,41 +7,25 @@
 export type Finding = { id: string; title: string };
 
 export const FINDINGS = {
-  challengeNeedsApiKey: {
-    id: "F1",
+  // F1 to F6 were fixed in api#134 (scute-api-v2 v23) and js#41; their tests now assert the fixed behavior.
+  otpSignInUndeletes: {
+    id: "F8",
     title:
-      "ScuteClient's challenge calls (verifyMfaChallenge, switchMfaMethod, ...) hit /v1/auth/:app_id/challenges/*, " +
-      "which answers 401 'HTTP Token: Access denied.' without the app's API key, so a browser can't finish an MFA sign-in",
+      "POST /v1/auth/:app_id/otps/login (sendLoginOtp, signIn) brings a deleted user back: the same user id answers " +
+      "404 before and 200 after, with the old account's data (the identifier lookup no longer does this)",
   },
-  adminSessionsNeedUserToken: {
-    id: "F2",
+  signUpCantSeeAccounts: {
+    id: "F9",
     title:
-      "ScuteAdminApi.listUserSessions and revokeUserSession send the app secret, but /v1/:app_id/users/:id/sessions " +
-      "also wants a user session token (X-Authorization): 401 'Not authorized'",
+      "ScuteClient.signUp checks email_verified / phone_verified on the identifier lookup, which answers only id, status, " +
+      "webauthn_enabled and the identifier now, so an existing account gets a registration code instead of " +
+      "IdentifierAlreadyExistsError",
   },
-  snapshotAudIsInternalId: {
-    id: "F3",
+  getUserByUserIdBroken: {
+    id: "F10",
     title:
-      "Policy snapshots are signed with aud = the app's internal UUID, so verifySnapshotToken(token, jwks, appId) with the " +
-      "app id the SDK is configured with (app_...) rejects every snapshot ('Snapshot is for another app')",
-  },
-  signInBeforeAppData: {
-    id: "F4",
-    title:
-      "ScuteClient.signIn doesn't wait for the app's config: when it arrives after the identifier lookup, signIn throws " +
-      "TypeError (reading 'email_auth_type')",
-  },
-  phoneLookup500: {
-    id: "F5",
-    title:
-      "Looking a user up by phone queries a column app_users doesn't have: GET /v1/auth/:app_id/mfa/status?identifier=<phone> " +
-      "and the auth MCP's scute_identify with a phone answer 500",
-  },
-  identifierLookupCreatesUsers: {
-    id: "F6",
-    title:
-      "GET /v1/auth/:app_id/users?identifier= (getUserByIdentifier; signIn and verifyOtp use it) creates the user when it " +
-      "doesn't exist, and brings back a deleted one",
+      "ScuteAdminApi.getUserByUserId asks GET /v1/auth/:app_id/users?user_id=, which only takes an identifier: " +
+      "400 invalid_identifier",
   },
 } satisfies Record<string, Finding>;
 

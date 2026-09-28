@@ -17,7 +17,7 @@ than `424242` in the output.
 | 1. App | `ScuteClient.getAppData`, `ScuteAdminApi.getAppData` |
 | 2. Sign-in | email OTP (`signIn`, `verifyOtp`, `signInWithTokenPayload`), SMS OTP (`sendLoginOtp`), `getUser`, `refreshSession`, `listUserSessions`, `revokeSession`, admin `listUserSessions` / `revokeUserSession`, `signOut` |
 | 3. Tokens | the remote check (`getUser` with a good and a tampered token). Local JWKS verification of a session token is skipped: the SDKs have no API for it. Local verification is covered where the SDKs have it: `verifySnapshotToken` (tampered, expired, other app) and `@scute/mcp-gateway` `verifyAccessToken` (tampered, expired, other audience or issuer) |
-| 4. MFA | `enrollMfa` TOTP (the code computed from the secret, RFC 6238 with `node:crypto`), `verifyMfaEnrollment`, `listMfaMethods`, `getMfaStatus`, `generateBackupCodes`, a sign-in that then needs MFA finished with `verifyMfaChallenge` (TOTP) and with a backup code (`switchMfaMethod`) (both known bug F1), `removeMfaMethod`. With `SCUTE_LIVE_SLOW=1` it also waits out the re-verify window (over 5 minutes), checks `needsReverification`, and removes the method with a completed challenge |
+| 4. MFA | `enrollMfa` TOTP (the code computed from the secret, RFC 6238 with `node:crypto`), `verifyMfaEnrollment`, `listMfaMethods`, `getMfaStatus`, `generateBackupCodes`, a sign-in that then needs MFA finished in the browser's way, with no key: `getChallengeStatus`, `verifyMfaChallenge` (TOTP), and a backup code after `switchMfaMethod`; `removeMfaMethod` with the completed challenge. With `SCUTE_LIVE_SLOW=1` it also waits out the re-verify window (over 5 minutes), checks `needsReverification`, and removes the method with a completed challenge |
 | 5. Admin users | `createUser`, `getUser`, `getUserByIdentifier`, `listUsers`, `updateUser`, `deactivateUser`, `activateUser`, `deleteUser` |
 | 6. Impersonation | `impersonateUser` (the `act` claim), `listImpersonations`, `beginImpersonation` / `getImpersonation` / `stopImpersonating` in the client, a "not while impersonating" permission denied inside the session (`authz.can`) and from the backend (`impersonationContext`), admin `stopImpersonating` |
 | 7. Authz | policy import (dry run, apply, idempotent), roles assigned and removed, `authzCheck`, `authzCheckBatch`, `authzUserPermissions`, `authzAuthorizedUsers`, `authzFilter`, a step-up redeemed (`authzStartStepUp`), `authz.can` / `canMany` / `permissions` / `reviews`, `authzSnapshot`, local decisions matching the server over a matrix (`ScuteLocalAuthz`, `decideLocally`), access requests (`requestAccess`, `myRequests`, `cancelRequest`, `authzRequests`, `authzCreateRequest`, `authzDecideRequest`, an approval spent once) |
@@ -38,21 +38,30 @@ method is missing.
 
 ## Known bugs
 
-Running it against scute-api-v2 turned up six bugs (`src/lib/findings.ts`).
-A test that hits one records it and stops, so it passes while the bug
-reproduces; once the bug is fixed that test fails with "no longer
-reproduces", and whoever fixed it turns the check into a plain assertion.
-Everything else fails as usual, so a run is green except for regressions,
-and it ends by listing the known bugs that still reproduce.
+A bug the suite found is listed in `src/lib/findings.ts`. A test that hits
+one records it and stops, so it passes while the bug reproduces; once the
+bug is fixed that test fails with "no longer reproduces", and whoever fixed
+it turns the check into a plain assertion. Everything else fails as usual,
+so a run is green except for regressions, and it ends by listing the known
+bugs that still reproduce.
+
+Still open (scute-api-v2 v23, js main):
 
 | | Bug | Evidence |
 | --- | --- | --- |
-| F1 | `ScuteClient`'s challenge calls (`verifyMfaChallenge`, `switchMfaMethod`, `getChallengeStatus`, `resendChallenge`, `cancelChallenge`, the MS Authenticator ones) need the app's API key, which a browser never has: an MFA sign-in can't be finished | `POST /v1/auth/:app_id/challenges/:token/verify`, `POST .../challenges`, `DELETE` and `GET .../challenges/:token` all answer 401 `HTTP Token: Access denied.` without the key (404 `challenge_not_found` with it) |
-| F2 | `ScuteAdminApi.listUserSessions` and `revokeUserSession` send the secret, but the API also wants a user session token | `GET /v1/:app_id/users/:id/sessions` and `DELETE .../sessions/:id` answer 401 `Not authorized` with the secret |
-| F3 | Policy snapshots are signed with `aud` = the app's internal UUID, so `verifySnapshotToken(token, jwks, appId)` with the `app_...` id rejects every snapshot | `Snapshot is for another app`; the snapshot's `jwks` path carries the UUID too |
-| F4 | `ScuteClient.signIn` doesn't wait for the app's config; if it arrives after the identifier lookup, `signIn` throws | `TypeError: Cannot read properties of undefined (reading 'email_auth_type')` with the config request 1.5 s late |
-| F5 | Looking a user up by phone queries a column `app_users` doesn't have | `GET /v1/auth/:app_id/mfa/status?identifier=<phone>` and the auth MCP's `scute_identify {phone}` answer 500 |
-| F6 | `GET /v1/auth/:app_id/users?identifier=` (`getUserByIdentifier`; `signIn` and `verifyOtp` use it) creates the user when it doesn't exist, and brings back a deleted one | 200 with a new user for an unknown email; a deleted user's `GET /v1/:app_id/users/:id` goes from 404 to 200 after the lookup |
+| F8 | `POST /v1/auth/:app_id/otps/login` (`sendLoginOtp`, `signIn`) brings a deleted user back, with the old account's data | The deleted user's `GET /v1/:app_id/users/:id` goes from 404 to 200 (same id) after an OTP send to their email |
+| F9 | `ScuteClient.signUp` decides with `email_verified` / `phone_verified` from the identifier lookup, which doesn't answer them any more (F6), so an existing account gets a registration code instead of `IdentifierAlreadyExistsError` | `signUp(<a verified account's email>)` answers no error and sends a code |
+| F10 | `ScuteAdminApi.getUserByUserId` asks `GET /v1/auth/:app_id/users?user_id=`, which only takes an identifier | 400 `invalid_identifier` |
+
+Fixed, and now asserted (api#134 on scute-api-v2 v23, js#41):
+
+- F1: the MFA step of a sign-in works without the API key (`getChallengeStatus`, `verifyMfaChallenge`, `switchMfaMethod`).
+- F2: `ScuteAdminApi.listUserSessions` and `revokeUserSession` work with the secret alone.
+- F3: the policy snapshot's `aud` and JWKS path use the public `app_...` id, so `verifySnapshotToken` passes with it.
+- F4: `signIn` right after construction waits for the app config.
+- F5: MFA status by phone and `scute_identify {phone}` answer 200.
+- F6: the identifier lookup answers only `id`, `status`, `webauthn_enabled` and the identifier; with public sign-up off an unknown identifier answers null and makes nobody; a deleted user stays deleted.
+- F7: a refreshed access token names the public app id.
 
 ## Credentials
 
@@ -85,8 +94,8 @@ SCUTE_LIVE_SLOW=1 pnpm test:live  # also the tests that wait out real time windo
 pnpm --filter @scute/live-tests typecheck
 ```
 
-A run takes under a minute (77 tests: 65 pass, 10 pass as known bugs, 2
-are skipped), or about seven minutes with `SCUTE_LIVE_SLOW=1`. The TOTP
+A run takes under a minute (82 tests: 77 pass, 3 pass as known bugs, 2
+are skipped), or about six minutes with `SCUTE_LIVE_SLOW=1`. The TOTP
 steps wait for a fresh 30 second window, and the decision log is written by
 a background job, so it polls. The tests run in order in one file
 (`src/scute.live.ts`); a test that needs something an earlier one failed to
@@ -95,4 +104,5 @@ known bugs that still reproduce and whether cleanup deleted everything.
 
 The suite turns on what it tests in its own app. Client checks, access
 requests, impersonation and logging every allow stay on; the OAuth server
-setting and the MFA policy go back to how they were at the end.
+setting, public sign-up (turned off for one test) and the MFA policy go
+back to how they were.

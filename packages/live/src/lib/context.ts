@@ -67,7 +67,15 @@ export class LiveContext {
   readonly state: {
     main?: SignedIn;
     phone?: SignedIn;
-    mfa?: SignedIn & { secret?: string; enrollmentId?: string; lastStep?: number; backupCodes?: string[]; completedChallenge?: string };
+    mfa?: SignedIn & {
+      secret?: string;
+      enrollmentId?: string;
+      lastStep?: number;
+      backupCodes?: string[];
+      completedChallenge?: string;
+      /** The client of the MFA user's newest sign-in (its session is the newest). */
+      latestClient?: ScuteClient;
+    };
     second?: { id: string; email: string };
     policyImported?: boolean;
     agents: Record<string, boolean>;

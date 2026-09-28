@@ -4,8 +4,7 @@
 import { describe, expect, it } from "vitest";
 import type { ScuteUserSession } from "@scute/js-core";
 import type { LiveContext } from "../lib/context";
-import { done, noError, ok, statusOf } from "../lib/check";
-import { FINDINGS, knownBug } from "../lib/findings";
+import { done, ok } from "../lib/check";
 import { accessOf } from "../lib/flows";
 
 const newest = (sessions: ScuteUserSession[]) =>
@@ -26,30 +25,27 @@ export function sessionsSuite(get: () => LiveContext) {
       expect(Boolean(after.error), "the revoked session's token is refused").toBe(true);
     });
 
-    it("the backend lists a user's sessions (ScuteAdminApi.listUserSessions; known bug F2: 401)", async ({ skip, annotate }) => {
+    it("the backend lists a user's sessions with the secret alone (ScuteAdminApi.listUserSessions; fixed F2)", async ({ skip }) => {
       const ctx = get();
       const mfa = ctx.state.mfa ?? skip("needs the MFA user's sign-in");
-      const result = await ctx.admin.listUserSessions(mfa.id);
-      // F2: GET /v1/:app_id/users/:id/sessions wants a user session token next to the secret.
-      const code = statusOf(result.error);
-      if (code !== 401) noError(result.error, "listUserSessions");
-      await knownBug(annotate, FINDINGS.adminSessionsNeedUserToken, code === 401, `GET /v1/:app_id/users/:id/sessions answered ${code}`);
-      // Once F2 is fixed: noError(result.error, "listUserSessions") and at least one session.
+      const viaAdmin = ok(await ctx.admin.listUserSessions(mfa.id), "listUserSessions");
+      const viaUser = ok(await mfa.client.listUserSessions(), "the user's own listUserSessions");
+      expect(viaAdmin.map((s) => String(s.id)).sort()).toEqual(viaUser.map((s) => String(s.id)).sort());
+      expect(viaAdmin.length).toBeGreaterThan(0);
     });
 
-    it("the backend revokes a user's session (ScuteAdminApi.revokeUserSession; known bug F2: 401)", async ({ skip, annotate }) => {
+    it("the backend revokes a user's session with the secret alone; its token stops working (revokeUserSession; fixed F2)", async ({ skip }) => {
       const ctx = get();
       const mfa = ctx.state.mfa ?? skip("needs the MFA user's sign-in");
-      const mine = ok(await mfa.client.listUserSessions(), "listUserSessions");
-      const target = newest(mine);
+      // The newest session is the MFA user's latest sign-in (the MFA tests), or the first one.
+      const owner = mfa.latestClient ?? mfa.client;
+      const access = await accessOf(owner);
+      const target = newest(ok(await ctx.admin.listUserSessions(mfa.id), "listUserSessions"));
 
-      const result = await ctx.admin.revokeUserSession(mfa.id, target.id);
-      // F2: DELETE /v1/:app_id/users/:id/sessions/:session_id wants a user session token next to the secret.
-      const code = statusOf(result.error);
-      if (code !== 401) noError(result.error, "revokeUserSession");
-      await knownBug(annotate, FINDINGS.adminSessionsNeedUserToken, code === 401, `DELETE /v1/:app_id/users/:id/sessions/:id answered ${code}`);
-      // Once F2 is fixed: noError(result.error, "revokeUserSession"), the session is gone from the list, and if it was
-      // this client's own, its access token is refused.
+      done(await ctx.admin.revokeUserSession(mfa.id, target.id), "revokeUserSession");
+      const left = ok(await ctx.admin.listUserSessions(mfa.id), "listUserSessions");
+      expect(left.some((s) => s.id === target.id), "the revoked session is gone").toBe(false);
+      expect(Boolean((await ctx.newClient().getUser(access)).error), "its access token is refused").toBe(true);
     });
   });
 

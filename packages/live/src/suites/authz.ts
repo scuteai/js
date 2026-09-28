@@ -14,7 +14,6 @@ import {
 } from "@scute/js-core";
 import type { LiveContext } from "../lib/context";
 import { done, ok } from "../lib/check";
-import { FINDINGS, knownBug } from "../lib/findings";
 
 /** The policy this run imports: one resource type, five roles, all prefixed live-<runid>. */
 export function policyDocument(ctx: LiveContext) {
@@ -261,26 +260,16 @@ export function authzSuite(get: () => LiveContext) {
       expect(ok(await main.client.authz.reviews(), "authz.reviews"), "not a reviewer").toEqual([]);
     });
 
-    it("verifies the policy snapshot against the app's JWKS, with the app id the SDK is configured with (verifySnapshotToken; known bug F3)", async ({ annotate }) => {
+    it("verifies the policy snapshot against the app's JWKS, with the app id the SDK is configured with (verifySnapshotToken; fixed F3)", async () => {
       const ctx = get();
       const snap = ok(await ctx.admin.authzSnapshot(), "authzSnapshot");
       expect(snap.token.split(".").length).toBe(3);
+      expect(snap.jwks, "the JWKS path names the public app id").toBe(`/v1/auth/${ctx.env.appId}/jwks`);
       const { data: jwks } = await ctx.api.get(snap.jwks, { auth: "none" });
-
-      // The signature itself verifies against the JWKS (checked with the token's own audience).
-      const own = await verifySnapshotToken(snap.token, jwks, decodeSnapshotToken(snap.token).aud);
-      expect(own.version).toBe(snap.version);
-      expect(own.policy.permissions[ctx.perm("edit")]?.requires_verification).toBe(true);
-
-      // F3: the snapshot's aud is the app's internal UUID, not the app_... id the SDK knows.
-      let refusal = "";
-      try {
-        await verifySnapshotToken(snap.token, jwks, ctx.env.appId);
-      } catch (e) {
-        refusal = (e as Error).message;
-      }
-      if (refusal && refusal !== "Snapshot is for another app") throw new Error(`verifySnapshotToken: ${refusal}`);
-      await knownBug(annotate, FINDINGS.snapshotAudIsInternalId, refusal === "Snapshot is for another app", `verifySnapshotToken(token, jwks, "app_...") threw "${refusal}"`);
+      const claims = await verifySnapshotToken(snap.token, jwks, ctx.env.appId);
+      expect(claims.aud).toBe(ctx.env.appId);
+      expect(claims.version).toBe(snap.version);
+      expect(claims.policy.permissions[ctx.perm("edit")]?.requires_verification).toBe(true);
     });
 
     it("refuses a tampered snapshot and an expired one (verifySnapshotToken)", async () => {
@@ -288,11 +277,10 @@ export function authzSuite(get: () => LiveContext) {
       const snap = ok(await ctx.admin.authzSnapshot(), "authzSnapshot");
       const { data: jwks } = await ctx.api.get(snap.jwks, { auth: "none" });
       const claims = decodeSnapshotToken(snap.token);
-      // Checked with the snapshot's own audience, so only the signature and the expiry are on trial here.
       const [h, , s] = snap.token.split(".");
       const forged = Buffer.from(JSON.stringify({ ...claims, version: claims.version + 1000 })).toString("base64url");
-      await expect(verifySnapshotToken(`${h}.${forged}.${s}`, jwks, claims.aud)).rejects.toThrow(/Bad signature/);
-      await expect(verifySnapshotToken(snap.token, jwks, claims.aud, new Date((claims.exp + 60) * 1000))).rejects.toThrow(/expired/);
+      await expect(verifySnapshotToken(`${h}.${forged}.${s}`, jwks, ctx.env.appId)).rejects.toThrow(/Bad signature/);
+      await expect(verifySnapshotToken(snap.token, jwks, ctx.env.appId, new Date((claims.exp + 60) * 1000))).rejects.toThrow(/expired/);
       await expect(verifySnapshotToken(snap.token, jwks, "app_someone_else")).rejects.toThrow(/another app/);
     });
 
