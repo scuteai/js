@@ -138,6 +138,21 @@ export class ScuteClient {
     return this.call<EngineDecision>("POST", `${this.auth}/agent/check`, body, token);
   }
 
+  // RB-42: properties (named secrets and key pairs) a tool uses at call time.
+
+  property(token: string, name: string) {
+    return this.call<{ name: string; value: string }>("GET", `${this.auth}/agent/properties/${encodeURIComponent(name)}`, undefined, token);
+  }
+
+  signWithProperty(token: string, name: string, body: { claims: Record<string, unknown> } | { data: string }) {
+    return this.call<{ jws?: string; signature?: string; alg: string; kid: string }>(
+      "POST",
+      `${this.auth}/agent/properties/${encodeURIComponent(name)}/sign`,
+      body,
+      token
+    );
+  }
+
   createSession(token: string, body: { channel?: string; external_ref?: string; caller?: Record<string, unknown> }) {
     return this.call<AgentSession>("POST", `${this.auth}/agent/sessions`, body, token);
   }
