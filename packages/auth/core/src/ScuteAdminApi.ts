@@ -27,6 +27,47 @@ import type {
 import type { AuthzFilter } from "./lib/authzFilter";
 
 /** A conversation on Scute's auth MCP server, as your backend sees it. */
+/** RB-45: something an agent's safety rails caught, for a person to review. */
+export type AgentMonitorItem = {
+  id: string;
+  kind: "first_use" | "loop" | "paused";
+  agent: string;
+  task_id?: string;
+  permission?: string;
+  resource?: string;
+  detail?: Record<string, unknown>;
+  status: "open" | "acknowledged" | "flagged";
+  note?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  created_at: string;
+};
+
+/** RB-45: the decision log's hash chain, checked. Keep `head` somewhere else. */
+export type DecisionLogCheck = {
+  ok: boolean;
+  chain?: string;
+  checked: number;
+  head?: { seq: number; row_hash: string; at: string };
+  first_break?: { id: string; seq: number; at: string; reason: "changed" | "missing_or_moved" };
+};
+
+/** RB-45: what an agent did over a period. */
+export type AgentReport = {
+  agent: Record<string, unknown>;
+  period: { from: string; to: string };
+  tasks: { total: number; by_status: Record<string, number>; people: number; autonomous: number };
+  decisions: {
+    total: number;
+    by_decision: Record<string, number>;
+    by_permission: ({ permission: string } & Record<string, number | string>)[];
+    allow_sample_rate: number;
+  };
+  human_steps: { verifications: Record<string, number>; approvals: Record<string, number> };
+  safety: { caught: Record<string, number>; reviews: Record<string, number>; flagged: AgentMonitorItem[] };
+  log: DecisionLogCheck;
+};
+
 export type AgentConversation = {
   conversation_id: string;
   verified: boolean;
@@ -388,6 +429,61 @@ class ScuteAdminApi extends ScuteBaseHttp {
     return this.post<AuthzDecision & { say?: string }>(
       `${this._appsPath}/authz/agents/${encodeURIComponent(agentSlug)}/conversations/${encodeURIComponent(conversationId)}/check`,
       check,
+      this._authorizationHeader
+    );
+  }
+
+  // ── Agent monitoring (RB-45) ──
+  //
+  // What the safety rails caught (first use of a permission, a loop, a pause
+  // over budget) waits in a review inbox. The decision log is a hash chain
+  // you can check, and each agent has an evidence report per period.
+
+  /** The review inbox. Open items by default; `status: "all"` for everything. */
+  async agentMonitor(
+    params: { status?: AgentMonitorItem["status"] | "all"; kind?: AgentMonitorItem["kind"]; agent?: string; limit?: number; before?: string } = {}
+  ) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => value !== undefined && query.set(key, String(value)));
+    const qs = query.toString() ? `?${query}` : "";
+    return this.get<{ items: AgentMonitorItem[]; counts: Record<AgentMonitorItem["status"], number>; next?: string }>(
+      `${this._appsPath}/authz/agents/monitor${qs}`,
+      this._authorizationHeader
+    );
+  }
+
+  /** Acknowledge or flag an item. It never changes the agent: resume a paused one separately. */
+  async reviewAgentMonitorItem(id: string, review: { status: "acknowledged" | "flagged"; note?: string }) {
+    return this.post<AgentMonitorItem>(
+      `${this._appsPath}/authz/agents/monitor/${encodeURIComponent(id)}/review`,
+      review,
+      this._authorizationHeader
+    );
+  }
+
+  /** The evidence report for one agent (last 30 days unless you say; at most 400). */
+  async agentReport(agentSlug: string, period: { from?: string | Date; to?: string | Date } = {}) {
+    const query = new URLSearchParams();
+    if (period.from) query.set("from", new Date(period.from).toISOString());
+    if (period.to) query.set("to", new Date(period.to).toISOString());
+    const qs = query.toString() ? `?${query}` : "";
+    return this.get<AgentReport>(`${this._appsPath}/authz/agents/${encodeURIComponent(agentSlug)}/report${qs}`, this._authorizationHeader);
+  }
+
+  /** Check that the app's decision log hasn't been changed, cut or reordered. */
+  async verifyDecisionLog(period: { from?: string | Date; to?: string | Date } = {}) {
+    const query = new URLSearchParams();
+    if (period.from) query.set("from", new Date(period.from).toISOString());
+    if (period.to) query.set("to", new Date(period.to).toISOString());
+    const qs = query.toString() ? `?${query}` : "";
+    return this.get<DecisionLogCheck>(`${this._appsPath}/authz/decisions/verify${qs}`, this._authorizationHeader);
+  }
+
+  /** The kill switch for every agent of the app: suspends them all and ends their open tasks. */
+  async suspendAllAgents(reason?: string) {
+    return this.post<{ suspended: string[]; tasks_revoked: number }>(
+      `${this._appsPath}/authz/agents/suspend_all`,
+      reason ? { reason } : {},
       this._authorizationHeader
     );
   }
