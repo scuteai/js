@@ -1,0 +1,33 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "@scute/auth-ui-react": "0.3.1",
+    "@scute/sdk-e2e": "0.1.0",
+    "@scute/js-core": "0.9.0",
+    "@scute/nextjs-handlers": "0.8.1",
+    "@scute/react-hooks": "0.8.1",
+    "create-scute-app": "0.2.0",
+    "@scute/eslint-config": "0.0.0",
+    "@scute/harness": "0.1.0",
+    "@scute/mcp-gateway": "0.1.0",
+    "@scute/tsconfig": "0.0.0"
+  },
+  "changesets": [
+    "admin-list-user-sessions",
+    "auth-ui-built-and-typed",
+    "authz-can",
+    "authz-sweep",
+    "harness-core",
+    "harness-hardening",
+    "harness-human-steps",
+    "harness-properties",
+    "impersonation",
+    "mcp-gateway-human-tools",
+    "mcp-gateway",
+    "mfa-reverify",
+    "scrub-oauth-token",
+    "sdk-hardening-v2",
+    "sso-required-error"
+  ]
+}
