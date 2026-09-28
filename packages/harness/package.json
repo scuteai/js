@@ -1,6 +1,6 @@
 {
   "name": "@scute/harness",
-  "version": "0.1.0",
+  "version": "0.2.0-next.0",
   "description": "Guardrails for the agents you build: permissions, verification, approvals, grounding and budgets from Scute, on the agent framework you already use.",
   "license": "MIT",
   "keywords": [
