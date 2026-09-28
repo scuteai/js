@@ -6,8 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { needsReverification } from "@scute/js-core";
 import type { LiveContext } from "../lib/context";
-import { describeError, done, noError, ok, sleep, statusOf } from "../lib/check";
-import { FINDINGS, knownBug } from "../lib/findings";
+import { describeError, done, noError, ok, sleep } from "../lib/check";
 import { otpSignIn } from "../lib/flows";
 import { freshTotp, selfTest } from "../lib/totp";
 
@@ -82,7 +81,7 @@ export function mfaSuite(get: () => LiveContext) {
       expect(ok(await mfa.client.listMfaMethods(), "listMfaMethods").backup_codes_available).toBe(10);
     });
 
-    it("a new sign-in now needs MFA, and a TOTP code finishes it (verifyMfaChallenge; known bug F1: 401)", async ({ skip, annotate }) => {
+    it("a new sign-in now needs MFA, and a TOTP code finishes it, with no key (getChallengeStatus, verifyMfaChallenge; fixed F1)", async ({ skip }) => {
       const ctx = get();
       const mfa = ctx.state.mfa ?? skip("needs the MFA user's sign-in");
       const secret = mfa.secret ?? skip("needs the TOTP enrollment");
@@ -94,29 +93,35 @@ export function mfaSuite(get: () => LiveContext) {
       const token = outcome.challengeToken ?? "";
       expect(token.length).toBeGreaterThan(0);
 
+      // The browser has no API key: the sign-in's own MFA challenge answers without one.
+      const status = ok(await client.getChallengeStatus(token), "getChallengeStatus");
+      expect(status.challenge.status).toBe("pending");
+      expect(status.challenge.method).toBe("totp");
+
       const { code, step } = await freshTotp(secret, mfa.lastStep);
       mfa.lastStep = step;
       const { error } = await client.verifyMfaChallenge(token, code);
-      // F1: POST /v1/auth/:app_id/challenges/:token/verify answers 401 without the app's API key, which a browser never has.
-      if (statusOf(error) !== 401) noError(error, "verifyMfaChallenge");
-      await knownBug(annotate, FINDINGS.challengeNeedsApiKey, statusOf(error) === 401, `POST /challenges/:token/verify answered 401 (${describeError(error)})`);
-      // Once F1 is fixed: mfa.completedChallenge = token, and client.getUser() is the MFA user.
+      noError(error, "verifyMfaChallenge");
+      mfa.completedChallenge = token;
+      expect(String(ok(await client.getUser(), "getUser").user?.id)).toBe(mfa.id);
+      mfa.latestClient = client;
     });
 
-    it("a backup code finishes an MFA sign-in (switchMfaMethod, verifyMfaChallenge; known bug F1: 401)", async ({ skip, annotate }) => {
+    it("a backup code finishes an MFA sign-in after switching method, with no key (switchMfaMethod, verifyMfaChallenge; fixed F1)", async ({ skip }) => {
       const ctx = get();
       const mfa = ctx.state.mfa ?? skip("needs the MFA user's sign-in");
-      if (!mfa.backupCodes?.length) skip("needs the backup codes");
+      const codes = mfa.backupCodes ?? skip("needs the backup codes");
       const client = ctx.newClient();
       const outcome = await otpSignIn(client, mfa.identifier, "sendLoginOtp");
       if (outcome.kind !== "mfa") throw new Error("the sign-in went through without asking for MFA");
 
-      const switched = await client.switchMfaMethod(outcome.challengeToken ?? "", "backup_code");
-      // F1: switchMfaMethod cancels and makes a challenge (DELETE and POST /v1/auth/:app_id/challenges), 401 without the API key.
-      if (statusOf(switched.error) !== 401) noError(switched.error, "switchMfaMethod");
-      await knownBug(annotate, FINDINGS.challengeNeedsApiKey, statusOf(switched.error) === 401, `POST /challenges answered 401 (${describeError(switched.error)})`);
-      // Once F1 is fixed: verifyMfaChallenge(switched.data.token, codes[0]) signs the MFA user in, and
-      // listMfaMethods shows 9 backup codes left.
+      const switched = ok(await client.switchMfaMethod(outcome.challengeToken ?? "", "backup_code"), "switchMfaMethod");
+      expect(switched.method).toBe("backup_code");
+      const { error } = await client.verifyMfaChallenge(switched.token, codes[0]);
+      noError(error, "verifyMfaChallenge with a backup code");
+      expect(String(ok(await client.getUser(), "getUser").user?.id)).toBe(mfa.id);
+      expect(ok(await mfa.client.listMfaMethods(), "listMfaMethods").backup_codes_available, "a backup code works once").toBe(9);
+      mfa.latestClient = client;
     });
 
     it("SCUTE_LIVE_SLOW=1: after the re-verify window, removing the method needs a verification (needsReverification)", async ({ skip }) => {
@@ -130,9 +135,9 @@ export function mfaSuite(get: () => LiveContext) {
       const refused = await mfa.client.removeMfaMethod(enrollmentId);
       expect(needsReverification(refused.error), `expected verification_required, got ${describeError(refused.error)}`).toBe(true);
 
-      // The proof: the completed MFA challenge of the TOTP sign-in, or (while F1 blocks that) a step-up
-      // challenge the backend starts (authzStartStepUp) and finishes with the person's TOTP code. No SDK
-      // method finishes a challenge from the backend: POST /v1/auth/:app_id/challenges/:token/verify.
+      // The proof: the completed MFA challenge of the TOTP sign-in, or (when that test didn't get one) a
+      // step-up challenge the backend starts (authzStartStepUp) and finishes with the person's TOTP code. No
+      // SDK method finishes a challenge from the backend: POST /v1/auth/:app_id/challenges/:token/verify.
       let challenge = mfa.completedChallenge;
       if (!challenge) {
         const started = ok(

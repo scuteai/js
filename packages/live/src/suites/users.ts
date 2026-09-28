@@ -2,7 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { LiveContext } from "../lib/context";
-import { done, failed, ok, statusOf } from "../lib/check";
+import { PHASE } from "../lib/context";
+import { done, errorCodeOf, failed, noError, ok, statusOf } from "../lib/check";
 import { FINDINGS, knownBug } from "../lib/findings";
 
 type ManagedUser = { id: string | number; email: string | null; status: string; authz_attributes?: Record<string, unknown> };
@@ -67,24 +68,78 @@ export function usersSuite(get: () => LiveContext) {
       deleted = { id, email };
     });
 
-    it("getUserByIdentifier only looks an identifier up (known bug F6: it makes the user)", async ({ annotate }) => {
+    it("the identifier lookup answers only what sign-in needs (getUserByIdentifier; fixed F6)", async ({ skip }) => {
+      const ctx = get();
+      const second = ctx.state.second ?? skip("needs the created user");
+      const { user } = ok(await ctx.admin.getUserByIdentifier(second.email), "getUserByIdentifier");
+      expect(String(user?.id)).toBe(second.id);
+      expect(Object.keys(user ?? {}).sort()).toEqual(["email", "id", "status", "webauthn_enabled"]);
+      // The same without any credentials, as a browser asks.
+      const { data } = await ctx.api.get(`${ctx.api.authPath}/users`, { auth: "none", query: { identifier: second.email } });
+      expect(Object.keys(data.user ?? {}).sort()).toEqual(["email", "id", "status", "webauthn_enabled"]);
+    });
+
+    it("with public sign-up on, looking up an unknown identifier makes the user (what released SDKs' signIn needs)", async () => {
       const ctx = get();
       const email = ctx.email("lookup");
       const { user } = ok(await ctx.admin.getUserByIdentifier(email), "getUserByIdentifier");
       if (user) ctx.trackUser(String(user.id));
       const listed = ok(await ctx.admin.listUsers({ email }), "listUsers");
       for (const u of listed.users) ctx.trackUser(String(u.id));
-      // F6: GET /v1/auth/:app_id/users?identifier= finds or creates.
-      await knownBug(annotate, FINDINGS.identifierLookupCreatesUsers, listed.users.length > 0, "GET /v1/auth/:app_id/users?identifier=<unknown email> answered 200 with a new user");
+      expect(user?.email).toBe(email);
+      expect(listed.users.map((u) => String(u.id))).toEqual([String(user?.id)]);
     });
 
-    it("a deleted user stays deleted when looked up by identifier (known bug F6: the lookup brings them back)", async ({ skip, annotate }) => {
+    it("with public sign-up off, an unknown identifier answers null and makes nobody (fixed F6)", async () => {
+      const ctx = get();
+      // No SDK method for app settings: GET/PATCH /v1/apps/:app_id.
+      const { data: app } = await ctx.api.get<{ public_signup?: boolean }>(ctx.api.appPath, { auth: "none" });
+      const was = app.public_signup !== false;
+      ctx.cleanup.add(PHASE.settings, "restore public sign-up", () => ctx.api.patch(ctx.api.appPath, { public_signup: was }));
+      const email = ctx.email("closed");
+      try {
+        await ctx.api.patch(ctx.api.appPath, { public_signup: false });
+        const { user } = ok(await ctx.admin.getUserByIdentifier(email), "getUserByIdentifier");
+        expect(user ?? null).toBeNull();
+        const listed = ok(await ctx.admin.listUsers({ email }), "listUsers");
+        for (const u of listed.users) ctx.trackUser(String(u.id));
+        expect(listed.users.length, "nobody was made").toBe(0);
+      } finally {
+        // Back right away: the sign-ins after this make new users.
+        await ctx.api.patch(ctx.api.appPath, { public_signup: was });
+      }
+    });
+
+    it("a deleted user stays deleted when looked up by identifier (fixed F6)", async ({ skip }) => {
       const ctx = get();
       const gone = deleted ?? skip("needs the deleted user");
-      await ctx.admin.getUserByIdentifier(gone.email);
+      const { user } = ok(await ctx.admin.getUserByIdentifier(gone.email), "getUserByIdentifier");
+      expect(user ?? null, "a deleted user's identifier answers null").toBeNull();
+      expect(failed(await ctx.admin.getUser(gone.id), "getUser of the deleted user").status).toBe(404);
+    });
+
+    it("a deleted user stays deleted when they sign in again (known bug F8: the OTP send brings them back)", async ({ skip, annotate }) => {
+      const ctx = get();
+      const gone = deleted ?? skip("needs the deleted user");
+      const sent = await ctx.newClient().sendLoginOtp(gone.email);
       const after = await ctx.admin.getUser(gone.id);
-      // F6: the lookup's find-or-create undeletes the soft-deleted row. (Cleanup deletes it again.)
-      await knownBug(annotate, FINDINGS.identifierLookupCreatesUsers, !after.error, `GET /v1/:app_id/users/:id answered ${after.error ? statusOf(after.error) : 200} after the lookup`);
+      // F8: POST /v1/auth/:app_id/otps/login find-or-creates, and a unique index sends it back to the deleted row,
+      // which it undeletes. (Cleanup deletes the user again.)
+      await knownBug(
+        annotate,
+        FINDINGS.otpSignInUndeletes,
+        !after.error,
+        `POST /otps/login answered ${sent.error ? statusOf(sent.error) : 200}, then GET /v1/:app_id/users/:id answered 200 (it was 404)`
+      );
+    });
+
+    it("gets a user's basic info by user id (getUserByUserId; known bug F10: 400)", async ({ skip, annotate }) => {
+      const ctx = get();
+      const second = ctx.state.second ?? skip("needs the created user");
+      const result = await ctx.admin.getUserByUserId(second.id);
+      const code = statusOf(result.error);
+      if (code !== 400) noError(result.error, "getUserByUserId");
+      await knownBug(annotate, FINDINGS.getUserByUserIdBroken, code === 400, `GET /v1/auth/:app_id/users?user_id= answered ${code} ${errorCodeOf(result.error) ?? ""}`.trim());
     });
   });
 }

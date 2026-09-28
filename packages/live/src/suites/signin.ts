@@ -2,9 +2,9 @@
 // the user, refresh, sessions, and checking an access token.
 
 import { describe, expect, it } from "vitest";
-import { InvalidAuthTokenError } from "@scute/js-core";
+import { IdentifierAlreadyExistsError, InvalidAuthTokenError } from "@scute/js-core";
 import type { LiveContext } from "../lib/context";
-import { describeError, noError, ok, statusOf, tamper } from "../lib/check";
+import { claimsOf, describeError, noError, ok, tamper } from "../lib/check";
 import { FINDINGS, knownBug } from "../lib/findings";
 import { accessOf, otpSignIn } from "../lib/flows";
 
@@ -41,6 +41,7 @@ export function signInSuite(get: () => LiveContext) {
       ok(await main.client.refreshSession(), "refreshSession");
       const after = await accessOf(main.client);
       expect(after !== before, "refresh should hand out a new access token").toBe(true);
+      expect(claimsOf(after).aid, "the refreshed token names the public app id (F7)").toBe(get().env.appId);
       const { user } = ok(await main.client.getUser(after), "getUser with the new token");
       expect(String(user?.id)).toBe(main.id);
     });
@@ -71,17 +72,14 @@ export function signInSuite(get: () => LiveContext) {
   });
 
   describe("2a. sign-in edge cases", () => {
-    it("getMfaStatus by phone number, before sign-in (known bug F5: 500)", async ({ skip, annotate }) => {
+    it("getMfaStatus by phone number, before sign-in (fixed F5: it answered 500)", async ({ skip }) => {
       const ctx = get();
       if (!ctx.state.phone) skip("needs the SMS sign-in (the phone user)");
-      const status = await ctx.newClient().getMfaStatus(ctx.phone);
-      // F5: GET /v1/auth/:app_id/mfa/status?identifier=<phone> looks the phone up on app_users, which has no phone column.
-      const code = statusOf(status.error);
-      if (code !== 500) noError(status.error, "getMfaStatus(phone)");
-      await knownBug(annotate, FINDINGS.phoneLookup500, code === 500, `GET /mfa/status?identifier=<phone> answered ${code}`);
+      const status = ok(await ctx.newClient().getMfaStatus(ctx.phone), "getMfaStatus(phone)");
+      expect(status.mfa_enabled, "the phone user has no MFA").toBe(false);
     });
 
-    it("signIn right after the client is made, before its app config arrives (known bug F4: TypeError)", async ({ annotate }) => {
+    it("signIn right after the client is made, before its app config arrives (fixed F4: it threw a TypeError)", async () => {
       const ctx = get();
       const email = ctx.email("early");
       const real = globalThis.fetch;
@@ -91,23 +89,28 @@ export function signInSuite(get: () => LiveContext) {
         if (new URL(url).pathname === `/v1/apps/${ctx.env.appId}`) await new Promise((r) => setTimeout(r, 1500));
         return real(input, init);
       }) as typeof fetch;
-      let thrown: unknown;
-      let result: { error?: unknown } | undefined;
+      let result: Awaited<ReturnType<ReturnType<LiveContext["newClient"]>["signIn"]>>;
       try {
         result = await ctx.newClient().signIn(email);
-      } catch (e) {
-        thrown = e;
       } finally {
         globalThis.fetch = real;
       }
-      // The identifier lookup made the user either way (F6); delete it at the end.
+      // Public sign-up is on, so the identifier lookup made the user; delete it at the end.
       const listed = ok(await ctx.admin.listUsers({ email }), "listUsers");
       for (const u of listed.users) ctx.trackUser(String(u.id));
 
-      const typeError = thrown instanceof TypeError && /email_auth_type/.test(thrown.message);
-      if (thrown && !typeError) throw thrown;
-      if (!typeError) noError(result?.error, "signIn");
-      await knownBug(annotate, FINDINGS.signInBeforeAppData, typeError, "signIn threw TypeError reading 'email_auth_type'");
+      noError(result.error, "signIn");
+      expect(Boolean(result.data && "otp" in result.data && result.data.otp?.id), "signIn waited for the config and sent a code").toBe(true);
+    });
+
+    it("signUp refuses an identifier that already has an account (known bug F9: it sends a code instead)", async ({ skip, annotate }) => {
+      const ctx = get();
+      const main = ctx.state.main ?? skip("needs the email sign-in (a verified account)");
+      const result = await ctx.newClient().signUp(main.identifier);
+      if (result.error && !(result.error instanceof IdentifierAlreadyExistsError)) noError(result.error, "signUp");
+      // F9: signUp decides with email_verified / phone_verified from the identifier lookup, which answers only
+      // id, status, webauthn_enabled and the identifier now, so it never sees an existing account.
+      await knownBug(annotate, FINDINGS.signUpCantSeeAccounts, !result.error, "signUp of a verified account answered no error and sent a registration code");
     });
   });
 

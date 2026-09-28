@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import type { LiveContext } from "../lib/context";
 import { TEST_CODE } from "../lib/context";
 import { failed, ok } from "../lib/check";
-import { FINDINGS, knownBug } from "../lib/findings";
 import { McpHttpClient } from "../lib/mcp";
 import { registerAgent } from "./agents";
 
@@ -96,21 +95,24 @@ export function authMcpSuite(get: () => LiveContext) {
       expect(denied.say).toBeTruthy();
     });
 
-    it("scute_identify with a test phone number (known bug F5: 500)", async ({ skip, annotate }) => {
+    it("scute_identify with a test phone number, then scute_submit_code 424242 (fixed F5: it answered 500)", async ({ skip }) => {
       const ctx = get();
       const key = agentKey ?? skip("needs the agent key");
       if (!ctx.state.phone) skip("needs the SMS sign-in (an active user with that phone)");
       // A second conversation on the same key, so the first one stays as it is.
       const other = new McpHttpClient(`${ctx.env.baseUrl}/v1/mcp/auth/${encodeURIComponent(ctx.env.appId)}`, key);
-      expect((await other.initialize()).status).toBe(200);
-      const answer = await other.request("tools/call", { name: "scute_identify", arguments: { phone: ctx.phone } });
-      await other.close();
-      // F5: find_user looks the phone up on app_users, which has no phone column.
-      if (answer.status === 500) {
-        await knownBug(annotate, FINDINGS.phoneLookup500, true, "tools/call scute_identify {phone} answered HTTP 500");
-        return;
+      try {
+        expect((await other.initialize()).status).toBe(200);
+        const identify = await other.callTool("scute_identify", { phone: ctx.phone });
+        expect(identify.status).toBe(200);
+        expect(identify.isError, identify.text).toBe(false);
+        expect(identify.structuredContent.status).toBe("code_sent");
+        const submitted = await other.callTool("scute_submit_code", { code: TEST_CODE });
+        expect(submitted.structuredContent.status, submitted.text).toBe("verified");
+        expect((await other.callTool("scute_whoami")).structuredContent.verified).toBe(true);
+      } finally {
+        await other.close();
       }
-      await knownBug(annotate, FINDINGS.phoneLookup500, false, "");
     });
 
     it("once the platform ends the conversation, the backend check refuses (not_verified)", async ({ skip }) => {
