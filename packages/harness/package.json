@@ -17,7 +17,9 @@
     "url": "https://github.com/scuteai/js.git",
     "directory": "packages/harness"
   },
-  "publishConfig": {},
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist",
     "LICENSE"

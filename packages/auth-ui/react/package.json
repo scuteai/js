@@ -2,7 +2,9 @@
   "name": "@scute/auth-ui-react",
   "version": "0.4.0-next.1",
   "private": false,
-  "publishConfig": {},
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
