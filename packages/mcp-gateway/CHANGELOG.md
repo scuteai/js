@@ -1,5 +1,12 @@
 # @scute/mcp-gateway
 
+## 0.2.0-next.1
+
+### Patch Changes
+
+- Updated dependencies [466dedc]
+  - @scute/harness@0.2.0-next.1
+
 ## 0.2.0-next.0
 
 ### Minor Changes

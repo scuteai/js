@@ -14,10 +14,12 @@
     "@scute/tsconfig": "0.0.0"
   },
   "changesets": [
+    "admin-agent-conversations",
     "admin-list-user-sessions",
     "auth-ui-built-and-typed",
     "authz-can",
     "authz-sweep",
+    "harness-budget-pause",
     "harness-core",
     "harness-hardening",
     "harness-human-steps",

@@ -1,5 +1,11 @@
 # @scute/harness
 
+## 0.2.0-next.1
+
+### Patch Changes
+
+- 466dedc: A run closes for good when Scute pauses the agent for going over its budget (`budget_exceeded`), the same as when its task is revoked. It no longer mints a fresh task for a paused agent.
+
 ## 0.2.0-next.0
 
 ### Minor Changes
