@@ -37,6 +37,15 @@ export function ok<R extends { data?: unknown; error?: unknown }>(result: R, wha
   return result.data as Exclude<R["data"], null | undefined>;
 }
 
+/**
+ * Fail with a plain message when an SDK call answered an error. (Never
+ * `expect(error).toBeNull()`: vitest would print the error, whose request
+ * URL can carry a token.)
+ */
+export function noError(error: unknown, what: string): void {
+  if (error) throw new Error(`${what} failed: ${describeError(error)}`);
+}
+
 /** For SDK calls that answer no data (deletes): only that there was no error. */
 export function done(result: { error?: unknown }, what: string): void {
   if (result.error) throw new Error(`${what} failed: ${describeError(result.error)}`);

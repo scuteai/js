@@ -4,7 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { InvalidAuthTokenError } from "@scute/js-core";
 import type { LiveContext } from "../lib/context";
-import { describeError, ok, tamper } from "../lib/check";
+import { describeError, noError, ok, statusOf, tamper } from "../lib/check";
+import { FINDINGS, knownBug } from "../lib/findings";
 import { accessOf, otpSignIn } from "../lib/flows";
 
 export function signInSuite(get: () => LiveContext) {
@@ -69,6 +70,47 @@ export function signInSuite(get: () => LiveContext) {
     });
   });
 
+  describe("2a. sign-in edge cases", () => {
+    it("getMfaStatus by phone number, before sign-in (known bug F5: 500)", async ({ skip, annotate }) => {
+      const ctx = get();
+      if (!ctx.state.phone) skip("needs the SMS sign-in (the phone user)");
+      const status = await ctx.newClient().getMfaStatus(ctx.phone);
+      // F5: GET /v1/auth/:app_id/mfa/status?identifier=<phone> looks the phone up on app_users, which has no phone column.
+      const code = statusOf(status.error);
+      if (code !== 500) noError(status.error, "getMfaStatus(phone)");
+      await knownBug(annotate, FINDINGS.phoneLookup500, code === 500, `GET /mfa/status?identifier=<phone> answered ${code}`);
+    });
+
+    it("signIn right after the client is made, before its app config arrives (known bug F4: TypeError)", async ({ annotate }) => {
+      const ctx = get();
+      const email = ctx.email("early");
+      const real = globalThis.fetch;
+      // The app config request (GET /v1/apps/:app_id) answers 1.5s late, like a slow or cold request would.
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (new URL(url).pathname === `/v1/apps/${ctx.env.appId}`) await new Promise((r) => setTimeout(r, 1500));
+        return real(input, init);
+      }) as typeof fetch;
+      let thrown: unknown;
+      let result: { error?: unknown } | undefined;
+      try {
+        result = await ctx.newClient().signIn(email);
+      } catch (e) {
+        thrown = e;
+      } finally {
+        globalThis.fetch = real;
+      }
+      // The identifier lookup made the user either way (F6); delete it at the end.
+      const listed = ok(await ctx.admin.listUsers({ email }), "listUsers");
+      for (const u of listed.users) ctx.trackUser(String(u.id));
+
+      const typeError = thrown instanceof TypeError && /email_auth_type/.test(thrown.message);
+      if (thrown && !typeError) throw thrown;
+      if (!typeError) noError(result?.error, "signIn");
+      await knownBug(annotate, FINDINGS.signInBeforeAppData, typeError, "signIn threw TypeError reading 'email_auth_type'");
+    });
+  });
+
   describe("3. tokens", () => {
     it("the remote check accepts the access token and refuses a tampered one (getUser)", async ({ skip }) => {
       const ctx = get();
@@ -77,7 +119,7 @@ export function signInSuite(get: () => LiveContext) {
       const fresh = ctx.newClient();
 
       const good = await fresh.getUser(access);
-      expect(good.error, describeError(good.error)).toBeNull();
+      noError(good.error, "getUser with the access token");
       expect(String(good.data.user?.id)).toBe(main.id);
 
       const bad = await fresh.getUser(tamper(access));

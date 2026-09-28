@@ -4,9 +4,11 @@
 // deleted in afterAll, even when a test failed.
 
 import { randomBytes } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import { ScuteAdminApi, ScuteClient, type ScuteTokenPayload } from "@scute/js-core";
 import type { LiveEnv } from "../env";
 import { describeError } from "./check";
+import { reproducedSummary } from "./findings";
 import { Api } from "./http";
 
 /** The code every test identity gets (and the only code this suite may print). */
@@ -174,11 +176,21 @@ export class LiveContext {
     });
   }
 
-  async tearDown(): Promise<void> {
+  /**
+   * Cleanup, then what the run wants said at the end: the known bugs that
+   * still reproduce and anything cleanup couldn't delete (names and API error
+   * codes only). Written to `summaryFile` for global-setup to print.
+   */
+  async tearDown(summaryFile?: string): Promise<void> {
     const failures = await this.cleanup.run();
-    if (failures.length) {
-      // Names and API error codes only.
-      console.warn(`[scute live] cleanup left ${failures.length} thing(s) behind for run ${this.runId}:\n  ${failures.join("\n  ")}`);
-    }
+    const lines = [reproducedSummary() ?? `[scute live] run ${this.runId}: no known bugs reproduced`];
+    lines.push(
+      failures.length
+        ? `[scute live] cleanup left ${failures.length} thing(s) behind for run ${this.runId}:\n  ${failures.join("\n  ")}`
+        : `[scute live] cleanup: everything run ${this.runId} made is deleted`
+    );
+    const text = lines.join("\n");
+    if (summaryFile) writeFileSync(summaryFile, text);
+    else console.warn(text);
   }
 }

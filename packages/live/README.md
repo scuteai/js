@@ -17,7 +17,7 @@ than `424242` in the output.
 | 1. App | `ScuteClient.getAppData`, `ScuteAdminApi.getAppData` |
 | 2. Sign-in | email OTP (`signIn`, `verifyOtp`, `signInWithTokenPayload`), SMS OTP (`sendLoginOtp`), `getUser`, `refreshSession`, `listUserSessions`, `revokeSession`, admin `listUserSessions` / `revokeUserSession`, `signOut` |
 | 3. Tokens | the remote check (`getUser` with a good and a tampered token). Local JWKS verification of a session token is skipped: the SDKs have no API for it. Local verification is covered where the SDKs have it: `verifySnapshotToken` (tampered, expired, other app) and `@scute/mcp-gateway` `verifyAccessToken` (tampered, expired, other audience or issuer) |
-| 4. MFA | `enrollMfa` TOTP (the code computed from the secret, RFC 6238 with `node:crypto`), `verifyMfaEnrollment`, `listMfaMethods`, `getMfaStatus`, `generateBackupCodes`, a sign-in that then needs MFA finished with `verifyMfaChallenge` (TOTP) and with a backup code (`switchMfaMethod`), `removeMfaMethod` with the completed challenge. With `SCUTE_LIVE_SLOW=1` it also waits out the re-verify window (over 5 minutes) and checks `needsReverification` |
+| 4. MFA | `enrollMfa` TOTP (the code computed from the secret, RFC 6238 with `node:crypto`), `verifyMfaEnrollment`, `listMfaMethods`, `getMfaStatus`, `generateBackupCodes`, a sign-in that then needs MFA finished with `verifyMfaChallenge` (TOTP) and with a backup code (`switchMfaMethod`) (both known bug F1), `removeMfaMethod`. With `SCUTE_LIVE_SLOW=1` it also waits out the re-verify window (over 5 minutes), checks `needsReverification`, and removes the method with a completed challenge |
 | 5. Admin users | `createUser`, `getUser`, `getUserByIdentifier`, `listUsers`, `updateUser`, `deactivateUser`, `activateUser`, `deleteUser` |
 | 6. Impersonation | `impersonateUser` (the `act` claim), `listImpersonations`, `beginImpersonation` / `getImpersonation` / `stopImpersonating` in the client, a "not while impersonating" permission denied inside the session (`authz.can`) and from the backend (`impersonationContext`), admin `stopImpersonating` |
 | 7. Authz | policy import (dry run, apply, idempotent), roles assigned and removed, `authzCheck`, `authzCheckBatch`, `authzUserPermissions`, `authzAuthorizedUsers`, `authzFilter`, a step-up redeemed (`authzStartStepUp`), `authz.can` / `canMany` / `permissions` / `reviews`, `authzSnapshot`, local decisions matching the server over a matrix (`ScuteLocalAuthz`, `decideLocally`), access requests (`requestAccess`, `myRequests`, `cancelRequest`, `authzRequests`, `authzCreateRequest`, `authzDecideRequest`, an approval spent once) |
@@ -35,6 +35,24 @@ policy, assigning roles, properties, settings, the OAuth server, the decision
 log, finishing a challenge from the backend) go through a small typed fetch
 helper (`src/lib/http.ts`) with the app secret; each call site says which
 method is missing.
+
+## Known bugs
+
+Running it against scute-api-v2 turned up six bugs (`src/lib/findings.ts`).
+A test that hits one records it and stops, so it passes while the bug
+reproduces; once the bug is fixed that test fails with "no longer
+reproduces", and whoever fixed it turns the check into a plain assertion.
+Everything else fails as usual, so a run is green except for regressions,
+and it ends by listing the known bugs that still reproduce.
+
+| | Bug | Evidence |
+| --- | --- | --- |
+| F1 | `ScuteClient`'s challenge calls (`verifyMfaChallenge`, `switchMfaMethod`, `getChallengeStatus`, `resendChallenge`, `cancelChallenge`, the MS Authenticator ones) need the app's API key, which a browser never has: an MFA sign-in can't be finished | `POST /v1/auth/:app_id/challenges/:token/verify`, `POST .../challenges`, `DELETE` and `GET .../challenges/:token` all answer 401 `HTTP Token: Access denied.` without the key (404 `challenge_not_found` with it) |
+| F2 | `ScuteAdminApi.listUserSessions` and `revokeUserSession` send the secret, but the API also wants a user session token | `GET /v1/:app_id/users/:id/sessions` and `DELETE .../sessions/:id` answer 401 `Not authorized` with the secret |
+| F3 | Policy snapshots are signed with `aud` = the app's internal UUID, so `verifySnapshotToken(token, jwks, appId)` with the `app_...` id rejects every snapshot | `Snapshot is for another app`; the snapshot's `jwks` path carries the UUID too |
+| F4 | `ScuteClient.signIn` doesn't wait for the app's config; if it arrives after the identifier lookup, `signIn` throws | `TypeError: Cannot read properties of undefined (reading 'email_auth_type')` with the config request 1.5 s late |
+| F5 | Looking a user up by phone queries a column `app_users` doesn't have | `GET /v1/auth/:app_id/mfa/status?identifier=<phone>` and the auth MCP's `scute_identify {phone}` answer 500 |
+| F6 | `GET /v1/auth/:app_id/users?identifier=` (`getUserByIdentifier`; `signIn` and `verifyOtp` use it) creates the user when it doesn't exist, and brings back a deleted one | 200 with a new user for an unknown email; a deleted user's `GET /v1/:app_id/users/:id` goes from 404 to 200 after the lookup |
 
 ## Credentials
 
@@ -67,10 +85,13 @@ SCUTE_LIVE_SLOW=1 pnpm test:live  # also the tests that wait out real time windo
 pnpm --filter @scute/live-tests typecheck
 ```
 
-A run takes a couple of minutes (the TOTP steps wait for a fresh 30 second
-window, and the decision log is written by a background job). The tests run
-in order in one file (`src/scute.live.ts`); a test that needs something an
-earlier one failed to make is skipped with a note saying what it needed.
+A run takes under a minute (77 tests: 65 pass, 10 pass as known bugs, 2
+are skipped), or about seven minutes with `SCUTE_LIVE_SLOW=1`. The TOTP
+steps wait for a fresh 30 second window, and the decision log is written by
+a background job, so it polls. The tests run in order in one file
+(`src/scute.live.ts`); a test that needs something an earlier one failed to
+make is skipped with a note saying what it needed. The run ends with the
+known bugs that still reproduce and whether cleanup deleted everything.
 
 The suite turns on what it tests in its own app. Client checks, access
 requests, impersonation and logging every allow stay on; the OAuth server

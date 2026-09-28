@@ -2,12 +2,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { LiveContext } from "../lib/context";
-import { done, failed, ok } from "../lib/check";
+import { done, failed, ok, statusOf } from "../lib/check";
+import { FINDINGS, knownBug } from "../lib/findings";
 
 type ManagedUser = { id: string | number; email: string | null; status: string; authz_attributes?: Record<string, unknown> };
 
 export function usersSuite(get: () => LiveContext) {
   describe("5. admin users", () => {
+    let deleted: { id: string; email: string } | undefined;
     it("creates a user (createUser)", async () => {
       const ctx = get();
       const email = ctx.email(2);
@@ -56,11 +58,33 @@ export function usersSuite(get: () => LiveContext) {
 
     it("deletes a user (deleteUser); getUser then answers 404", async () => {
       const ctx = get();
-      const { user } = ok(await ctx.admin.createUser(ctx.email("deleted")), "createUser");
+      const email = ctx.email("deleted");
+      const { user } = ok(await ctx.admin.createUser(email), "createUser");
       const id = String(user.id);
       ctx.trackUser(id);
       done(await ctx.admin.deleteUser(id), "deleteUser");
       expect(failed(await ctx.admin.getUser(id), "getUser of a deleted user").status).toBe(404);
+      deleted = { id, email };
+    });
+
+    it("getUserByIdentifier only looks an identifier up (known bug F6: it makes the user)", async ({ annotate }) => {
+      const ctx = get();
+      const email = ctx.email("lookup");
+      const { user } = ok(await ctx.admin.getUserByIdentifier(email), "getUserByIdentifier");
+      if (user) ctx.trackUser(String(user.id));
+      const listed = ok(await ctx.admin.listUsers({ email }), "listUsers");
+      for (const u of listed.users) ctx.trackUser(String(u.id));
+      // F6: GET /v1/auth/:app_id/users?identifier= finds or creates.
+      await knownBug(annotate, FINDINGS.identifierLookupCreatesUsers, listed.users.length > 0, "GET /v1/auth/:app_id/users?identifier=<unknown email> answered 200 with a new user");
+    });
+
+    it("a deleted user stays deleted when looked up by identifier (known bug F6: the lookup brings them back)", async ({ skip, annotate }) => {
+      const ctx = get();
+      const gone = deleted ?? skip("needs the deleted user");
+      await ctx.admin.getUserByIdentifier(gone.email);
+      const after = await ctx.admin.getUser(gone.id);
+      // F6: the lookup's find-or-create undeletes the soft-deleted row. (Cleanup deletes it again.)
+      await knownBug(annotate, FINDINGS.identifierLookupCreatesUsers, !after.error, `GET /v1/:app_id/users/:id answered ${after.error ? statusOf(after.error) : 200} after the lookup`);
     });
   });
 }

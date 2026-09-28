@@ -5,7 +5,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { decodeImpersonation, impersonationContext, type ScuteImpersonationTokens } from "@scute/js-core";
 import type { LiveContext } from "../lib/context";
-import { claimsOf, describeError, done, failed, ok } from "../lib/check";
+import { claimsOf, describeError, done, failed, noError, ok } from "../lib/check";
 
 export function impersonationSuite(get: () => LiveContext) {
   describe("6. impersonation", () => {
@@ -67,7 +67,7 @@ export function impersonationSuite(get: () => LiveContext) {
       }
 
       const begun = await browser.beginImpersonation(started);
-      expect(begun.error, describeError(begun.error)).toBeNull();
+      noError(begun.error, "beginImpersonation");
       const who = await browser.getImpersonation();
       expect(who?.actor.email).toBe(supportEmail());
       expect(String(ok(await browser.getUser(), "getUser").user?.id)).toBe(main.id);
@@ -91,7 +91,7 @@ export function impersonationSuite(get: () => LiveContext) {
       const list = ok(await ctx.admin.listImpersonations(main.id), "listImpersonations");
       expect(list.map((s) => String(s.session_id))).not.toContain(String(started.session_id));
       const gone = await ctx.newClient().getUser(started.access);
-      expect(gone.error, "the ended session's token is refused").toBeTruthy();
+      expect(Boolean(gone.error), "the ended session's token is refused").toBe(true);
     });
 
     it("the backend refuses a 'not while impersonating' permission with impersonationContext(claims)", async ({ skip }) => {
@@ -121,7 +121,7 @@ export function impersonationSuite(get: () => LiveContext) {
       const list = ok(await ctx.admin.listImpersonations(main.id), "listImpersonations");
       expect(list.map((s) => String(s.session_id))).not.toContain(String(second.session_id));
       const refused = await ctx.newClient().getUser(second.access);
-      expect(refused.error, "the ended session's token is refused").toBeTruthy();
+      expect(Boolean(refused.error), "the ended session's token is refused").toBe(true);
     });
   });
 }

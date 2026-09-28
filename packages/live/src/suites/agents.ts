@@ -5,7 +5,7 @@
 
 import { createPublicKey, randomBytes, verify } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { createHarness, guards, type Harness, type Run } from "@scute/harness";
+import { createHarness, guards, type Harness, type Run, type Verdict } from "@scute/harness";
 import type { LiveContext } from "../lib/context";
 import { TEST_CODE } from "../lib/context";
 import { ok, refusal, safely, tamper } from "../lib/check";
@@ -13,6 +13,9 @@ import { verifyJws, type Jwk } from "../lib/jws";
 
 type AgentJson = { slug: string; status: string; roles: string[]; settings?: Record<string, any>; suspended_reason?: string };
 type TaskJson = { id: string; status: string; acts_for?: string; ref?: string; actions?: string[] };
+
+/** What Scute's engine said (a proceed verdict carries no reason of its own; the permissions guard's result does). */
+const engineReason = (v: Verdict) => v.results.find((r) => r.guard === "permissions")?.decision.engine?.reason;
 
 /** Tool names to permissions (the resource's slug has dashes, so the naming convention can't guess it). */
 export const toolsFor = (ctx: LiveContext) => ({
@@ -92,6 +95,7 @@ export function agentsSuite(get: () => LiveContext) {
       const r = run ?? skip("needs the run");
       const inside = await safely(() => r.check("read_doc", { doc_id: "1" }), "run.check read_doc");
       expect(inside.kind, inside.decision.reason).toBe("proceed");
+      expect(engineReason(inside)).toBe("role_grant");
 
       const outside = await safely(() => r.check("delete_doc", { doc_id: "1" }), "run.check delete_doc");
       expect(outside.kind).toBe("deny");
@@ -115,8 +119,8 @@ export function agentsSuite(get: () => LiveContext) {
       expect(finished.status).toBe("completed");
 
       const after = await safely(() => r.check("edit_doc", { doc_id: "2" }), "run.check edit_doc again");
-      expect(after.kind, after.decision.reason).toBe("proceed");
-      expect(after.decision.reason).toBe("verified");
+      expect(after.kind, engineReason(after)).toBe("proceed");
+      expect(engineReason(after)).toBe("verified");
     });
 
     it("files a reviewer approval for the exact call, and runs it once approved", async ({ skip }) => {
@@ -135,6 +139,7 @@ export function agentsSuite(get: () => LiveContext) {
       ok(await ctx.admin.authzDecideRequest(requestId, "approve", { note: "live test" }), "authzDecideRequest");
       const after = await safely(() => r.check("delete_doc", { doc_id: "9" }), "run.check delete_doc again");
       expect(after.kind, after.decision.reason).toBe("proceed");
+      expect(engineReason(after)).toBe("approved");
       await safely(() => r.complete(), "run.complete");
     });
 

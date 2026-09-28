@@ -2,7 +2,7 @@
 // later blocks use what earlier ones signed in or made. Without credentials
 // every test is skipped (global-setup.ts says why, in one line).
 
-import { afterAll, beforeAll, describe } from "vitest";
+import { afterAll, beforeAll, describe, inject } from "vitest";
 import { loadEnv } from "./env";
 import { LiveContext } from "./lib/context";
 import { agentsSuite } from "./suites/agents";
@@ -31,7 +31,7 @@ describe.skipIf(!ctx)("Scute JS SDKs, live", () => {
   });
 
   afterAll(async () => {
-    await get().tearDown();
+    await get().tearDown(inject("summaryFile"));
   });
 
   appSuite(get);
