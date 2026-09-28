@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import type { LiveContext } from "../lib/context";
 import { PHASE } from "../lib/context";
 import { done, errorCodeOf, failed, noError, ok, statusOf } from "../lib/check";
-import { FINDINGS, knownBug } from "../lib/findings";
 
 type ManagedUser = { id: string | number; email: string | null; status: string; authz_attributes?: Record<string, unknown> };
 
@@ -119,13 +118,12 @@ export function usersSuite(get: () => LiveContext) {
       expect(failed(await ctx.admin.getUser(gone.id), "getUser of the deleted user").status).toBe(404);
     });
 
-    it("gets a user's basic info by user id (getUserByUserId; known bug F10: 400)", async ({ skip, annotate }) => {
+    it("gets a user by user id (getUserByUserId, deprecated for getUser; fixed F10)", async ({ skip }) => {
       const ctx = get();
       const second = ctx.state.second ?? skip("needs the created user");
-      const result = await ctx.admin.getUserByUserId(second.id);
-      const code = statusOf(result.error);
-      if (code !== 400) noError(result.error, "getUserByUserId");
-      await knownBug(annotate, FINDINGS.getUserByUserIdBroken, code === 400, `GET /v1/auth/:app_id/users?user_id= answered ${code} ${errorCodeOf(result.error) ?? ""}`.trim());
+      const { user } = ok(await ctx.admin.getUserByUserId(second.id), "getUserByUserId");
+      expect(String(user?.id)).toBe(second.id);
+      expect(user?.email).toBe(second.email);
     });
   });
 }
