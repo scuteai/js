@@ -108,6 +108,14 @@ export function fakeScute(
       if (!task) return json({ error: "Task token missing" }, 401);
       return json({ id: "req1", status: state.requestStatus, say: "I've asked for approval. I'll let you know when there's an answer." }, 201);
     }
+    if (method === "POST" && path === "/v1/auth/app1/agent/plans") {
+      if (!task) return json({ error: "Task token missing" }, 401);
+      const steps = (body.steps ?? []).map((s: any) => ({ permission: `${s.resource?.type ?? ""}:${s.action}`, needs: "approval", details: s.details }));
+      return json({ id: "plan1", status: "pending", say: "I've asked for approval.", steps }, 201);
+    }
+    if (method === "GET" && path === "/v1/auth/app1/agent/plans/plan1") {
+      return json({ id: "plan1", status: state.requestStatus, steps: [] });
+    }
     if (method === "GET" && path === "/v1/auth/app1/agent/approvals/req1") {
       return json({ id: "req1", status: state.requestStatus, say: state.requestStatus === "approved" ? "It's approved." : "Still waiting." });
     }

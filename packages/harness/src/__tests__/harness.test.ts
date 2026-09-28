@@ -400,3 +400,42 @@ describe("combining guards", () => {
     });
   });
 });
+
+describe("plans and previews (RB-45)", () => {
+  it("files a plan from tool calls, then checks each call with the plan and its exact arguments", async () => {
+    const scute = fakeScute();
+    const run = createHarness({ ...base, fetch: scute.fetch }).run({ actsFor: "user1" });
+
+    const plan = await run.requestPlan(
+      [
+        { tool: "refund_invoice", args: { invoice_id: 1, amount: 40 } },
+        { tool: "refund_invoice", args: { invoice_id: 2, amount: 15 } },
+      ],
+      "Two refunds for ticket 88"
+    );
+    expect(plan.id).toBe("plan1");
+    const [filed] = scute.paths("/v1/auth/app1/agent/plans");
+    expect(filed.body.reason).toBe("Two refunds for ticket 88");
+    expect(filed.body.steps).toEqual([
+      expect.objectContaining({ action: "refund", resource: { type: "invoice", key: "1" }, details: { invoice_id: 1, amount: 40 } }),
+      expect.objectContaining({ action: "refund", resource: { type: "invoice", key: "2" }, details: { invoice_id: 2, amount: 15 } }),
+    ]);
+    expect((await run.snapshot()).planId).toBe("plan1");
+
+    await run.check("refund_invoice", { invoice_id: 2, amount: 15 });
+    const checks = scute.paths(CHECK);
+    expect(checks.at(-1)!.body).toMatchObject({ plan: "plan1", details: { invoice_id: 2, amount: 15 } });
+  });
+
+  it("previews a call as a dry run, without proofs and without using the budget", async () => {
+    const scute = fakeScute();
+    const run = createHarness({ ...base, fetch: scute.fetch, guards: [guards.permissions(), guards.budget({ calls: 1 })] }).run({ actsFor: "user1" });
+
+    for (let i = 0; i < 3; i++) await run.preview("refund_invoice", { invoice_id: 1, amount: 40 });
+    const sent = scute.paths(CHECK).map((c) => c.body);
+    expect(sent).toHaveLength(3);
+    expect(sent.every((b) => b.dry_run === true && b.plan === undefined && b.challenge === undefined && b.approval === undefined)).toBe(true);
+    expect((await run.check("refund_invoice", { invoice_id: 1, amount: 40 })).kind).toBe("proceed"); // the budget's one call is still there
+    expect((await run.check("refund_invoice", { invoice_id: 1, amount: 40 })).kind).not.toBe("proceed"); // and now it's used
+  });
+});

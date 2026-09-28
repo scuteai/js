@@ -118,6 +118,25 @@ tools: {
   with other arguments is a new request. Approvals and verifications are
   spent only on a call no other guard stops. `run.approvalStatus(id)` checks.
 
+### Plans and previews
+
+When the agent knows its steps up front, file them once and let a reviewer approve the whole plan:
+
+```ts
+const plan = await run.requestPlan(
+  [
+    { tool: "refund_invoice", args: { invoice_id: 1, amount: 40 } },
+    { tool: "refund_invoice", args: { invoice_id: 2, amount: 15 } },
+  ],
+  "Two refunds for ticket 88"
+);
+// plan.steps says what each one needs: none, approval, or verify (the person, at run time)
+```
+
+Once it's approved, each step that needed approval runs once, with exactly those arguments, through the usual `run.check`. `run.planStatus()` shows which steps ran.
+
+`run.preview(tool, args)` asks what a call would need right now (a dry run): it doesn't count toward budgets and doesn't use up a verification or approval.
+
 ## Runs and state
 
 Checks within one run go one at a time, so budgets hold when the model

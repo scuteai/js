@@ -1,4 +1,4 @@
-import { ScuteHarnessError, type Approval, type Verification, type Whoami } from "./client";
+import { ScuteHarnessError, type AgentPlan, type Approval, type Verification, type Whoami } from "./client";
 import { resourceRef } from "./convention";
 import { Call, describeCall, runs } from "./decisions";
 import { aiSdkPrepareStep, aiSdkToolApproval, aiSdkTools, type AiSdkApprovalStatus } from "./adapters/ai-sdk";
@@ -43,6 +43,8 @@ type RunState = {
   challenges: Record<string, string>;
   /** "permission|object" -> the access request filed for one exact call */
   approvals: Record<string, { id: string; call: string }>;
+  /** The plan this run filed (RB-45): its approved steps run once each. */
+  planId?: string;
   /** Calls the person confirmed in your UI (tool + arguments), each good once. */
   confirmed?: string[];
   calls: number;
@@ -396,6 +398,7 @@ export class Run {
     const permission = call.permission!;
     const filed = s.approvals[approvalKey(call)];
     const approval = options.proofs && filed?.call === fingerprint(call.tool, call.args) ? filed.id : undefined;
+    const plan = options.proofs && !approval ? s.planId : undefined;
     const decision = await this.agent((token) =>
       this.harness.client.check(token, {
         action: call.spec.action!,
@@ -403,7 +406,8 @@ export class Run {
         context: { ...this.options.context, ...context, args: call.args },
         challenge: options.proofs ? s.challenges[permission] : undefined,
         approval,
-        details: approval ? call.args : undefined,
+        plan,
+        details: approval || plan ? call.args : undefined,
         session_id: s.sessionId,
       })
     );
@@ -439,6 +443,51 @@ export class Run {
     s.approvals[approvalKey(call)] = { id: approval.id, call: fingerprint(call.tool, call.args) };
     await this.save();
     return approval;
+  }
+
+  /**
+   * File a plan: every call the agent means to make, for one review. Once a
+   * reviewer approves it, each call that needed approval runs once, with
+   * exactly these arguments, through the usual checks (RB-45).
+   */
+  async requestPlan(calls: { tool: string; args: Args }[], reason?: string): Promise<AgentPlan> {
+    const steps = calls
+      .map(({ tool, args }) => new Call(this, randomId(), tool, args, this.harness.spec(tool), [], false))
+      .filter((call) => call.permission && call.spec.action)
+      .map((call) => ({ action: call.spec.action!, resource: call.resource, context: { ...this.options.context, args: call.args }, details: call.args }));
+    const plan = await this.agent((token) => this.harness.client.requestPlan(token, { steps, reason }));
+    if (plan.id) {
+      const s = await this.load();
+      s.planId = plan.id;
+      await this.save();
+    }
+    return plan;
+  }
+
+  /** Where this run's plan stands, and which steps ran. */
+  async planStatus(): Promise<AgentPlan | undefined> {
+    const s = await this.load();
+    if (!s.planId) return undefined;
+    return this.agent((token) => this.harness.client.plan(token, s.planId!));
+  }
+
+  /**
+   * What Scute would answer for this call right now, without counting it
+   * toward budgets or spending a verification or approval (a dry run).
+   */
+  async preview(tool: string, args: Args): Promise<EngineDecision> {
+    const call = new Call(this, randomId(), tool, args, this.harness.spec(tool), [], false);
+    if (!call.permission || !call.spec.action) return { decision: "allow", allowed: true, reason: "no_permission" } as EngineDecision;
+    return this.agent((token) =>
+      this.harness.client.check(token, {
+        action: call.spec.action!,
+        resource: call.resource,
+        context: { ...this.options.context, args: call.args },
+        details: call.args,
+        session_id: undefined,
+        dry_run: true,
+      })
+    );
   }
 
   /** Where an approval this run filed stands, with a `say` line. */
