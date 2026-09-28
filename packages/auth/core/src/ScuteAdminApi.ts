@@ -68,6 +68,18 @@ export type AgentReport = {
   log: DecisionLogCheck;
 };
 
+/** A person's earlier, deleted account in this app. */
+export type ScutePreviousAccount = {
+  id: string;
+  status: string;
+  created_at: string;
+  deleted_at: string;
+  merged_into?: string;
+  roles: number;
+  passkeys: number;
+  mfa_methods: string[];
+};
+
 export type AgentConversation = {
   conversation_id: string;
   verified: boolean;
@@ -178,13 +190,42 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   /**
-   * Get user's basic information by user id.
-   * * Unauthenticated
+   * Get a user by id. Same as {@link getUser} (secret key): the public route
+   * this used to call only takes an identifier, so it always answered 400.
+   * @deprecated Use {@link getUser}.
    * @param userId {UniqueIdentifier}
    */
   async getUserByUserId(userId: UniqueIdentifier) {
-    return this.get<{ user: ScuteUser | null }>(
-      `${this._authPath}/users?user_id=${encodeURIComponent(userId)}`
+    return this.getUser(userId);
+  }
+
+  /**
+   * A person's earlier, deleted accounts in this app. Someone deleted who
+   * signs in again gets a fresh account; their old one stays here, and can
+   * be merged in with {@link mergeUser}.
+   * @param userId The live account's id
+   */
+  async previousAccounts(userId: UniqueIdentifier) {
+    const { data, error } = await this.get<{ previous_accounts: ScutePreviousAccount[] }>(
+      `${this._v1Path}/users/${encodeURIComponent(userId)}/previous_accounts`,
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.previous_accounts, error: null };
+  }
+
+  /**
+   * Merge a deleted account of the same person into their live one: roles,
+   * resource roles, passkeys, MFA factors and data move over (the live
+   * account wins where both have a value); history stays on the old one,
+   * which can't be merged again.
+   * @param userId The live account's id
+   * @param fromId The deleted account's id (from {@link previousAccounts})
+   */
+  async mergeUser(userId: UniqueIdentifier, fromId: UniqueIdentifier) {
+    return this.post<{ user_id: string; merged: string; moved: Record<string, number> }>(
+      `${this._v1Path}/users/${encodeURIComponent(userId)}/merge`,
+      { from: fromId },
+      this._authorizationHeader
     );
   }
 

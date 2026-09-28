@@ -247,7 +247,13 @@ export type ScuteSessionType =
   | "magic"
   | "xlogin"
   | "oauth"
-  | "misc";
+  | "misc"
+  | "otp"
+  | "workspace"
+  | "m2m"
+  | "mfa"
+  | "challenge"
+  | "impersonation";
 
 export type ScutePaginationMeta = {
   total_pages: number;
