@@ -3,16 +3,14 @@
 // admin can list the person's previous accounts and merge one in, and
 // someone deactivated and then deleted is refused at sign-in.
 //
-// No SDK method lists or merges previous accounts yet (DX-09):
-// GET /v1/:app_id/users/:id/previous_accounts, POST /v1/:app_id/users/:id/merge.
+// ScuteAdminApi.previousAccounts and mergeUser (js#43) list and merge them.
 
 import { describe, expect, it } from "vitest";
 import type { LiveContext } from "../lib/context";
 import { PHASE } from "../lib/context";
-import { done, failed, ok, refusal } from "../lib/check";
+import { done, failed, ok } from "../lib/check";
 import { otpSignIn } from "../lib/flows";
 
-type PreviousAccount = { id: string; status: string; deleted_at?: string; merged_into?: string; roles: number };
 type ManagedUser = { id: string; authz_attributes?: Record<string, unknown> };
 
 export function accountsSuite(get: () => LiveContext) {
@@ -20,11 +18,7 @@ export function accountsSuite(get: () => LiveContext) {
     let oldId: string | undefined;
     let freshId: string | undefined;
 
-    const previousAccounts = async (ctx: LiveContext, id: string) =>
-      (await ctx.api.get<{ previous_accounts: PreviousAccount[] }>(`/v1/${ctx.env.appId}/users/${id}/previous_accounts`)).data
-        .previous_accounts;
-    const merge = (ctx: LiveContext, into: string, from: string, expect?: number[]) =>
-      ctx.api.post<{ user_id: string; merged: string; moved: Record<string, number> }>(`/v1/${ctx.env.appId}/users/${into}/merge`, { from }, { expect });
+    const previousAccounts = async (ctx: LiveContext, id: string) => ok(await ctx.admin.previousAccounts(id), "previousAccounts");
     const attributesOf = async (ctx: LiveContext, id: string) =>
       ((ok(await ctx.admin.getUser(id), "getUser").user as unknown as ManagedUser).authz_attributes ?? {}) as Record<string, unknown>;
 
@@ -53,7 +47,7 @@ export function accountsSuite(get: () => LiveContext) {
       // Should the merge test not get there, merge here so the role moves to a live account cleanup can take it from.
       const into = freshId;
       const from = oldId;
-      ctx.cleanup.add(PHASE.merges, `merge the previous account of user ${into}`, () => merge(ctx, into, from, [200, 404, 422]));
+      ctx.cleanup.add(PHASE.merges, `merge the previous account of user ${into}`, () => ctx.admin.mergeUser(into, from));
 
       expect(freshId, "a new app user id").not.toBe(oldId);
       expect(failed(await ctx.admin.getUser(oldId), "getUser of the old account").status, "the old account stays deleted").toBe(404);
@@ -61,7 +55,7 @@ export function accountsSuite(get: () => LiveContext) {
       expect((await attributesOf(ctx, freshId)).region, "the fresh account starts empty").toBeUndefined();
     });
 
-    it("previous_accounts lists the old account (no SDK method yet)", async ({ skip }) => {
+    it("previousAccounts lists the old account", async ({ skip }) => {
       const ctx = get();
       const into = freshId ?? skip("needs the fresh account");
       const from = oldId ?? skip("needs the old account");
@@ -73,11 +67,11 @@ export function accountsSuite(get: () => LiveContext) {
       expect(old?.merged_into).toBeUndefined();
     });
 
-    it("merge moves the old account's role and attributes in; a second merge answers 422 already_merged", async ({ skip }) => {
+    it("mergeUser moves the old account's role and attributes in; a second merge answers 422 already_merged", async ({ skip }) => {
       const ctx = get();
       const into = freshId ?? skip("needs the fresh account");
       const from = oldId ?? skip("needs the old account");
-      const { data } = await merge(ctx, into, from);
+      const data = ok(await ctx.admin.mergeUser(into, from), "mergeUser");
       expect(data.user_id).toBe(into);
       expect(data.merged).toBe(from);
       expect(data.moved.roles).toBe(1);
@@ -87,7 +81,7 @@ export function accountsSuite(get: () => LiveContext) {
       expect((await previousAccounts(ctx, into)).find((a) => a.id === from)?.merged_into).toBe(into);
       expect(failed(await ctx.admin.getUser(from), "getUser of the merged account").status, "the old account stays deleted").toBe(404);
 
-      const again = await refusal(() => merge(ctx, into, from));
+      const again = failed(await ctx.admin.mergeUser(into, from), "a second mergeUser");
       expect(again.status).toBe(422);
       expect(again.code).toBe("already_merged");
     });

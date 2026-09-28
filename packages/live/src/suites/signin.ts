@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { IdentifierAlreadyExistsError, InvalidAuthTokenError } from "@scute/js-core";
 import type { LiveContext } from "../lib/context";
 import { claimsOf, describeError, noError, ok, tamper } from "../lib/check";
-import { FINDINGS, knownBug } from "../lib/findings";
 import { accessOf, otpSignIn } from "../lib/flows";
 
 export function signInSuite(get: () => LiveContext) {
@@ -103,22 +102,25 @@ export function signInSuite(get: () => LiveContext) {
       expect(Boolean(result.data && "otp" in result.data && result.data.otp?.id), "signIn waited for the config and sent a code").toBe(true);
     });
 
-    it("signUp refuses an identifier that already has an account (known bug F9: it sends a code instead)", async ({ skip, annotate }) => {
+    it("after an OTP sign-in the email counts as verified, and signUp refuses the account without sending a code (fixed F9)", async ({ skip }) => {
       const ctx = get();
-      const main = ctx.state.main ?? skip("needs the email sign-in (an account that proved its email)");
-      // What signUp decides with: the identifier lookup's email_verified.
+      const main = ctx.state.main ?? skip("needs the email sign-in");
+      // What signUp decides with: the identifier lookup's email_verified, set by the completed email code.
       const { data: lookup } = await ctx.api.get(`${ctx.api.authPath}/users`, { auth: "none", query: { identifier: main.identifier } });
+      expect(lookup.user?.email_verified, "an email OTP sign-in confirms the email").toBe(true);
+
+      const since = Date.now() - 60_000;
       const result = await ctx.newClient().signUp(main.identifier);
-      if (result.error && !(result.error instanceof IdentifierAlreadyExistsError)) noError(result.error, "signUp");
-      // F9: the lookup answers email_verified again (api#135), but an email OTP sign-in never marks the email
-      // verified (only magic links do), so in an OTP app signUp still can't see the account.
-      await knownBug(
-        annotate,
-        FINDINGS.signUpCantSeeAccounts,
-        !result.error,
-        `signUp of an account that signed in by email OTP sent a registration code; the lookup answers email_verified: ${String(lookup.user?.email_verified)}`
+      expect(result.error instanceof IdentifierAlreadyExistsError, `signUp answered ${describeError(result.error)}`).toBe(true);
+
+      // No code went out: no pending email code for the user since. No SDK method lists an app's challenges:
+      // GET /v1/auth/:app_id/challenges/app.
+      const { data } = await ctx.api.get<{ challenges: { app_user_id?: string; created_at?: string }[] }>(
+        `${ctx.api.authPath}/challenges/app`,
+        { query: { status: "pending", challenge_method: "email_otp" } }
       );
-      // Once fixed: result.error is an IdentifierAlreadyExistsError and no email_otp challenge was made for the user.
+      const sent = (data.challenges ?? []).filter((c) => c.app_user_id === main.id && Date.parse(c.created_at ?? "") >= since);
+      expect(sent.length, "no registration code was sent").toBe(0);
     });
   });
 

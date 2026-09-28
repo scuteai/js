@@ -6,23 +6,9 @@
 
 export type Finding = { id: string; title: string };
 
-export const FINDINGS = {
-  // F1 to F7 were fixed in api#134 (scute-api-v2 v23) and js#41; their tests now assert the fixed behavior.
-  // F8 is settled (api#136: a fresh account, and an admin merge); its tests assert that now.
-  signUpCantSeeAccounts: {
-    id: "F9",
-    title:
-      "ScuteClient.signUp decides \"already exists\" from the identifier lookup's email_verified / phone_verified. The " +
-      "lookup answers them again (api#135), but an OTP sign-in never marks the email or phone verified (only magic " +
-      "links do), so in an OTP app an existing account gets a registration code instead of IdentifierAlreadyExistsError",
-  },
-  getUserByUserIdBroken: {
-    id: "F10",
-    title:
-      "ScuteAdminApi.getUserByUserId asks GET /v1/auth/:app_id/users?user_id=, which only takes an identifier: " +
-      "400 invalid_identifier",
-  },
-} satisfies Record<string, Finding>;
+// Nothing open. F1 to F10, found by this suite, are fixed (api#134 to #137 on scute-api-v2, js#41 and
+// js#43) and their tests assert the fixed behavior. Add a finding here when a run turns up a new one.
+export const FINDINGS = {} satisfies Record<string, Finding>;
 
 type Annotate = (message: string, type?: string) => Promise<unknown>;
 
