@@ -26,6 +26,16 @@ import type {
 } from "./ScuteAuthzApi";
 import type { AuthzFilter } from "./lib/authzFilter";
 
+/** A conversation on Scute's auth MCP server, as your backend sees it. */
+export type AgentConversation = {
+  conversation_id: string;
+  verified: boolean;
+  verified_at?: string;
+  person?: { app_user_id: string; email?: string; name?: string };
+  ended: boolean;
+  task: { id: string; status: string };
+};
+
 class ScuteAdminApi extends ScuteBaseHttp {
   protected appId: UniqueIdentifier;
   protected secretKey?: string;
@@ -337,6 +347,47 @@ class ScuteAdminApi extends ScuteBaseHttp {
     const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
     return this.delete(
       `${this._appsPath}/users/${encodeURIComponent(userId)}/impersonate${query}`,
+      this._authorizationHeader
+    );
+  }
+
+  // ── Agents that talk to people (auth MCP) ──
+  //
+  // A voice or chat agent connects to Scute's auth MCP server with an agent
+  // key and finds out who it's talking to in the conversation. Your backend
+  // then asks about that conversation by the platform's own id (for
+  // ElevenLabs, {{system__conversation_id}}); no token passes through the
+  // model.
+
+  /** A key the platform connects with (scak_...). The key is in the answer once. */
+  async createAgentKey(agentSlug: string, name?: string) {
+    return this.post<{ id: string; name?: string; hint: string; key: string }>(
+      `${this._appsPath}/authz/agents/${encodeURIComponent(agentSlug)}/keys`,
+      name ? { name } : {},
+      this._authorizationHeader
+    );
+  }
+
+  /** Who got verified in this conversation (by the platform's conversation id). */
+  async agentConversation(agentSlug: string, conversationId: string) {
+    return this.get<AgentConversation>(
+      `${this._appsPath}/authz/agents/${encodeURIComponent(agentSlug)}/conversations/${encodeURIComponent(conversationId)}`,
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * May the agent do this for the person verified in this conversation?
+   * Refused with `not_verified` when nobody is. The answer has a `say` line.
+   */
+  async agentConversationCheck(
+    agentSlug: string,
+    conversationId: string,
+    check: { action: string; resource?: AuthzCheck["resource"]; context?: Record<string, unknown> }
+  ) {
+    return this.post<AuthzDecision & { say?: string }>(
+      `${this._appsPath}/authz/agents/${encodeURIComponent(agentSlug)}/conversations/${encodeURIComponent(conversationId)}/check`,
+      check,
       this._authorizationHeader
     );
   }
