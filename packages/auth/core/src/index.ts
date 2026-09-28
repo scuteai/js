@@ -1,6 +1,6 @@
 import ScuteClient, { createClient } from "./ScuteClient";
 import ScuteAdminApi from "./ScuteAdminApi";
-export type { AgentConversation, AgentMonitorItem, AgentReport, DecisionLogCheck, ScutePreviousAccount } from "./ScuteAdminApi";
+export type { AgentConversation, AgentMonitorItem, AgentReport, DecisionLogCheck, ScutePreviousAccount, AuthzPolicyEdit, AuthzSuggestion, AuthzBacktest } from "./ScuteAdminApi";
 import ScuteVerifyApi from "./ScuteVerifyApi";
 import ScuteAuthzApi from "./ScuteAuthzApi";
 import ScuteElementsApi from "./ScuteElementsApi";
