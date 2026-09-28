@@ -325,7 +325,9 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   /**
-   * List all sessions for a user.
+   * List all sessions for a user. Server side, with the app's secret key
+   * alone: no user session is needed (the key manages every user of its
+   * app). A signed-in user lists their own with `ScuteClient.listUserSessions`.
    * @param id User ID
    */
   async listUserSessions(id: UniqueIdentifier) {
@@ -338,11 +340,12 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   /**
-   * Revoke a particular session from a user.
+   * Revoke one of a user's sessions: its tokens stop working at once.
+   * Server side, with the app's secret key alone (no user session needed).
    * @param userId User ID
    * @param sessionId Session ID
    */
-  async revokeUserSession(
+    async revokeUserSession(
     userId: UniqueIdentifier,
     sessionId: UniqueIdentifier
   ) {

@@ -538,6 +538,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @returns Polling data if webauthn is not available else null.
    */
   async signIn(identifier: ScuteIdentifier, options?: ScuteSignInOptions) {
+    // Ensure app data is loaded before checking email_auth_type: right after
+    // construction it could still be loading. If it can't load, say so
+    // instead of guessing the sign-in method.
+    const { error: appDataError } = await this._initializeAppData();
+    if (appDataError) {
+      return { data: null, error: appDataError };
+    }
+
     const { data, error } = await this._identifierExists(identifier);
     if (error) {
       return { data: null, error };
@@ -567,8 +575,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     identifier: ScuteIdentifier,
     options?: ScuteSignInOrUpOptions
   ) {
-    // Ensure app data is loaded before checking email_auth_type
-    await this._initializeAppData();
+    // Ensure app data is loaded before checking email_auth_type; if it can't
+    // load, say so instead of guessing the sign-in method.
+    const { error: appDataError } = await this._initializeAppData();
+    if (appDataError) {
+      return { data: null, error: appDataError };
+    }
 
     const { data, error } = await this._identifierExists(identifier);
     if (error) {
@@ -633,7 +645,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     if (
       isMaybePhoneNumber(identifier) ||
-      this.appData.email_auth_type === "otp"
+      this.appData?.email_auth_type === "otp"
     ) {
       return this.sendLoginOtp(identifier);
     }
@@ -679,7 +691,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   ) {
     if (
       isMaybePhoneNumber(identifier) ||
-      this.appData.email_auth_type === "otp"
+      this.appData?.email_auth_type === "otp"
     ) {
       return this.sendRegisterOtp(identifier, options?.userMeta);
     }

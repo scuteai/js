@@ -580,14 +580,33 @@ describe("sign in / sign up routing", () => {
     expect(sent()).toEqual(["/otps/login"]);
   });
 
-  // Known limitation, tracked separately: signIn does not load app data
-  // itself, so it rejects with a TypeError when app data failed to load.
-  it("signIn rejects with a TypeError when app data failed to load", async () => {
+  // signIn and signInOrUp load app data themselves; when it can't load they
+  // return that error instead of throwing or guessing the sign-in method.
+  it("signIn and signInOrUp return the error when app data failed to load, and send nothing", async () => {
     server.on("GET", `/v1/apps/${APP_ID}`, { status: 500, body: {} });
     lookup(userFixture());
     const client = newClient();
     await ready(client);
-    await expect(client.signIn("ada@example.com")).rejects.toThrow(TypeError);
+    const signIn = await client.signIn("ada@example.com");
+    expect(signIn.data).toBeNull();
+    expect(signIn.error).toBeTruthy();
+    const either = await client.signInOrUp("ada@example.com");
+    expect(either.data).toBeNull();
+    expect(either.error).toBeTruthy();
+    expect(sent()).toEqual([]);
+  });
+
+  // The race the live suite hit: signIn right after construction, before
+  // app data has arrived.
+  it("signIn waits for app data it hasn't loaded yet", async () => {
+    server.on("GET", `/v1/apps/${APP_ID}`, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50)); // app data answers late
+      return { body: appDataFixture({ email_auth_type: "otp" }) };
+    });
+    lookup(userFixture());
+    const client = newClient();
+    await client.signIn("ada@example.com");
+    expect(sent()).toEqual(["/otps/login"]);
   });
 
   it("signUp: an existing verified identifier -> IdentifierAlreadyExistsError", async () => {
