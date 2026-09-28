@@ -7,19 +7,14 @@
 export type Finding = { id: string; title: string };
 
 export const FINDINGS = {
-  // F1 to F6 were fixed in api#134 (scute-api-v2 v23) and js#41; their tests now assert the fixed behavior.
-  otpSignInUndeletes: {
-    id: "F8",
-    title:
-      "POST /v1/auth/:app_id/otps/login (sendLoginOtp, signIn) brings a deleted user back: the same user id answers " +
-      "404 before and 200 after, with the old account's data (the identifier lookup no longer does this)",
-  },
+  // F1 to F7 were fixed in api#134 (scute-api-v2 v23) and js#41; their tests now assert the fixed behavior.
+  // F8 is settled (api#136: a fresh account, and an admin merge); its tests assert that now.
   signUpCantSeeAccounts: {
     id: "F9",
     title:
-      "ScuteClient.signUp checks email_verified / phone_verified on the identifier lookup, which answers only id, status, " +
-      "webauthn_enabled and the identifier now, so an existing account gets a registration code instead of " +
-      "IdentifierAlreadyExistsError",
+      "ScuteClient.signUp decides \"already exists\" from the identifier lookup's email_verified / phone_verified. The " +
+      "lookup answers them again (api#135), but an OTP sign-in never marks the email or phone verified (only magic " +
+      "links do), so in an OTP app an existing account gets a registration code instead of IdentifierAlreadyExistsError",
   },
   getUserByUserIdBroken: {
     id: "F10",

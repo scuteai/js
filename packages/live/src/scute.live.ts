@@ -5,6 +5,7 @@
 import { afterAll, beforeAll, describe, inject } from "vitest";
 import { loadEnv } from "./env";
 import { LiveContext } from "./lib/context";
+import { accountsSuite } from "./suites/accounts";
 import { agentsSuite } from "./suites/agents";
 import { appSuite } from "./suites/app";
 import { authMcpSuite } from "./suites/auth-mcp";
@@ -38,6 +39,7 @@ describe.skipIf(!ctx)("Scute JS SDKs, live", () => {
   signInSuite(get);
   usersSuite(get);
   authzSuite(get);
+  accountsSuite(get);
   impersonationSuite(get);
   agentsSuite(get);
   authMcpSuite(get);
