@@ -24,6 +24,7 @@ import {
   TechnicalError,
 } from "../lib/errors";
 import { version } from "../lib/version";
+import { needsReverification } from "../lib/helpers";
 import {
   accessToken,
   APP_ID,
@@ -328,6 +329,8 @@ describe("authenticated endpoint table", () => {
     { name: "removeMfaMethod", invoke: (c) => c.removeMfaMethod("m_1"), method: "DELETE", path: "/mfa/methods/m_1", body: undefined },
     { name: "setDefaultMfaMethod", invoke: (c) => c.setDefaultMfaMethod("m_1"), method: "PATCH", path: "/mfa/methods/m_1/default", body: {} },
     { name: "generateBackupCodes", invoke: (c) => c.generateBackupCodes(), method: "POST", path: "/mfa/backup-codes", body: {} },
+    { name: "generateBackupCodes({ challenge })", invoke: (c) => c.generateBackupCodes({ challenge: "ch_9" }), method: "POST", path: "/mfa/backup-codes", body: { challenge: "ch_9" } },
+    { name: "enrollMfa({ challenge })", invoke: (c) => c.enrollMfa({ method: "totp", challenge: "ch_9" }), method: "POST", path: "/mfa/enroll", body: { method: "totp", challenge: "ch_9" } },
     { name: "listAlternatePhones", invoke: (c) => c.listAlternatePhones(), method: "GET", path: "/current_user/alternate_phones", body: undefined },
     { name: "addAlternatePhone", invoke: (c) => c.addAlternatePhone("+15551234567", "work"), method: "POST", path: "/current_user/alternate_phones", body: { phone: "+15551234567", label: "work" } },
     { name: "verifyAlternatePhoneChallenge", invoke: (c) => c.verifyAlternatePhoneChallenge("ch_1", "111222"), method: "POST", path: "/current_user/alternate_phones/verify", body: { challenge_token: "ch_1", code: "111222" } },
@@ -366,6 +369,33 @@ describe("authenticated endpoint table", () => {
       expect(server.calls.length).toBe(before);
     }
   );
+
+  it("removeMfaMethod passes a verification's token as ?challenge=", async () => {
+    seedSession(storage, { access: ACCESS, refresh: refreshToken() });
+    server.on("DELETE", `${AUTH_PREFIX}/mfa/methods/m_1`, { status: 204, body: {} });
+    const client = newClient();
+    await ready(client);
+
+    await client.removeMfaMethod("m_1", { challenge: "ch 9" });
+
+    expect(server.callsTo("DELETE", `${AUTH_PREFIX}/mfa/methods/m_1`)[0].query.get("challenge")).toBe("ch 9");
+  });
+
+  it("needsReverification spots the API's verification_required refusal", async () => {
+    seedSession(storage, { access: ACCESS, refresh: refreshToken() });
+    server.on("POST", `${AUTH_PREFIX}/mfa/backup-codes`, {
+      status: 403,
+      body: { error: "Verify it's you first", error_code: "verification_required", details: { recent_sign_in_minutes: 10 } },
+    });
+    const client = newClient();
+    await ready(client);
+
+    const { error } = await client.generateBackupCodes();
+
+    expect(needsReverification(error)).toBe(true);
+    expect(needsReverification(new Error("x"))).toBe(false);
+    expect(needsReverification(null)).toBe(false);
+  });
 
   it("addDevice posts /devices/register with X-Authorization and returns a register error as { error }", async () => {
     seedSession(storage, { access: ACCESS });

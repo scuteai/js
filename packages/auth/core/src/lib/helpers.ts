@@ -96,6 +96,16 @@ export const decodeImpersonation = (accessToken?: string | null): ScuteImpersona
 export const impersonationContext = (claims?: { imp?: unknown; act?: unknown } | null): Record<string, unknown> =>
   claims?.imp === true ? { impersonated: true, actor: claims.act ?? "unknown" } : {};
 
+/**
+ * True when an MFA change was refused because the user has to verify again:
+ * sign in again, or retry with a completed verification's token
+ * (`challenge`). Removing a method, new backup codes, and adding another
+ * method need it once the sign-in is older than the app's
+ * mfa_reverify_minutes (default 10).
+ */
+export const needsReverification = (error: unknown): boolean =>
+  (error as { json?: { error_code?: string } } | null)?.json?.error_code === "verification_required";
+
 export const decodeAccessToken = (accessToken: string) => {
   try {
     const payload = jwtDecode<_ScuteAccessPayload>(accessToken);
