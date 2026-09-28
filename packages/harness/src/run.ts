@@ -477,13 +477,18 @@ export class Run {
     return this.agent((token) => this.harness.client.reportTools(token, tools));
   }
 
-  /** @internal guards.decoy: the agent called a decoy tool. Scute pauses it, so the run is over. */
+  /**
+   * @internal guards.decoy: the agent called a decoy tool. Scute pauses it,
+   * so the run is over; it closes here even if the report fails.
+   */
   async reportDecoy(tool: string) {
-    const result = await this.agent((token) => this.harness.client.decoy(token, tool));
-    const s = await this.load();
-    s.closed = true;
-    await this.save();
-    return result;
+    try {
+      return await this.agent((token) => this.harness.client.decoy(token, tool));
+    } finally {
+      const s = await this.load();
+      s.closed = true;
+      await this.save();
+    }
   }
 
   /** Where this run's plan stands, and which steps ran. */

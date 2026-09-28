@@ -469,4 +469,14 @@ describe("tool drift and decoys (RB-45)", () => {
     expect((await run.snapshot()).closed).toBe(true);
     await expect(run.token()).rejects.toThrow(/task is closed/);
   });
+
+  it("closes the run on a decoy call even when the report fails", async () => {
+    const scute = fakeScute();
+    const failing = (async (url: any, init: any) =>
+      String(url).endsWith("/agent/decoys") ? new Response("{}", { status: 500 }) : scute.fetch(url, init)) as typeof fetch;
+    const run = createHarness({ ...base, fetch: failing, guards: [guards.decoy(["export_all_customers"])] }).run({ actsFor: "user1" });
+
+    expect((await run.check("export_all_customers", {})).kind).toBe("deny");
+    expect((await run.snapshot()).closed).toBe(true);
+  });
 });
