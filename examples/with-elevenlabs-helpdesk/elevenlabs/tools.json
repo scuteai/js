@@ -1,0 +1,57 @@
+{
+  "_comment": "Server (webhook) tools for the ElevenLabs agent. Replace https://YOUR-BACKEND with where `pnpm start` runs (it must be reachable over https, e.g. a tunnel while testing). conversation_id comes from the system dynamic variable, never from the model.",
+  "tools": [
+    {
+      "type": "webhook",
+      "name": "unlock_account",
+      "description": "Unlock the verified caller's account. Only after Scute verified them.",
+      "api_schema": {
+        "url": "https://YOUR-BACKEND/tools/unlock_account",
+        "method": "POST",
+        "request_headers": { "X-Tool-Secret": "{{secret__tool_secret}}" },
+        "request_body_schema": {
+          "type": "object",
+          "properties": {
+            "conversation_id": { "type": "string", "dynamic_variable": "system__conversation_id" }
+          },
+          "required": ["conversation_id"]
+        }
+      }
+    },
+    {
+      "type": "webhook",
+      "name": "reset_password",
+      "description": "Reset the verified caller's password; the temporary one goes to their email. Needs a fresh verification (Scute will say so).",
+      "api_schema": {
+        "url": "https://YOUR-BACKEND/tools/reset_password",
+        "method": "POST",
+        "request_headers": { "X-Tool-Secret": "{{secret__tool_secret}}" },
+        "request_body_schema": {
+          "type": "object",
+          "properties": {
+            "conversation_id": { "type": "string", "dynamic_variable": "system__conversation_id" }
+          },
+          "required": ["conversation_id"]
+        }
+      }
+    },
+    {
+      "type": "webhook",
+      "name": "create_ticket",
+      "description": "Open a helpdesk ticket for the verified caller.",
+      "api_schema": {
+        "url": "https://YOUR-BACKEND/tools/create_ticket",
+        "method": "POST",
+        "request_headers": { "X-Tool-Secret": "{{secret__tool_secret}}" },
+        "request_body_schema": {
+          "type": "object",
+          "properties": {
+            "conversation_id": { "type": "string", "dynamic_variable": "system__conversation_id" },
+            "summary": { "type": "string", "description": "One line: what they need help with" }
+          },
+          "required": ["conversation_id", "summary"]
+        }
+      }
+    }
+  ]
+}

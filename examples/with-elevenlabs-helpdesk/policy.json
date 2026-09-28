@@ -1,0 +1,22 @@
+{
+  "scute_policy": 1,
+  "resources": {
+    "account": { "name": "Account", "actions": ["read", "unlock", "reset_password"] },
+    "ticket": { "name": "Ticket", "actions": ["create"] }
+  },
+  "permissions": {
+    "account:reset_password": { "requires_verification": true, "verification_method": "any" }
+  },
+  "roles": {
+    "employee": {
+      "name": "Employee",
+      "default": true,
+      "permissions": ["account:read", "account:unlock", "account:reset_password", "ticket:create"]
+    },
+    "helpdesk-voice": {
+      "name": "Helpdesk voice agent",
+      "description": "The most the voice agent can ever do, for anyone",
+      "permissions": ["account:read", "account:unlock", "account:reset_password", "ticket:create"]
+    }
+  }
+}
