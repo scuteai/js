@@ -1,6 +1,6 @@
 {
   "name": "@scute/auth-ui-react",
-  "version": "0.4.0-next.2",
+  "version": "0.4.0-next.3",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -26,8 +26,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@scute/js-core": "0.10.0-next.2",
-    "@scute/react-hooks": "0.9.0-next.2"
+    "@scute/js-core": "0.10.0-next.3",
+    "@scute/react-hooks": "0.9.0-next.3"
   },
   "peerDependencies": {
     "react": ">=18",

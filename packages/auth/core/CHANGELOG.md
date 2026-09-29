@@ -1,5 +1,11 @@
 # @scute/js-core
 
+## 0.10.0-next.3
+
+### Minor Changes
+
+- c469716: `admin.authzSuggestions(days)` lists proposed policy changes from the decision log (unused grants, repeated refusals, approvals that are always granted). `admin.authzBacktest(change, { days })` shows what a change would have done to recent decisions. Nothing is ever applied.
+
 ## 0.10.0-next.2
 
 ### Minor Changes
