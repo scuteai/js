@@ -1,0 +1,162 @@
+<!DOCTYPE html><html class="default" lang="en"><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>@scute/harness | Scute</title><meta name="description" content="Documentation for Scute"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/search.js" id="tsd-search-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os"</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container">
+<div class="table-cell" id="tsd-search" data-base="..">
+<div class="field"><label for="tsd-search-field" class="tsd-widget tsd-toolbar-icon search no-caption"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M15.7824 13.833L12.6666 10.7177C12.5259 10.5771 12.3353 10.499 12.1353 10.499H11.6259C12.4884 9.39596 13.001 8.00859 13.001 6.49937C13.001 2.90909 10.0914 0 6.50048 0C2.90959 0 0 2.90909 0 6.49937C0 10.0896 2.90959 12.9987 6.50048 12.9987C8.00996 12.9987 9.39756 12.4863 10.5008 11.6239V12.1332C10.5008 12.3332 10.5789 12.5238 10.7195 12.6644L13.8354 15.7797C14.1292 16.0734 14.6042 16.0734 14.8948 15.7797L15.7793 14.8954C16.0731 14.6017 16.0731 14.1267 15.7824 13.833ZM6.50048 10.499C4.29094 10.499 2.50018 8.71165 2.50018 6.49937C2.50018 4.29021 4.28781 2.49976 6.50048 2.49976C8.71001 2.49976 10.5008 4.28708 10.5008 6.49937C10.5008 8.70852 8.71314 10.499 6.50048 10.499Z" fill="var(--color-text)"></path></svg></label><input type="text" id="tsd-search-field" aria-label="Search"/></div>
+<div class="field">
+<div id="tsd-toolbar-links"></div></div>
+<ul class="results">
+<li class="state loading">Preparing search index...</li>
+<li class="state failure">The search index is not available</li></ul><a href="../index.html" class="title">Scute</a></div>
+<div class="table-cell" id="tsd-widgets"><a href="#" class="tsd-widget tsd-toolbar-icon menu no-caption" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="2" fill="var(--color-text)"></rect><rect x="1" y="7" width="14" height="2" fill="var(--color-text)"></rect><rect x="1" y="11" width="14" height="2" fill="var(--color-text)"></rect></svg></a></div></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<ul class="tsd-breadcrumb">
+<li><a href="../index.html">Scute</a></li>
+<li><a href="_scute_harness.html">@scute/harness</a></li></ul>
+<h1>Module @scute/harness</h1></div>
+<section class="tsd-panel tsd-typography"><a id="md:scuteharness" class="tsd-anchor"></a><h1><a href="#md:scuteharness">@scute/harness</a></h1><p>Guardrails for the agents you build. Guards decide on every tool call:
+who may do what (Scute&#39;s engine), whether the person has to verify or
+confirm, whether an argument was made up, whether a budget is spent. It
+works with the agent framework you already use and any model provider,
+because it hooks the tool calls, not the model.</p>
+<pre><code class="language-sh"><span class="hl-3">pnpm</span><span class="hl-0"> </span><span class="hl-4">add</span><span class="hl-0"> </span><span class="hl-4">@scute/harness</span>
+</code><button>Copy</button></pre>
+<p>Set <code>SCUTE_APP_ID</code> and <code>SCUTE_SECRET</code> (server side; neither ever reaches the
+model), and register the agent in Scute with an owner and roles.</p>
+<pre><code class="language-ts"><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">createHarness</span><span class="hl-0">, </span><span class="hl-1">guards</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/harness&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-2">export</span><span class="hl-0"> </span><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-6">harness</span><span class="hl-0"> = </span><span class="hl-3">createHarness</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-1">agent:</span><span class="hl-0"> </span><span class="hl-4">&quot;support-bot&quot;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-1">guards:</span><span class="hl-0"> [</span><br/><span class="hl-0">    </span><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">permissions</span><span class="hl-0">(), </span><span class="hl-7">// the agent&#39;s roles, the person it works for, and this task: all three</span><br/><span class="hl-0">    </span><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">approval</span><span class="hl-0">({ </span><span class="hl-1">when:</span><span class="hl-0"> { </span><span class="hl-1">tier:</span><span class="hl-0"> </span><span class="hl-4">&quot;high&quot;</span><span class="hl-0"> } }), </span><span class="hl-7">// the person confirms risky calls</span><br/><span class="hl-0">    </span><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">grounding</span><span class="hl-0">(), </span><span class="hl-7">// ids and amounts come from the person or a tool, not the model</span><br/><span class="hl-0">    </span><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">args</span><span class="hl-0">({ </span><span class="hl-1">refund_invoice:</span><span class="hl-0"> { </span><span class="hl-1">amount:</span><span class="hl-0"> { </span><span class="hl-1">max:</span><span class="hl-0"> </span><span class="hl-8">500</span><span class="hl-0"> } } }),</span><br/><span class="hl-0">    </span><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">budget</span><span class="hl-0">({ </span><span class="hl-1">calls:</span><span class="hl-0"> </span><span class="hl-8">20</span><span class="hl-0">, </span><span class="hl-1">perHour:</span><span class="hl-0"> { </span><span class="hl-1">high:</span><span class="hl-0"> </span><span class="hl-8">5</span><span class="hl-0"> } }),</span><br/><span class="hl-0">    </span><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">content</span><span class="hl-0">({ </span><span class="hl-1">pii:</span><span class="hl-0"> [</span><span class="hl-4">&quot;card&quot;</span><span class="hl-0">, </span><span class="hl-4">&quot;ssn&quot;</span><span class="hl-0">] }),</span><br/><span class="hl-0">  ],</span><br/><span class="hl-0">  </span><span class="hl-1">tools:</span><span class="hl-0"> { </span><span class="hl-1">refund_invoice:</span><span class="hl-0"> { </span><span class="hl-1">tier:</span><span class="hl-0"> </span><span class="hl-4">&quot;high&quot;</span><span class="hl-0"> } },</span><br/><span class="hl-0">});</span>
+</code><button>Copy</button></pre>
+<a id="md:with-the-vercel-ai-sdk-v7" class="tsd-anchor"></a><h2><a href="#md:with-the-vercel-ai-sdk-v7">With the Vercel AI SDK (v7)</a></h2><pre><code class="language-ts"><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">generateText</span><span class="hl-0">, </span><span class="hl-1">isStepCount</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;ai&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> = </span><span class="hl-1">harness</span><span class="hl-0">.</span><span class="hl-3">run</span><span class="hl-0">({ </span><span class="hl-1">id:</span><span class="hl-0"> </span><span class="hl-1">chat</span><span class="hl-0">.</span><span class="hl-1">id</span><span class="hl-0">, </span><span class="hl-1">actsFor:</span><span class="hl-0"> </span><span class="hl-1">user</span><span class="hl-0">.</span><span class="hl-1">id</span><span class="hl-0">, </span><span class="hl-1">task:</span><span class="hl-0"> { </span><span class="hl-1">actions:</span><span class="hl-0"> [</span><span class="hl-4">&quot;invoice:read&quot;</span><span class="hl-0">, </span><span class="hl-4">&quot;invoice:refund&quot;</span><span class="hl-0">] } });</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-6">result</span><span class="hl-0"> = </span><span class="hl-2">await</span><span class="hl-0"> </span><span class="hl-3">generateText</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-1">model</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-1">messages</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-1">tools:</span><span class="hl-0"> </span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-3">tools</span><span class="hl-0">({ </span><span class="hl-1">refund_invoice</span><span class="hl-0">, </span><span class="hl-1">read_invoice</span><span class="hl-0"> }),</span><br/><span class="hl-0">  </span><span class="hl-1">toolApproval:</span><span class="hl-0"> </span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-1">toolApproval</span><span class="hl-0">, </span><span class="hl-7">// verify and confirm become &#39;user-approval&#39;; deny and guide become &#39;denied&#39;</span><br/><span class="hl-0">  </span><span class="hl-1">prepareStep:</span><span class="hl-0"> </span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-1">prepareStep</span><span class="hl-0">, </span><span class="hl-7">// hides tools the task can never use</span><br/><span class="hl-0">  </span><span class="hl-1">stopWhen:</span><span class="hl-0"> [</span><span class="hl-3">isStepCount</span><span class="hl-0">(</span><span class="hl-8">20</span><span class="hl-0">), </span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-1">budgetExceeded</span><span class="hl-0">],</span><br/><span class="hl-0">});</span>
+</code><button>Copy</button></pre>
+<p>When a call doesn&#39;t run, the model gets a message that says what to do
+next (&quot;Don&#39;t guess invoice_id: ask the person&quot;), so it recovers instead of
+retrying blindly.</p>
+<a id="md:any-other-loop" class="tsd-anchor"></a><h2><a href="#md:any-other-loop">Any other loop</a></h2><pre><code class="language-ts"><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-6">refund</span><span class="hl-0"> = </span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-3">wrap</span><span class="hl-0">(</span><span class="hl-4">&quot;refund_invoice&quot;</span><span class="hl-0">, </span><span class="hl-5">async</span><span class="hl-0"> (</span><span class="hl-1">args</span><span class="hl-0">) </span><span class="hl-5">=&gt;</span><span class="hl-0"> </span><span class="hl-1">billing</span><span class="hl-0">.</span><span class="hl-3">refund</span><span class="hl-0">(</span><span class="hl-1">args</span><span class="hl-0">));</span><br/><span class="hl-2">await</span><span class="hl-0"> </span><span class="hl-3">refund</span><span class="hl-0">({ </span><span class="hl-1">invoice_id:</span><span class="hl-0"> </span><span class="hl-4">&quot;INV-1&quot;</span><span class="hl-0">, </span><span class="hl-1">amount:</span><span class="hl-0"> </span><span class="hl-8">90</span><span class="hl-0"> }); </span><span class="hl-7">// the result, or the message for the model</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-6">verdict</span><span class="hl-0"> = </span><span class="hl-2">await</span><span class="hl-0"> </span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-3">check</span><span class="hl-0">(</span><span class="hl-4">&quot;refund_invoice&quot;</span><span class="hl-0">, </span><span class="hl-1">args</span><span class="hl-0">, { </span><span class="hl-1">messages</span><span class="hl-0"> }); </span><span class="hl-7">// or check yourself</span>
+</code><button>Copy</button></pre>
+<a id="md:decisions" class="tsd-anchor"></a><h2><a href="#md:decisions">Decisions</a></h2><p>Each guard answers one of: <code>proceed</code>, <code>transform</code> (run with other
+arguments), <code>approve</code> (someone confirms), <code>verify</code> (the person proves it&#39;s
+them), <code>guide</code> (don&#39;t run; tell the model what to do), <code>redirect</code>, <code>deny</code>.
+The strictest enforced answer wins. A guard that throws counts as <code>deny</code>
+(fail closed).</p>
+<p>Every guard runs in a mode: <code>enforce</code>, <code>monitor</code> (records and calls
+<code>onAlert</code>, never blocks) or <code>observe</code> (records only). Start a new guard in
+<code>observe</code>, watch <code>onDecision</code>, then enforce.</p>
+<a id="md:tools-map-to-permissions-by-name" class="tsd-anchor"></a><h2><a href="#md:tools-map-to-permissions-by-name">Tools map to permissions by name</a></h2><p><code>refund_invoice</code> needs <code>invoice:refund</code> on the invoice named by
+<code>invoice_id</code> (or <code>invoiceId</code>, or <code>id</code>). The call&#39;s arguments reach the
+engine as <code>context.args</code> (<code>context.args.amount &lt; 500</code>); the object&#39;s own
+attributes come from what Scute stores for it, which the model can&#39;t
+override. Override per tool:</p>
+<pre><code class="language-ts"><span class="hl-9">tools</span><span class="hl-0">: {</span><br/><span class="hl-0">  </span><span class="hl-9">send_money</span><span class="hl-0">: { </span><span class="hl-9">permission</span><span class="hl-0">: </span><span class="hl-4">&quot;payment:create&quot;</span><span class="hl-0">, </span><span class="hl-9">key</span><span class="hl-0">: </span><span class="hl-4">&quot;to&quot;</span><span class="hl-0">, </span><span class="hl-9">tier</span><span class="hl-0">: </span><span class="hl-4">&quot;high&quot;</span><span class="hl-0"> },</span><br/><span class="hl-0">  </span><span class="hl-9">get_weather</span><span class="hl-0">: </span><span class="hl-5">false</span><span class="hl-0">, </span><span class="hl-7">// no permission check</span><br/><span class="hl-0">}</span>
+</code><button>Copy</button></pre>
+<a id="md:people-in-the-loop" class="tsd-anchor"></a><h2><a href="#md:people-in-the-loop">People in the loop</a></h2><ul>
+<li><p><strong>Verify.</strong> A permission that needs verification (or <code>guards.verifyPerson()</code>)
+answers <code>verify</code>. Everything works with the task token alone:
+<code>run.startVerification({ method: &quot;email_otp&quot; })</code> sends a code (or
+<code>entra_push</code>, <code>sms_otp</code>, <code>totp</code>), <code>run.submitCode(code)</code> passes on what the
+person read out, <code>run.verificationStatus()</code> checks a push. Scute checks
+it&#39;s the right person; the next check of that permission goes through.</p>
+</li>
+<li><p><strong>Let the model do it.</strong> Give it the human tools and it verifies the
+person itself, mid-conversation (voice or chat):</p>
+<pre><code class="language-ts"><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">jsonSchema</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;ai&quot;</span><span class="hl-0">;</span><br/><span class="hl-9">tools</span><span class="hl-0">: { ...</span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-3">tools</span><span class="hl-0">(</span><span class="hl-1">myTools</span><span class="hl-0">), ...</span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-3">humanTools</span><span class="hl-0">(</span><span class="hl-1">jsonSchema</span><span class="hl-0">) }</span>
+</code><button>Copy</button></pre>
+<p><code>scute_verify_person</code>, <code>scute_submit_code</code>, <code>scute_check_verification</code>,
+<code>scute_approval_status</code> and <code>scute_whoami</code>. Every answer has a <code>say</code> line
+the agent can speak as is (&quot;I&#39;ve emailed a code to a***@example.com.
+What&#39;s the code?&quot;). Blocked calls tell the model which tool to use.</p>
+</li>
+<li><p><strong>Confirm.</strong> <code>guards.approval()</code> asks the person the agent works for. With
+the AI SDK that&#39;s the tool approval request in your chat UI; elsewhere,
+call <code>run.confirm(tool, args)</code> when they confirm, and that exact call
+goes through once.</p>
+</li>
+<li><p><strong>Reviewer approval.</strong> A permission that requires approval files a Scute
+access request for the exact call (its arguments go with it and reviewers
+see them), tagged with the agent and task (<code>verdict.say</code>: &quot;I&#39;ve asked for
+approval...&quot;). Only that same call goes through once it&#39;s approved; a call
+with other arguments is a new request. Approvals and verifications are
+spent only on a call no other guard stops. <code>run.approvalStatus(id)</code> checks.</p>
+</li>
+</ul>
+<a id="md:plans-and-previews" class="tsd-anchor"></a><h3><a href="#md:plans-and-previews">Plans and previews</a></h3><p>When the agent knows its steps up front, file them once and let a reviewer approve the whole plan:</p>
+<pre><code class="language-ts"><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-6">plan</span><span class="hl-0"> = </span><span class="hl-2">await</span><span class="hl-0"> </span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-3">requestPlan</span><span class="hl-0">(</span><br/><span class="hl-0">  [</span><br/><span class="hl-0">    { </span><span class="hl-1">tool:</span><span class="hl-0"> </span><span class="hl-4">&quot;refund_invoice&quot;</span><span class="hl-0">, </span><span class="hl-1">args:</span><span class="hl-0"> { </span><span class="hl-1">invoice_id:</span><span class="hl-0"> </span><span class="hl-8">1</span><span class="hl-0">, </span><span class="hl-1">amount:</span><span class="hl-0"> </span><span class="hl-8">40</span><span class="hl-0"> } },</span><br/><span class="hl-0">    { </span><span class="hl-1">tool:</span><span class="hl-0"> </span><span class="hl-4">&quot;refund_invoice&quot;</span><span class="hl-0">, </span><span class="hl-1">args:</span><span class="hl-0"> { </span><span class="hl-1">invoice_id:</span><span class="hl-0"> </span><span class="hl-8">2</span><span class="hl-0">, </span><span class="hl-1">amount:</span><span class="hl-0"> </span><span class="hl-8">15</span><span class="hl-0"> } },</span><br/><span class="hl-0">  ],</span><br/><span class="hl-0">  </span><span class="hl-4">&quot;Two refunds for ticket 88&quot;</span><br/><span class="hl-0">);</span><br/><span class="hl-7">// plan.steps says what each one needs: none, approval, or verify (the person, at run time)</span>
+</code><button>Copy</button></pre>
+<p>Once it&#39;s approved, each step that needed approval runs once, with exactly those arguments, through the usual <code>run.check</code>. <code>run.planStatus()</code> shows which steps ran.</p>
+<p><code>run.preview(tool, args)</code> asks what a call would need right now (a dry run): it doesn&#39;t count toward budgets and doesn&#39;t use up a verification or approval.</p>
+<a id="md:tool-drift-and-decoys" class="tsd-anchor"></a><h3><a href="#md:tool-drift-and-decoys">Tool drift and decoys</a></h3><p>Report the tools the model sees, and Scute notices if one changes later (a changed description is a known prompt injection route):</p>
+<pre><code class="language-ts"><span class="hl-2">await</span><span class="hl-0"> </span><span class="hl-1">run</span><span class="hl-0">.</span><span class="hl-3">reportTools</span><span class="hl-0">(</span><span class="hl-1">tools</span><span class="hl-0">.</span><span class="hl-3">map</span><span class="hl-0">((</span><span class="hl-1">t</span><span class="hl-0">) </span><span class="hl-5">=&gt;</span><span class="hl-0"> ({ </span><span class="hl-1">name:</span><span class="hl-0"> </span><span class="hl-1">t</span><span class="hl-0">.</span><span class="hl-1">name</span><span class="hl-0">, </span><span class="hl-1">description:</span><span class="hl-0"> </span><span class="hl-1">t</span><span class="hl-0">.</span><span class="hl-1">description</span><span class="hl-0">, </span><span class="hl-1">inputSchema:</span><span class="hl-0"> </span><span class="hl-1">t</span><span class="hl-0">.</span><span class="hl-1">inputSchema</span><span class="hl-0"> })));</span>
+</code><button>Copy</button></pre>
+<p>Only a hash of each definition leaves your process. The first report is the baseline.</p>
+<p>Decoy tools are tools no legitimate task calls. Offer them to the model like any other, and list them in <code>guards.decoy</code>. A call is refused, and Scute pauses the agent and alerts your team:</p>
+<pre><code class="language-ts"><span class="hl-3">createHarness</span><span class="hl-0">({ ..., </span><span class="hl-1">guards:</span><span class="hl-0"> [</span><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">decoy</span><span class="hl-0">([</span><span class="hl-4">&quot;export_all_customers&quot;</span><span class="hl-0">]), </span><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">permissions</span><span class="hl-0">()] });</span>
+</code><button>Copy</button></pre>
+<a id="md:runs-and-state" class="tsd-anchor"></a><h2><a href="#md:runs-and-state">Runs and state</a></h2><p>Checks within one run go one at a time, so budgets hold when the model
+asks for several tools at once. Streaming tools (an <code>execute</code> that yields)
+are counted but their parts reach the model as they come, without the
+after-guards. Grounding needs the conversation: the AI SDK adapter passes
+it; with <code>run.check()</code> pass <code>messages</code>.</p>
+<p>A run is one job: a short-lived Scute task (token minted on first use,
+never shown to the model), its session, and what guards remember. Reuse
+<code>id</code> (with the same <code>actsFor</code>) to resume across requests; in serverless
+apps pass a shared <code>store</code> (<code>{ get, set }</code> over Redis, KV or a table). A
+task revoked in Scute ends the run for good. <code>run.complete()</code> or
+<code>run.revoke()</code> ends the task; suspending the agent in Scute ends them all.
+An agent process without the secret key can run on a task token your
+backend minted: <code>harness.run({ token })</code>.</p>
+<a id="md:your-own-guards" class="tsd-anchor"></a><h2><a href="#md:your-own-guards">Your own guards</a></h2><pre><code class="language-ts"><span class="hl-1">guards</span><span class="hl-0">.</span><span class="hl-3">define</span><span class="hl-0">(</span><span class="hl-4">&quot;no-weekend-refunds&quot;</span><span class="hl-0">, (</span><span class="hl-1">call</span><span class="hl-0">) </span><span class="hl-5">=&gt;</span><br/><span class="hl-0">  </span><span class="hl-1">call</span><span class="hl-0">.</span><span class="hl-1">tool</span><span class="hl-0"> === </span><span class="hl-4">&quot;refund_invoice&quot;</span><span class="hl-0"> &amp;&amp; [</span><span class="hl-8">0</span><span class="hl-0">, </span><span class="hl-8">6</span><span class="hl-0">].</span><span class="hl-3">includes</span><span class="hl-0">(</span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-3">Date</span><span class="hl-0">().</span><span class="hl-3">getUTCDay</span><span class="hl-0">())</span><br/><span class="hl-0">    ? </span><span class="hl-1">call</span><span class="hl-0">.</span><span class="hl-3">guide</span><span class="hl-0">(</span><span class="hl-4">&quot;Refunds wait until Monday; offer to schedule one.&quot;</span><span class="hl-0">)</span><br/><span class="hl-0">    : </span><span class="hl-1">call</span><span class="hl-0">.</span><span class="hl-3">proceed</span><span class="hl-0">()</span><br/><span class="hl-0">);</span>
+</code><button>Copy</button></pre>
+<a id="md:license" class="tsd-anchor"></a><h2><a href="#md:license">License</a></h2><p>MIT</p>
+</section></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-index-accordion"><summary class="tsd-accordion-summary">
+<h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4.93896 8.531L12 15.591L19.061 8.531L16.939 6.409L12 11.349L7.06098 6.409L4.93896 8.531Z" fill="var(--color-text)" id="icon-chevronDown"></path></svg>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility">
+<h4 class="uppercase">Member Visibility</h4><form>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-private" name="private"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Private</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></form></div>
+<div class="tsd-theme-toggle">
+<h4 class="uppercase">Theme</h4><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-index-accordion tsd-page-navigation"><summary class="tsd-accordion-summary">
+<h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="#icon-chevronDown"></use></svg>On This Page</h3></summary>
+<div class="tsd-accordion-details">
+<ul>
+<li>
+<ul>
+<li><a href="#md:scuteharness"><span>@scute/harness</span></a></li>
+<li>
+<ul>
+<li><a href="#md:with-the-vercel-ai-sdk-v7"><span>With the <wbr/>Vercel AI SDK (v7)</span></a></li>
+<li><a href="#md:any-other-loop"><span>Any other loop</span></a></li>
+<li><a href="#md:decisions"><span>Decisions</span></a></li>
+<li><a href="#md:tools-map-to-permissions-by-name"><span>Tools map to permissions by name</span></a></li>
+<li><a href="#md:people-in-the-loop"><span>People in the loop</span></a></li>
+<li>
+<ul>
+<li><a href="#md:plans-and-previews"><span>Plans and previews</span></a></li>
+<li><a href="#md:tool-drift-and-decoys"><span>Tool drift and decoys</span></a></li></ul></li>
+<li><a href="#md:runs-and-state"><span>Runs and state</span></a></li>
+<li><a href="#md:your-own-guards"><span>Your own guards</span></a></li>
+<li><a href="#md:license"><span>License</span></a></li></ul></li></ul></li></ul></div></details></div>
+<div class="site-menu">
+<nav class="tsd-navigation"><a href="../index.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-4"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-namespace)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M9.33 16V7.24H10.77L13.446 14.74C13.43 14.54 13.41 14.296 13.386 14.008C13.37 13.712 13.354 13.404 13.338 13.084C13.33 12.756 13.326 12.448 13.326 12.16V7.24H14.37V16H12.93L10.266 8.5C10.282 8.692 10.298 8.936 10.314 9.232C10.33 9.52 10.342 9.828 10.35 10.156C10.366 10.476 10.374 10.784 10.374 11.08V16H9.33Z" fill="var(--color-text)"></path></g></svg><span>Scute</span></a>
+<ul class="tsd-small-nested-navigation">
+<li><a href="create_scute_app.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>create-<wbr/>scute-<wbr/>app</span></a></li>
+<li><a href="_scute_eslint_config.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/eslint-<wbr/>config</span></a></li>
+<li><a href="_scute_harness.html" class="current"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/harness</span></a></li>
+<li><a href="_scute_live_tests.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/live-<wbr/>tests</span></a></li>
+<li><a href="_scute_mcp_gateway.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/mcp-<wbr/>gateway</span></a></li>
+<li><a href="_scute_tsconfig.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/tsconfig</span></a></li>
+<li><a href="_scute_sdk_e2e.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/sdk-<wbr/>e2e</span></a></li>
+<li><a href="_scute_js_core.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/js-<wbr/>core -<wbr/> v0.10.0-<wbr/>next.2</span></a></li>
+<li><a href="_scute_nextjs_handlers.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/nextjs-<wbr/>handlers -<wbr/> v0.9.0-<wbr/>next.2</span></a></li>
+<li><a href="_scute_react_hooks.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/react-<wbr/>hooks -<wbr/> v0.9.0-<wbr/>next.2</span></a></li>
+<li><a href="_scute_auth_ui_react.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>@scute/auth-<wbr/>ui-<wbr/>react</span></a></li></ul></nav></div></div></div>
+<div class="tsd-generator">
+<p>Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></div>
+<div class="overlay"></div></body></html>
