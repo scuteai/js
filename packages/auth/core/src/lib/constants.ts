@@ -24,6 +24,8 @@ export const AUTH_CHANGE_EVENTS = {
   MFA_ENROLLMENT_REQUIRED: "mfa_enrollment_required",
   MFA_ENROLLMENT_SUGGESTED: "mfa_enrollment_suggested",
   MFA_VERIFIED: "mfa_verified",
+  /** Attack protection asks for a code before a magic link sign-in goes on. */
+  VERIFICATION_REQUIRED: "verification_required",
 } as const;
 
 export type AuthChangeEvent = ValueOf<typeof AUTH_CHANGE_EVENTS>;

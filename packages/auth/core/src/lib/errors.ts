@@ -195,7 +195,45 @@ export type WebAuthnErrorCode =
   | "ERROR_AUTHENTICATOR_MISSING_USER_VERIFICATION_SUPPORT"
   | "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED"
   | "ERROR_AUTHENTICATOR_NO_SUPPORTED_PUBKEYCREDPARAMS_ALG"
-  | "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY";
+  | "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY"
+  | "ERROR_PASSKEYS_UNAVAILABLE";
+
+/**
+ * True when this page can use passkeys: a browser, a secure context (https
+ * or localhost), and the WebAuthn API.
+ */
+export const passkeysAvailable = (): boolean => {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  if (window.isSecureContext === false) return false;
+  return (
+    typeof window.PublicKeyCredential !== "undefined" &&
+    typeof navigator.credentials?.create === "function" &&
+    typeof navigator.credentials?.get === "function"
+  );
+};
+
+/** Bytes a base64url (or base64) string decodes to. */
+export const base64urlByteLength = (value: string): number => {
+  const chars = value.replace(/=+$/, "").length;
+  return Math.floor((chars * 3) / 4);
+};
+
+/**
+ * Passkeys can't be used on this page: it isn't a secure context (https or
+ * localhost), or the browser has no WebAuthn API.
+ */
+export class PasskeysUnavailableError extends WebAuthnError {
+  constructor(cause?: Error) {
+    super({
+      message:
+        "Passkeys aren't available on this page. They need a secure connection (https) and a browser that supports them.",
+      code: "ERROR_PASSKEYS_UNAVAILABLE",
+      name: "PasskeysUnavailableError",
+      cause: cause as Error,
+    });
+    Object.setPrototypeOf(this, PasskeysUnavailableError.prototype);
+  }
+}
 
 // https://github.com/MasterKale/SimpleWebAuthn/blob/9757b8172d8d025eade46bd62be0e6c3c2216ea3/packages/browser/src/helpers/identifyRegistrationError.ts
 /**
@@ -300,9 +338,18 @@ export function identifyRegistrationError({
       });
     }
   } else if (error.name === "TypeError") {
+    // No passkey API on this page (an insecure context, or an older
+    // browser): calling it throws a TypeError. Say so, instead of guessing
+    // at the options.
+    if (!passkeysAvailable()) {
+      return new PasskeysUnavailableError(error);
+    }
+
+    // The JSON options carry the user id base64url encoded: measure the
+    // bytes it decodes to, not the string.
     const userId = publicKey.user.id;
     const userIdLength =
-      typeof userId !== "string" ? userId.byteLength : userId.length;
+      typeof userId !== "string" ? userId.byteLength : base64urlByteLength(userId);
 
     if (userIdLength < 1 || userIdLength > 64) {
       // https://www.w3.org/TR/webauthn-2/#sctn-createCredential (Step 5)

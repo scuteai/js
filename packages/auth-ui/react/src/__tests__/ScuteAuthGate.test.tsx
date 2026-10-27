@@ -46,7 +46,7 @@ async function renderAtLogin(client: FakeClient = createFakeClient(), props: Par
 }
 
 function submitEmail(email: string) {
-  const input = screen.getByPlaceholderText("you@example.com");
+  const input = screen.getByPlaceholderText("name@company.com");
   fireEvent.change(input, { target: { value: email } });
   fireEvent.submit(input.closest("form")!);
 }
@@ -68,7 +68,7 @@ describe("default views", () => {
   it("shows a loading screen until the SDK is initialized", async () => {
     const init = deferred<any>();
     const { container } = renderGate(createFakeClient({ _initialize: vi.fn(() => init.promise) }));
-    expect(screen.getByText("Loading...")).toBeTruthy();
+    expect(screen.getByText("Loading")).toBeTruthy();
     expect(view(container)).toBe("loading");
     expect(screen.queryByText(PROTECTED)).toBeNull();
     await act(async () => init.resolve({ error: null }));
@@ -78,8 +78,8 @@ describe("default views", () => {
   it("shows the email login form after init", async () => {
     const { container } = await renderAtLogin();
     expect(view(container)).toBe("login");
-    expect(screen.getByText("Enter your email to continue")).toBeTruthy();
-    const input = screen.getByPlaceholderText("you@example.com") as HTMLInputElement;
+    expect(screen.getByText(/Enter your email and we will send you a link or a code/)).toBeTruthy();
+    const input = screen.getByPlaceholderText("name@company.com") as HTMLInputElement;
     expect(input.type).toBe("email");
     expect(input.name).toBe("email");
     expect(input.required).toBe(true);
@@ -94,8 +94,9 @@ describe("default views", () => {
     await renderAtLogin(client);
     act(() => submitEmail("ada@example.com"));
     expect(client.signInOrUp).toHaveBeenCalledWith("ada@example.com");
-    const button = screen.getByRole("button", { name: "Loading..." }) as HTMLButtonElement;
+    const button = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
     await act(async () => pending.resolve({ data: null, error: null }));
     expect(screen.getByRole("button", { name: "Continue" })).toBeTruthy();
   });
@@ -110,7 +111,7 @@ describe("default views", () => {
     expect(err?.textContent).toBe("Identifier not recognized");
   });
 
-  it("shows the check-your-email screen with the identifier, and Change email goes back", async () => {
+  it("shows the check-your-inbox screen with the identifier, and Use a different email goes back", async () => {
     const client = createFakeClient();
     client.signInOrUp.mockImplementation(async () => {
       client.emit(AUTH_CHANGE_EVENTS.MAGIC_PENDING);
@@ -118,20 +119,21 @@ describe("default views", () => {
     });
     const { container } = await renderAtLogin(client);
     await act(async () => submitEmail("ada@example.com"));
-    expect(screen.getByRole("heading", { name: "Check your email" })).toBeTruthy();
-    expect(container.querySelector("strong")?.textContent).toBe("ada@example.com");
-    fireEvent.click(screen.getByRole("button", { name: "Change email" }));
+    expect(screen.getByRole("heading", { name: "Check your inbox" })).toBeTruthy();
+    expect(container.querySelector(".scute-signin__token")?.textContent).toBe("ada@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Use a different email" }));
     expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
   });
 
-  it("shows Verifying... while a magic link from the URL is being verified", async () => {
+  it("shows Signing you in while a magic link from the URL is being verified", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const verify = deferred<any>();
     const { container } = renderGate(createFakeClient({ verifyMagicLinkToken: vi.fn(() => verify.promise) }));
-    await screen.findByText("Verifying...");
-    expect(view(container)).toBe("loading");
+    await screen.findByRole("heading", { name: "Signing you in" });
+    expect(screen.getByText("Checking the link")).toBeTruthy();
+    expect(view(container)).toBe("magic_verifying");
     await act(async () => verify.resolve({ data: null, error: { message: "Link expired" } }));
-    await screen.findByText("Link expired");
+    await screen.findByRole("heading", { name: "This link has expired" });
   });
 
   it("shows the OTP screen and auto-submits once six digits are typed", async () => {
@@ -144,38 +146,40 @@ describe("default views", () => {
     });
     const { container } = await renderAtLogin(client);
     await act(async () => submitEmail("ada@example.com"));
-    expect(screen.getByRole("heading", { name: "Enter code" })).toBeTruthy();
-    expect(container.querySelector("strong")?.textContent).toBe("ada@example.com");
+    expect(screen.getByRole("heading", { name: "Enter the code" })).toBeTruthy();
+    expect(container.querySelector(".scute-signin__token")?.textContent).toBe("ada@example.com");
 
-    const input = screen.getByPlaceholderText("000000");
+    const first = screen.getByLabelText("Sign-in code, character 1 of 6");
     await act(async () => {
-      fireEvent.change(input, { target: { value: "12345" } });
+      fireEvent.change(first, { target: { value: "12345" } });
     });
     expect(client.verifyOtp).not.toHaveBeenCalled();
     await act(async () => {
-      fireEvent.change(input, { target: { value: "12-34 56" } });
+      fireEvent.change(first, { target: { value: "12-34 56" } });
     });
     expect(client.verifyOtp).toHaveBeenCalledTimes(1);
     expect(client.verifyOtp).toHaveBeenCalledWith("123456", "ada@example.com");
-    expect(container.querySelector("[data-scute-error]")?.textContent).toBe("Invalid OTP");
+    expect(container.querySelector("[data-scute-error]")?.textContent).toBe(
+      "That code didn't work. Check the email and try again."
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use a different email" }));
     expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
   });
 
   it("shows the passkey prompt on WEBAUTHN_VERIFY_START", async () => {
     const { client, container } = await renderAtLogin();
     act(() => client.emit(AUTH_CHANGE_EVENTS.WEBAUTHN_VERIFY_START));
-    expect(screen.getByRole("heading", { name: "Verify your passkey" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Use your passkey" })).toBeTruthy();
     expect(view(container)).toBe("webauthn_verify");
   });
 
   it("offers passkey registration after a magic link and shows the app after registering", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const { client } = renderGate();
-    await screen.findByRole("heading", { name: "Register a passkey" });
-    fireEvent.click(screen.getByRole("button", { name: "Register passkey" }));
-    await screen.findByRole("heading", { name: "Passkey registered" });
+    await screen.findByRole("heading", { name: "Add a passkey" });
+    fireEvent.click(screen.getByRole("button", { name: "Add a passkey" }));
+    await screen.findByRole("heading", { name: "Passkey added" });
     expect(client.addDevice).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(PROTECTED)).toBeNull();
     await waitFor(() => expect(screen.getByText(PROTECTED)).toBeTruthy(), { timeout: 3000 });
@@ -184,14 +188,14 @@ describe("default views", () => {
   it("shows the app after Skip for now", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const { client } = renderGate();
-    await screen.findByRole("heading", { name: "Register a passkey" });
+    await screen.findByRole("heading", { name: "Add a passkey" });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
     });
     expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1);
     expect(client.addDevice).not.toHaveBeenCalled();
     expect(screen.getByText(PROTECTED)).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Register a passkey" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Add a passkey" })).toBeNull();
   });
 
   it("shows the addDevice error on the offer, then the app after Skip for now", async () => {
@@ -200,9 +204,9 @@ describe("default views", () => {
       addDevice: vi.fn(async () => ({ data: null, error: { message: "The operation was cancelled" } })),
     });
     const { container } = renderGate(client);
-    await screen.findByRole("heading", { name: "Register a passkey" });
+    await screen.findByRole("heading", { name: "Add a passkey" });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Register passkey" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add a passkey" }));
     });
     expect(container.querySelector("[data-scute-error]")?.textContent).toBe("The operation was cancelled");
     expect(screen.queryByText(PROTECTED)).toBeNull();
@@ -212,15 +216,15 @@ describe("default views", () => {
     expect(screen.getByText(PROTECTED)).toBeTruthy();
   });
 
-  it("shows verification errors with a Try again button back to login", async () => {
+  it("shows verification errors with a Back to sign in button", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const client = createFakeClient({
       verifyMagicLinkToken: vi.fn(async () => ({ data: null, error: { message: "Link expired" } })),
     });
     const { container } = renderGate(client);
-    await screen.findByText("Link expired");
+    await screen.findByRole("heading", { name: "This link has expired" });
     expect(view(container)).toBe("error");
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
     expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
   });
 
@@ -232,16 +236,14 @@ describe("default views", () => {
   });
 
   it.each([
-    AUTH_CHANGE_EVENTS.MFA_REQUIRED,
-    AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED,
-    AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED,
-  ])("renders an empty container for %s", async (event) => {
+    [AUTH_CHANGE_EVENTS.MFA_REQUIRED, "We couldn't start the second step"],
+    [AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED, "Set up two-step verification first"],
+    [AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED, "Set up two-step verification"],
+  ])("has a default view for %s", async (event, heading) => {
     const { client, container } = await renderAtLogin();
     act(() => client.emit(event));
-    // Known limitation, tracked separately: the gate has no default UI for the MFA views, so it renders an empty container unless renderView handles them.
-    const box = container.querySelector("[data-scute-auth-container]");
-    expect(box).not.toBeNull();
-    expect(box!.children).toHaveLength(0);
+    expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
+    expect(container.querySelector("[data-scute-auth-container]")).not.toBeNull();
     expect(screen.queryByText(PROTECTED)).toBeNull();
   });
 });
@@ -263,7 +265,7 @@ describe("customization", () => {
       })
     );
     act(() => client.emit(AUTH_CHANGE_EVENTS.OTP_PENDING));
-    expect(screen.getByRole("heading", { name: "Enter code" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Enter the code" })).toBeTruthy();
   });
 
   it("does not consult renderView once authenticated", async () => {
@@ -279,7 +281,8 @@ describe("customization", () => {
     const { container } = await renderAtLogin();
     const root = container.querySelector("[data-scute-auth]") as HTMLElement;
     expect(root.getAttribute("data-scute-theme")).toBe("light");
-    expect(root.style.getPropertyValue("--scute-accent")).toBe("#4F46E5");
+    // The stylesheet's own ink accent: nothing set inline.
+    expect(root.style.getPropertyValue("--scute-accent")).toBe("");
     expect(container.querySelector("[data-scute-auth-logo]")).toBeNull();
   });
 
@@ -349,7 +352,7 @@ describe("onAuthenticated", () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const onAuthenticated = vi.fn();
     const { client } = renderGate(createFakeClient(), { onAuthenticated });
-    await screen.findByRole("heading", { name: "Register a passkey" });
+    await screen.findByRole("heading", { name: "Add a passkey" });
     act(() => client.emitSignedIn());
     expect(onAuthenticated).not.toHaveBeenCalled();
     await act(async () => {
@@ -402,7 +405,7 @@ describe("security", () => {
   it("does not render children while the passkey offer is showing, even though a session exists", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const { client } = renderGate();
-    await screen.findByRole("heading", { name: "Register a passkey" });
+    await screen.findByRole("heading", { name: "Add a passkey" });
     act(() => client.emitSignedIn());
     expect(screen.queryByText(PROTECTED)).toBeNull();
   });
@@ -480,12 +483,12 @@ describe("security", () => {
   it("never puts tokens in the DOM during the magic link and passkey flow", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     renderGate();
-    await screen.findByRole("heading", { name: "Register a passkey" });
+    await screen.findByRole("heading", { name: "Add a passkey" });
     expect(document.body.innerHTML).not.toContain(ACCESS_TOKEN);
     expect(document.body.innerHTML).not.toContain(REFRESH_TOKEN);
     expect(document.body.innerHTML).not.toContain(MAGIC_TOKEN);
-    fireEvent.click(screen.getByRole("button", { name: "Register passkey" }));
-    await screen.findByRole("heading", { name: "Passkey registered" });
+    fireEvent.click(screen.getByRole("button", { name: "Add a passkey" }));
+    await screen.findByRole("heading", { name: "Passkey added" });
     expect(document.body.innerHTML).not.toContain(ACCESS_TOKEN);
     expect(document.body.innerHTML).not.toContain(REFRESH_TOKEN);
   });

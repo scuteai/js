@@ -1,8 +1,8 @@
 // Headless hooks — bring your own UI
 
 // Auth flow (login / signup / passkey / MFA)
-export { useScuteAuthFlow } from "./useScuteAuthFlow";
-export type { AuthFlowView } from "./useScuteAuthFlow";
+export { useScuteAuthFlow, RESEND_COOLDOWN_SECONDS } from "./useScuteAuthFlow";
+export type { AuthFlowView, SignInRefusalCode } from "./useScuteAuthFlow";
 
 // Profile / account management
 export { useUserProfile } from "./useUserProfile";
@@ -48,6 +48,20 @@ export type {
   UseElementAccessRequestsResult,
   UseElementDecisionLogResult,
 } from "./useAuthzElements";
+
+// The sign-in, ready to drop in and themeable
+export { ScuteSignIn } from "./signin/ScuteSignIn";
+export type { ScuteAuthFlow } from "./signin/ScuteSignIn";
+export { useScuteSignInStep } from "./signin/parts";
+export type { StepInfo as ScuteSignInStep } from "./signin/parts";
+export type {
+  ScuteSignInProps,
+  ScuteSignInAppearance,
+  ScuteSignInCopy,
+  ScuteSignInLegal,
+  ScuteSignInMethods,
+  ScuteSignInMood,
+} from "./signin/types";
 
 // Pre-built gate component — drop-in auth
 export { ScuteAuthGate } from "./ScuteAuthGate";

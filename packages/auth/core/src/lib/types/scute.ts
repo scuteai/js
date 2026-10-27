@@ -224,6 +224,27 @@ export type ScuteMfaRequiredResponse = {
   available_methods: string[];
 };
 
+/**
+ * The code attack protection sends before a magic link sign-in goes on: a
+ * step-up challenge the browser verifies with its token alone.
+ */
+export type ScuteSignInVerification = {
+  token: string;
+  method: string;
+  expires_at: string;
+};
+
+/**
+ * Attack protection's answer (202) to a magic link sign-in that needs a
+ * code first. Verify the code, then the same link signs in.
+ */
+export type ScuteVerificationRequiredResponse = {
+  verification_required: true;
+  reason?: string;
+  threats?: string[];
+  verification?: ScuteSignInVerification;
+};
+
 
 export type ScuteUserSession = {
   id: UniqueIdentifier;

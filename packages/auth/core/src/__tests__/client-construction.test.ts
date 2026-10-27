@@ -20,6 +20,7 @@ import {
   IdentifierAlreadyExistsError,
   IdentifierNotRecognizedError,
   InvalidAuthTokenError,
+  PasskeysUnavailableError,
   ScuteError,
   TechnicalError,
 } from "../lib/errors";
@@ -413,9 +414,22 @@ describe("authenticated endpoint table", () => {
   // Known limitation, tracked separately: a /devices/register response
   // without `options` makes addDevice reject instead of returning { error }.
   it("addDevice rejects when the register response has no options", async () => {
+    // A page with the WebAuthn API, so the browser call is reached.
+    installBrowser();
+    Object.assign(window, { isSecureContext: true, PublicKeyCredential: function PublicKeyCredential() {} });
+    (navigator as any).credentials = { create: vi.fn(), get: vi.fn() };
     seedSession(storage, { access: ACCESS });
     server.on("POST", `${AUTH_PREFIX}/devices/register`, { body: {} });
     await expect(newClient().addDevice()).rejects.toThrow(/publicKey/);
+  });
+
+  it("addDevice returns PasskeysUnavailableError where the page has no passkey API", async () => {
+    seedSession(storage, { access: ACCESS });
+    server.on("POST", `${AUTH_PREFIX}/devices/register`, { body: { options: { challenge: "c", user: { id: "dXNyXzE" } } } });
+    const { data, error } = await newClient().addDevice();
+    expect(data).toBeNull();
+    expect(error).toBeInstanceOf(PasskeysUnavailableError);
+    expect((error as PasskeysUnavailableError).code).toBe("ERROR_PASSKEYS_UNAVAILABLE");
   });
 
   it("revokeSession without a credential id looks it up via GET /sessions first", async () => {
