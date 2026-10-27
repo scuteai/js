@@ -109,6 +109,19 @@ export function createFakeClient(overrides: Record<string, unknown> = {}) {
     verifyOtp: vi.fn(),
     verifyMfaChallenge: vi.fn(),
     addDevice: vi.fn(async () => ({ data: { id: "cred_1" }, error: null })),
+    // A secure page with the WebAuthn API, unless a test says otherwise.
+    isWebauthnSupported: vi.fn(() => true),
+    // Resends (no pending event: the flow is already on the step).
+    sendLoginMagicLink: vi.fn(async () => ({ data: { magic_link: { id: "ml_resent" } }, error: null })),
+    sendLoginOtp: vi.fn(async () => ({ data: { otp: { id: "otp_resent" } }, error: null })),
+    // Attack protection's code step for a magic link.
+    verifySignInVerification: vi.fn(async () => ({
+      data: { authPayload: AUTH_PAYLOAD, magicPayload: { userId: "usr_1" } },
+      error: null,
+    })),
+    resendChallenge: vi.fn(),
+    switchMfaMethod: vi.fn(),
+    signInWithOAuthProvider: vi.fn(),
     pendingMfaChallenge: null as any,
     pendingMfaEnrollmentSuggestion: null as any,
     signOut: vi.fn(async () => {

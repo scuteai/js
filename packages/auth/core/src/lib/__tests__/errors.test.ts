@@ -18,6 +18,9 @@ import {
   LoginRequiredError,
   NETWORK_ERROR_CODES,
   NewDeviceError,
+  PasskeysUnavailableError,
+  passkeysAvailable,
+  base64urlByteLength,
   ScuteError,
   TechnicalError,
   UnknownSignInError,
@@ -240,12 +243,61 @@ describe("identifyRegistrationError", () => {
     );
   });
 
+  // A page with the WebAuthn API (jsdom has none).
+  const withPasskeys = () => {
+    vi.stubGlobal("window", { isSecureContext: true, PublicKeyCredential: function PublicKeyCredential() {} });
+    vi.stubGlobal("navigator", { credentials: { create: vi.fn(), get: vi.fn() } });
+  };
+
   it("maps TypeError with an out of range user id length", () => {
+    withPasskeys();
     const err = identifyRegistrationError({
       error: namedError("TypeError"),
       options: { publicKey: { ...publicKey, user: { ...publicKey.user, id: "" } } } as any,
     });
     expect((err as WebAuthnError).code).toBe("ERROR_INVALID_USER_ID_LENGTH");
+  });
+
+  it("measures the base64url user id in bytes, not characters", () => {
+    withPasskeys();
+    // 64 bytes encode to 86 base64url characters: in range.
+    const id64 = "A".repeat(86);
+    expect(base64urlByteLength(id64)).toBe(64);
+    const ok = identifyRegistrationError({
+      error: namedError("TypeError"),
+      options: { publicKey: { ...publicKey, user: { ...publicKey.user, id: id64 } } } as any,
+    });
+    expect((ok as WebAuthnError).code).toBeUndefined();
+    expect(ok.name).toBe("TypeError");
+
+    const id65 = "A".repeat(88);
+    const tooLong = identifyRegistrationError({
+      error: namedError("TypeError"),
+      options: { publicKey: { ...publicKey, user: { ...publicKey.user, id: id65 } } } as any,
+    });
+    expect((tooLong as WebAuthnError).code).toBe("ERROR_INVALID_USER_ID_LENGTH");
+  });
+
+  it("reports passkeys unavailable for a TypeError on a page without the WebAuthn API", () => {
+    const cause = namedError("TypeError");
+    const err = identifyRegistrationError({
+      error: cause,
+      // A user id that would look out of range as a string length.
+      options: { publicKey: { ...publicKey, user: { ...publicKey.user, id: "A".repeat(100) } } } as any,
+    });
+    expect(err).toBeInstanceOf(PasskeysUnavailableError);
+    expect(err).toBeInstanceOf(WebAuthnError);
+    expect((err as WebAuthnError).code).toBe("ERROR_PASSKEYS_UNAVAILABLE");
+    expect(err.message).not.toMatch(/User ID/);
+    expect(getMeaningfulError(err).message).toMatch(/Passkeys aren't available/);
+  });
+
+  it("reports passkeys unavailable in an insecure context even with the API present", () => {
+    withPasskeys();
+    (window as any).isSecureContext = false;
+    expect(passkeysAvailable()).toBe(false);
+    const err = identifyRegistrationError({ error: namedError("TypeError"), options: { publicKey } as any });
+    expect((err as WebAuthnError).code).toBe("ERROR_PASSKEYS_UNAVAILABLE");
   });
 });
 

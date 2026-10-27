@@ -6,13 +6,18 @@ import { useSessions } from "../useSessions";
 import { useAlternatePhones } from "../useAlternatePhones";
 import { useSecureAccount } from "../useSecureAccount";
 import { ScuteAuthGate } from "../ScuteAuthGate";
+import { ScuteSignIn } from "../signin/ScuteSignIn";
+import { useScuteSignInStep } from "../signin/parts";
 import { useElementAccessRequests, useElementDecisionLog, useElementUserRoles } from "../useAuthzElements";
 
 describe("@scute/auth-ui-react public surface", () => {
-  it("exports exactly the headless hooks and the gate component", () => {
+  it("exports exactly the headless hooks, the sign-in and the gate component", () => {
     expect(Object.keys(pkg).sort()).toEqual(
       [
+        "RESEND_COOLDOWN_SECONDS",
         "ScuteAuthGate",
+        "ScuteSignIn",
+        "useScuteSignInStep",
         "useAlternatePhones",
         "useElementAccessRequests",
         "useElementDecisionLog",
@@ -32,6 +37,8 @@ describe("@scute/auth-ui-react public surface", () => {
     expect(pkg.useAlternatePhones).toBe(useAlternatePhones);
     expect(pkg.useSecureAccount).toBe(useSecureAccount);
     expect(pkg.ScuteAuthGate).toBe(ScuteAuthGate);
+    expect(pkg.ScuteSignIn).toBe(ScuteSignIn);
+    expect(pkg.useScuteSignInStep).toBe(useScuteSignInStep);
     expect(pkg.useElementUserRoles).toBe(useElementUserRoles);
     expect(pkg.useElementAccessRequests).toBe(useElementAccessRequests);
     expect(pkg.useElementDecisionLog).toBe(useElementDecisionLog);

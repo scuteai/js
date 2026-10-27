@@ -53,6 +53,8 @@ import {
   TechnicalError,
   UnknownSignInError,
   BaseHttpError,
+  PasskeysUnavailableError,
+  passkeysAvailable,
 } from "./lib/errors";
 
 import { version } from "./lib/version";
@@ -87,6 +89,8 @@ import type {
   ScuteOtpResponse,
   ScuteChallengeResponse,
   ScuteMfaRequiredResponse,
+  ScuteSignInVerification,
+  ScuteVerificationRequiredResponse,
   ScuteSsoDiscovery,
 } from "./lib/types/scute";
 
@@ -707,8 +711,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const { data, error: verifyError } = await this.verifyMagicLinkToken(token);
     if (verifyError) return { error: verifyError };
 
-    // If MFA is required, the event was already emitted by verifyMagicLinkToken
+    // If MFA or a verification code is required, the event was already
+    // emitted by verifyMagicLinkToken
     if (data && "mfaRequired" in data && data.mfaRequired) {
+      return { data, error: null };
+    }
+    if (data && "verificationRequired" in data && data.verificationRequired) {
       return { data, error: null };
     }
 
@@ -811,6 +819,30 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: verifyError };
     }
 
+    // Attack protection wants a code first (202). Nothing is signed in: the
+    // same link signs in once the code is verified
+    // (verifySignInVerification).
+    if (
+      authPayload &&
+      "verification_required" in authPayload &&
+      authPayload.verification_required
+    ) {
+      const answer = authPayload as ScuteVerificationRequiredResponse;
+      this._pendingSignInVerification = answer.verification
+        ? { magicToken: token, verification: answer.verification }
+        : null;
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.VERIFICATION_REQUIRED);
+      return {
+        data: {
+          verificationRequired: true as const,
+          verification: answer.verification ?? null,
+          reason: answer.reason,
+          threats: answer.threats ?? [],
+        },
+        error: null,
+      };
+    }
+
     // Check if MFA is required
     if (authPayload && "mfa_required" in authPayload && authPayload.mfa_required) {
       const mfaPayload = authPayload as unknown as ScuteMfaRequiredResponse;
@@ -854,7 +886,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @see {@link verifyMagicLinkToken}
    */
   private async _verifyMagicLinkTokenRequest(token: string) {
-    return this.patch<ScuteTokenPayload | ScuteMfaRequiredResponse>(
+    return this.patch<
+      ScuteTokenPayload | ScuteMfaRequiredResponse | ScuteVerificationRequiredResponse
+    >(
       "/magic_links/authenticate",
       { token }
     );
@@ -940,6 +974,55 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   private _pendingMfaChallenge: ScuteMfaRequiredResponse | null = null;
   /** Pending MFA enrollment suggestion (grace period). */
   private _pendingMfaEnrollmentSuggestion: { mfa_grace_days_remaining?: number; available_methods: string[] } | null = null;
+
+  /** Attack protection's code step for a magic link sign-in, while pending. */
+  private _pendingSignInVerification: {
+    magicToken: string;
+    verification: ScuteSignInVerification;
+  } | null = null;
+
+  /**
+   * The code attack protection sent before a magic link sign-in goes on
+   * (set when {@link verifyMagicLinkToken} answers `verificationRequired`).
+   * The magic link token is kept out of this getter.
+   */
+  get pendingSignInVerification(): ScuteSignInVerification | null {
+    return this._pendingSignInVerification?.verification ?? null;
+  }
+
+  /**
+   * Finish attack protection's code step for a magic link sign-in: verify
+   * the code against its challenge (no app key needed), then check the same
+   * link again, which now signs in (or asks for MFA, like
+   * {@link verifyMagicLinkToken}).
+   *
+   * @param code - The code that was sent
+   * @param pending - The challenge token and magic link token, when not the
+   *   pending ones from the last {@link verifyMagicLinkToken} call.
+   */
+  async verifySignInVerification(
+    code: string,
+    pending?: { challengeToken: string; magicToken: string }
+  ) {
+    const challengeToken =
+      pending?.challengeToken ?? this._pendingSignInVerification?.verification.token;
+    const magicToken =
+      pending?.magicToken ?? this._pendingSignInVerification?.magicToken;
+    if (!challengeToken || !magicToken) {
+      return { data: null, error: new InvalidMagicLinkError() };
+    }
+
+    const { error } = await this.post<{ status: string }>(
+      `/challenges/${encodeURIComponent(challengeToken)}/verify`,
+      { code }
+    );
+    if (error) {
+      return { data: null, error };
+    }
+
+    this._pendingSignInVerification = null;
+    return this.verifyMagicLinkToken(magicToken);
+  }
 
   /** Get the pending MFA challenge (if any). */
   get pendingMfaChallenge() {
@@ -1687,6 +1770,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     if (!decodedToken) {
       return { data: null, error: new TechnicalError() };
+    }
+
+    // No passkey API here (an insecure context or an older browser): say
+    // so rather than let the browser call fail with a TypeError.
+    if (!passkeysAvailable()) {
+      const e = new PasskeysUnavailableError();
+      this._reportClientError(e, "webauthn-register-finalize");
+      return { data: null, error: e };
     }
 
     let credential: webauthn.PublicKeyCredentialWithAttestationJSON;
