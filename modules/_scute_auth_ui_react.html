@@ -15,40 +15,195 @@
 <li><a href="../index.html">Scute</a></li>
 <li><a href="_scute_auth_ui_react.html">@scute/auth-ui-react</a></li></ul>
 <h1>Module @scute/auth-ui-react</h1></div>
-<section class="tsd-panel tsd-typography"><a id="md:scute-monorepo" class="tsd-anchor"></a><h1><a href="#md:scute-monorepo">Scute Monorepo</a></h1><a id="md:monorepo-structure" class="tsd-anchor"></a><h2><a href="#md:monorepo-structure">Monorepo Structure</a></h2><pre><code><span class="hl-0">├── </span><span class="hl-1">examples</span><br/><span class="hl-0">│   ├── </span><span class="hl-2">with</span><span class="hl-0">-</span><span class="hl-1">nextjs</span><br/><span class="hl-0">│   ├── </span><span class="hl-2">with</span><span class="hl-0">-</span><span class="hl-1">nodejs</span><br/><span class="hl-0">│   ├── </span><span class="hl-2">with</span><span class="hl-0">-</span><span class="hl-1">react</span><br/><span class="hl-0">│   ├── </span><span class="hl-2">with</span><span class="hl-0">-</span><span class="hl-1">vanilla</span><br/><span class="hl-0">│   ├── </span><span class="hl-2">with</span><span class="hl-0">-</span><span class="hl-1">vue</span><br/><span class="hl-0">├── </span><span class="hl-1">packages</span><br/><span class="hl-0">│   ├── </span><span class="hl-1">auth</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">core</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">edge</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">nextjs</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">node</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">react</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">vue</span><br/><span class="hl-0">│   ├── </span><span class="hl-1">auth</span><span class="hl-0">-</span><span class="hl-1">ui</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">elements</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">react</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">shared</span><br/><span class="hl-0">│   │   ├── </span><span class="hl-1">vue</span><br/><span class="hl-0">├── </span><span class="hl-1">package</span><span class="hl-0">.</span><span class="hl-1">json</span><br/><span class="hl-0">├── </span><span class="hl-1">pnpm</span><span class="hl-0">-</span><span class="hl-1">lock</span><span class="hl-0">.</span><span class="hl-1">yaml</span><br/><span class="hl-0">├── </span><span class="hl-1">pnpm</span><span class="hl-0">-</span><span class="hl-1">workspace</span><span class="hl-0">.</span><span class="hl-1">yaml</span><br/><span class="hl-0">├── </span><span class="hl-1">turbo</span><span class="hl-0">.</span><span class="hl-1">json</span><br/><span class="hl-0">├── .</span><span class="hl-1">gitignore</span><br/><span class="hl-0">└── ...</span>
+<section class="tsd-panel tsd-typography"><a id="md:scuteauth-ui-react" class="tsd-anchor"></a><h1><a href="#md:scuteauth-ui-react"><code>@scute/auth-ui-react</code></a></h1><p>Sign-in UI and headless hooks for <a href="https://scute.io">Scute</a> in React.</p>
+<ul>
+<li><strong><code>ScuteSignIn</code></strong>: the complete sign-in as one themeable component. Email first, then a passkey, a magic link or a 6-digit code (as your app is set up), MFA, and a passkey offer for next time.</li>
+<li><strong><code>ScuteAuthGate</code></strong>: wraps your app and shows <code>ScuteSignIn</code> until the visitor is signed in.</li>
+<li><strong>Headless hooks</strong> (<code>useScuteAuthFlow</code>, <code>useUserProfile</code>, <code>useSessions</code>, <code>useAlternatePhones</code>, <code>useSecureAccount</code>, <code>useElement*</code>) when you want to draw everything yourself.</li>
+</ul>
+<p>The components bring their own scoped stylesheet: no CSS import, no Tailwind, no bundler setup. They render the same in any React 18 or 19 app.</p>
+<a id="md:install" class="tsd-anchor"></a><h2><a href="#md:install">Install</a></h2><pre><code class="language-bash"><span class="hl-3">npm</span><span class="hl-0"> </span><span class="hl-4">install</span><span class="hl-0"> </span><span class="hl-4">@scute/auth-ui-react</span><span class="hl-0"> </span><span class="hl-4">@scute/react-hooks</span>
 </code><button>Copy</button></pre>
-<a id="md:examples" class="tsd-anchor"></a><h2><a href="#md:examples">Examples</a></h2><p><code>with-nextjs</code>, <code>with-nodejs</code>,<code>with-react</code>, <code>with-vue</code>, <code>with-vanilla</code></p>
-<p>Install with no lockfile.</p>
-<pre><code class="language-bash"><span class="hl-3">yarn</span><span class="hl-0"> </span><span class="hl-4">install</span><span class="hl-0"> </span><span class="hl-5">--no-lockfile</span>
+<p>Both components need the Scute client above them, from <code>AuthContextProvider</code> in <code>@scute/react-hooks</code>.</p>
+<a id="md:scutesignin" class="tsd-anchor"></a><h2><a href="#md:scutesignin">ScuteSignIn</a></h2><pre><code class="language-tsx"><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">ScuteSignIn</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/auth-ui-react&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-13">&lt;</span><span class="hl-12">ScuteSignIn</span><br/><span class="hl-0">  </span><span class="hl-14">appearance</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">logo:</span><span class="hl-11"> </span><span class="hl-4">&quot;/logo.svg&quot;</span><span class="hl-11">, </span><span class="hl-1">accentColor:</span><span class="hl-11"> </span><span class="hl-4">&quot;#0f766e&quot;</span><span class="hl-11">, </span><span class="hl-1">theme:</span><span class="hl-11"> </span><span class="hl-4">&quot;auto&quot;</span><span class="hl-11"> }</span><span class="hl-5">}</span><br/><span class="hl-0">  </span><span class="hl-14">copy</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">title:</span><span class="hl-11"> </span><span class="hl-4">&quot;Sign in to Acme&quot;</span><span class="hl-11"> }</span><span class="hl-5">}</span><br/><span class="hl-0">  </span><span class="hl-14">legal</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">termsUrl:</span><span class="hl-11"> </span><span class="hl-4">&quot;/terms&quot;</span><span class="hl-11">, </span><span class="hl-1">privacyUrl:</span><span class="hl-11"> </span><span class="hl-4">&quot;/privacy&quot;</span><span class="hl-11"> }</span><span class="hl-5">}</span><br/><span class="hl-0">  </span><span class="hl-14">methods</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">google:</span><span class="hl-11"> </span><span class="hl-5">true</span><span class="hl-11"> }</span><span class="hl-5">}</span><br/><span class="hl-0">  </span><span class="hl-14">onSignedIn</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">(</span><span class="hl-1">user</span><span class="hl-11">) </span><span class="hl-5">=&gt;</span><span class="hl-11"> </span><span class="hl-1">console</span><span class="hl-11">.</span><span class="hl-3">log</span><span class="hl-11">(</span><span class="hl-4">&quot;signed in&quot;</span><span class="hl-11">, </span><span class="hl-1">user</span><span class="hl-11">.</span><span class="hl-1">email</span><span class="hl-11">)</span><span class="hl-5">}</span><br/><span class="hl-13">/&gt;</span><span class="hl-0">;</span>
 </code><button>Copy</button></pre>
-<p>Set environment variables.</p>
-<p>Start dev server</p>
-<pre><code class="language-bash"><span class="hl-3">yarn</span><span class="hl-0"> </span><span class="hl-4">dev</span>
+<a id="md:props" class="tsd-anchor"></a><h3><a href="#md:props">Props</a></h3><table>
+<thead>
+<tr>
+<th>Prop</th>
+<th>Type</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>appearance.logo</code></td>
+<td><code>ReactNode | string</code></td>
+<td>none</td>
+<td>Your logo above the form: an element, or an image URL.</td>
+</tr>
+<tr>
+<td><code>appearance.accentColor</code></td>
+<td><code>string</code> (any CSS color)</td>
+<td>near-black (light), near-white (dark)</td>
+<td>Primary button and focus color. The button text picks black or white for contrast.</td>
+</tr>
+<tr>
+<td><code>appearance.theme</code></td>
+<td><code>&quot;light&quot; | &quot;dark&quot; | &quot;auto&quot;</code></td>
+<td><code>&quot;light&quot;</code></td>
+<td><code>&quot;auto&quot;</code> follows the visitor&#39;s system setting.</td>
+</tr>
+<tr>
+<td><code>appearance.radius</code></td>
+<td><code>&quot;none&quot; | &quot;small&quot; | &quot;medium&quot; | &quot;large&quot;</code></td>
+<td><code>&quot;medium&quot;</code></td>
+<td>Corners of fields, buttons, code boxes and the card.</td>
+</tr>
+<tr>
+<td><code>appearance.fontFamily</code></td>
+<td><code>string</code></td>
+<td>inherited from the page</td>
+<td>A CSS <code>font-family</code> for the whole sign-in.</td>
+</tr>
+<tr>
+<td><code>appearance.illustration</code></td>
+<td><code>ReactNode | false</code></td>
+<td>a small neutral icon per step</td>
+<td>Your own element above the step, or <code>false</code> for none.</td>
+</tr>
+<tr>
+<td><code>appearance.layout</code></td>
+<td><code>&quot;page&quot; | &quot;card&quot;</code></td>
+<td><code>&quot;page&quot;</code></td>
+<td><code>&quot;page&quot;</code> fills the viewport; <code>&quot;card&quot;</code> is a panel for your own page.</td>
+</tr>
+<tr>
+<td><code>appearance.className</code></td>
+<td><code>string</code></td>
+<td>none</td>
+<td>A class on the root element.</td>
+</tr>
+<tr>
+<td><code>copy.title</code></td>
+<td><code>string</code></td>
+<td><code>&quot;Sign in&quot;</code></td>
+<td>First step&#39;s title.</td>
+</tr>
+<tr>
+<td><code>copy.subtitle</code></td>
+<td><code>string</code></td>
+<td><code>&quot;Enter your email and we will send you a link or a code. No account yet? This makes one.&quot;</code></td>
+<td>First step&#39;s lead.</td>
+</tr>
+<tr>
+<td><code>copy.emailLabel</code></td>
+<td><code>string</code></td>
+<td><code>&quot;Email&quot;</code></td>
+<td>The field&#39;s label.</td>
+</tr>
+<tr>
+<td><code>copy.emailPlaceholder</code></td>
+<td><code>string</code></td>
+<td><code>&quot;name@company.com&quot;</code></td>
+<td>The field&#39;s placeholder.</td>
+</tr>
+<tr>
+<td><code>copy.continueLabel</code></td>
+<td><code>string</code></td>
+<td><code>&quot;Continue&quot;</code></td>
+<td>The submit button.</td>
+</tr>
+<tr>
+<td><code>legal.termsUrl</code></td>
+<td><code>string</code></td>
+<td>none</td>
+<td>Links &quot;Terms&quot; under the form.</td>
+</tr>
+<tr>
+<td><code>legal.privacyUrl</code></td>
+<td><code>string</code></td>
+<td>none</td>
+<td>Links &quot;Privacy Policy&quot; under the form. The line shows when either is set.</td>
+</tr>
+<tr>
+<td><code>methods.google</code></td>
+<td><code>boolean</code></td>
+<td><code>false</code></td>
+<td>Adds &quot;Continue with Google&quot;. Set Google up for your app in Scute first.</td>
+</tr>
+<tr>
+<td><code>onSignedIn</code></td>
+<td><code>(user) =&gt; void</code></td>
+<td>none</td>
+<td>Called once each time someone finishes signing in.</td>
+</tr>
+</tbody></table>
+<p>All prop types are exported: <code>ScuteSignInProps</code>, <code>ScuteSignInAppearance</code>, <code>ScuteSignInCopy</code>, <code>ScuteSignInLegal</code>, <code>ScuteSignInMethods</code>.</p>
+<a id="md:what-it-handles" class="tsd-anchor"></a><h3><a href="#md:what-it-handles">What it handles</a></h3><ul>
+<li><strong>Email</strong>, then whatever the app is set up for: a passkey, a magic link (with polling, so opening the link on another device signs this page in), or a 6-digit code (paste or type, sends itself when full).</li>
+<li><strong>Resend</strong> of the link or the code, once every 30 seconds.</li>
+<li><strong>Attack protection</strong>: when Scute wants to confirm an unusual magic link sign-in, the visitor gets a code and enters it right there; the same link then signs in.</li>
+<li><strong>MFA</strong>: authenticator app, email or text code (with resend), backup codes (8 characters), and switching between the methods the visitor has.</li>
+<li><strong>Passkey offer</strong> after a link or a code, skipped where the browser can&#39;t make a passkey (an http page, an old browser).</li>
+<li><strong>Clear refusals</strong>: banned or suspended accounts, and sign-ins blocked by IP or country rules, each get their own message. Every error step has a way back.</li>
+<li><strong>Accessibility</strong>: labelled fields, the title of each new step takes focus, status lines are live regions, errors are alerts tied to their field, full keyboard use of the code boxes.</li>
+</ul>
+<a id="md:theming-further" class="tsd-anchor"></a><h3><a href="#md:theming-further">Theming further</a></h3><p>Everything is drawn with CSS variables on the root (<code>.scute-signin</code>), so you can also set them in your own CSS:</p>
+<pre><code class="language-css"><span class="hl-15">.my-sign-in</span><span class="hl-0"> {</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-bg</span><span class="hl-0">: </span><span class="hl-16">#fafafa</span><span class="hl-0">;          </span><span class="hl-7">/* page background (layout &quot;page&quot;) */</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-panel</span><span class="hl-0">: </span><span class="hl-16">#ffffff</span><span class="hl-0">;       </span><span class="hl-7">/* fields, card */</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-line</span><span class="hl-0">: </span><span class="hl-16">#e4e4e7</span><span class="hl-0">;        </span><span class="hl-7">/* borders */</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-ink-strong</span><span class="hl-0">: </span><span class="hl-16">#18181b</span><span class="hl-0">;  </span><span class="hl-7">/* titles, field text */</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-ink-muted</span><span class="hl-0">: </span><span class="hl-16">#52525b</span><span class="hl-0">;   </span><span class="hl-7">/* leads */</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-ink-soft</span><span class="hl-0">: </span><span class="hl-16">#71717a</span><span class="hl-0">;    </span><span class="hl-7">/* hints, links */</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-bad</span><span class="hl-0">: </span><span class="hl-16">#b91c1c</span><span class="hl-0">;         </span><span class="hl-7">/* errors */</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-accent</span><span class="hl-0">: </span><span class="hl-16">#4338ca</span><span class="hl-0">;      </span><span class="hl-7">/* primary button */</span><br/><span class="hl-0">  </span><span class="hl-14">--scute-accent-ink</span><span class="hl-0">: </span><span class="hl-16">#ffffff</span><span class="hl-0">;  </span><span class="hl-7">/* primary button text */</span><br/><span class="hl-0">}</span>
 </code><button>Copy</button></pre>
-<a id="md:development-guide" class="tsd-anchor"></a><h2><a href="#md:development-guide">Development Guide</a></h2><p>It&#39;s recommended that using local npm registry server in order to test distributed packages.</p>
-<a id="md:verdaccio" class="tsd-anchor"></a><h3><a href="#md:verdaccio"><code>verdaccio</code></a></h3><p><a href="https://verdaccio.org/docs/what-is-verdaccio">https://verdaccio.org/docs/what-is-verdaccio</a></p>
-<a id="md:start-verdaccio-local-registry-server" class="tsd-anchor"></a><h4><a href="#md:start-verdaccio-local-registry-server">Start <code>verdaccio</code> Local Registry Server</a></h4><p><code>pnpm verdaccio-start</code></p>
-<a id="md:publish-packages-to-verdaccio-local-registry" class="tsd-anchor"></a><h4><a href="#md:publish-packages-to-verdaccio-local-registry">Publish packages to <code>verdaccio</code> local registry</a></h4><p>Login with </p>
-<pre><code class="language-bash"><span class="hl-3">pnpm</span><span class="hl-0"> </span><span class="hl-4">login</span><span class="hl-0"> </span><span class="hl-5">--registry</span><span class="hl-0"> </span><span class="hl-4">http://localhost:4873</span>
+<a id="md:your-own-illustration" class="tsd-anchor"></a><h3><a href="#md:your-own-illustration">Your own illustration</a></h3><p><code>appearance.illustration</code> takes any element. To make it follow the flow, read the step with <code>useScuteSignInStep()</code>:</p>
+<pre><code class="language-tsx"><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">useScuteSignInStep</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/auth-ui-react&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-5">function</span><span class="hl-0"> </span><span class="hl-3">Mascot</span><span class="hl-0">() {</span><br/><span class="hl-0">  </span><span class="hl-7">// view: the flow step (&quot;login&quot;, &quot;otp_input&quot;, &quot;mfa_verify&quot;, ...)</span><br/><span class="hl-0">  </span><span class="hl-7">// mood: &quot;idle&quot; | &quot;working&quot; | &quot;checking&quot; | &quot;locked&quot; | &quot;error&quot; | &quot;success&quot;</span><br/><span class="hl-0">  </span><span class="hl-7">// errorCount: goes up with each failed attempt</span><br/><span class="hl-0">  </span><span class="hl-5">const</span><span class="hl-0"> { </span><span class="hl-6">mood</span><span class="hl-0">, </span><span class="hl-6">errorCount</span><span class="hl-0"> } = </span><span class="hl-3">useScuteSignInStep</span><span class="hl-0">();</span><br/><span class="hl-0">  </span><span class="hl-2">return</span><span class="hl-0"> </span><span class="hl-13">&lt;</span><span class="hl-12">MyMascot</span><span class="hl-0"> </span><span class="hl-14">key</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-1">errorCount</span><span class="hl-5">}</span><span class="hl-0"> </span><span class="hl-14">mood</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-1">mood</span><span class="hl-5">}</span><span class="hl-0"> </span><span class="hl-13">/&gt;</span><span class="hl-0">;</span><br/><span class="hl-0">}</span><br/><br/><span class="hl-13">&lt;</span><span class="hl-12">ScuteSignIn</span><span class="hl-0"> </span><span class="hl-14">appearance</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">illustration:</span><span class="hl-11"> </span><span class="hl-13">&lt;</span><span class="hl-12">Mascot</span><span class="hl-11"> </span><span class="hl-13">/&gt;</span><span class="hl-11"> }</span><span class="hl-5">}</span><span class="hl-0"> </span><span class="hl-13">/&gt;</span><span class="hl-0">;</span>
 </code><button>Copy</button></pre>
-<p>Make sure that you are in the right package to publish and run</p>
-<pre><code class="language-bash"><span class="hl-3">pnpm</span><span class="hl-0"> </span><span class="hl-4">publish</span><span class="hl-0"> </span><span class="hl-5">--registry</span><span class="hl-0"> </span><span class="hl-4">http://localhost:4873</span>
+<a id="md:scuteauthgate" class="tsd-anchor"></a><h2><a href="#md:scuteauthgate">ScuteAuthGate</a></h2><p>Renders its children once the visitor is signed in, and <code>ScuteSignIn</code> until then.</p>
+<pre><code class="language-tsx"><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">ScuteAuthGate</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/auth-ui-react&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-13">&lt;</span><span class="hl-12">ScuteAuthGate</span><br/><span class="hl-0">  </span><span class="hl-14">appearance</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">logo:</span><span class="hl-11"> </span><span class="hl-4">&quot;/logo.svg&quot;</span><span class="hl-11">, </span><span class="hl-1">theme:</span><span class="hl-11"> </span><span class="hl-4">&quot;auto&quot;</span><span class="hl-11"> }</span><span class="hl-5">}</span><br/><span class="hl-0">  </span><span class="hl-14">legal</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">termsUrl:</span><span class="hl-11"> </span><span class="hl-4">&quot;/terms&quot;</span><span class="hl-11">, </span><span class="hl-1">privacyUrl:</span><span class="hl-11"> </span><span class="hl-4">&quot;/privacy&quot;</span><span class="hl-11"> }</span><span class="hl-5">}</span><br/><span class="hl-0">  </span><span class="hl-14">onAuthenticated</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">(</span><span class="hl-1">user</span><span class="hl-11">) </span><span class="hl-5">=&gt;</span><span class="hl-11"> </span><span class="hl-3">track</span><span class="hl-11">(</span><span class="hl-4">&quot;signed_in&quot;</span><span class="hl-11">, </span><span class="hl-1">user</span><span class="hl-11">.</span><span class="hl-1">id</span><span class="hl-11">)</span><span class="hl-5">}</span><br/><span class="hl-13">&gt;</span><br/><span class="hl-0">  </span><span class="hl-13">&lt;</span><span class="hl-12">App</span><span class="hl-0"> </span><span class="hl-13">/&gt;</span><br/><span class="hl-13">&lt;/</span><span class="hl-12">ScuteAuthGate</span><span class="hl-13">&gt;</span><span class="hl-0">;</span>
 </code><button>Copy</button></pre>
-<p>Then add this to namespace and registry to the example project&#39;s <code>.npmrc</code>  in order to test.  </p>
-<p>With this package manager will download packages from the local registry instead of <code>npmjs.com</code></p>
-<pre><code class="language-bash"><span class="hl-3">@scute:registry</span><span class="hl-0">=http://localhost:4873</span>
+<table>
+<thead>
+<tr>
+<th>Prop</th>
+<th>Type</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>children</code></td>
+<td><code>ReactNode</code></td>
+<td>Your app, shown once signed in.</td>
+</tr>
+<tr>
+<td><code>appearance</code>, <code>copy</code>, <code>legal</code>, <code>methods</code></td>
+<td>as <code>ScuteSignIn</code></td>
+<td>Passed to the sign-in.</td>
+</tr>
+<tr>
+<td><code>onAuthenticated</code></td>
+<td><code>(user) =&gt; void</code></td>
+<td>Called once each time the app is shown after a sign-in.</td>
+</tr>
+<tr>
+<td><code>renderView</code></td>
+<td><code>(view, auth) =&gt; ReactNode | null</code></td>
+<td>Draw a step yourself; return <code>null</code> to keep the default for that step. <code>auth</code> is the <code>useScuteAuthFlow()</code> result.</td>
+</tr>
+</tbody></table>
+<a id="md:nextjs-app-router" class="tsd-anchor"></a><h2><a href="#md:nextjs-app-router">Next.js (App Router)</a></h2><p>Create the client once, in a client component:</p>
+<pre><code class="language-tsx"><span class="hl-7">// app/providers.tsx</span><br/><span class="hl-4">&quot;use client&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">useState</span><span class="hl-0">, </span><span class="hl-2">type</span><span class="hl-0"> </span><span class="hl-1">ReactNode</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;react&quot;</span><span class="hl-0">;</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">createClientComponentClient</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/nextjs-handlers&quot;</span><span class="hl-0">;</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">AuthContextProvider</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/react-hooks&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-2">export</span><span class="hl-0"> </span><span class="hl-5">function</span><span class="hl-0"> </span><span class="hl-3">Providers</span><span class="hl-0">({ </span><span class="hl-1">children</span><span class="hl-0"> }: { </span><span class="hl-1">children</span><span class="hl-0">: </span><span class="hl-12">ReactNode</span><span class="hl-0"> }) {</span><br/><span class="hl-0">  </span><span class="hl-5">const</span><span class="hl-0"> [</span><span class="hl-6">scuteClient</span><span class="hl-0">] = </span><span class="hl-3">useState</span><span class="hl-0">(() </span><span class="hl-5">=&gt;</span><br/><span class="hl-0">    </span><span class="hl-3">createClientComponentClient</span><span class="hl-0">({</span><br/><span class="hl-0">      </span><span class="hl-1">appId:</span><span class="hl-0"> </span><span class="hl-1">process</span><span class="hl-0">.</span><span class="hl-1">env</span><span class="hl-0">.</span><span class="hl-6">NEXT_PUBLIC_SCUTE_APP_ID</span><span class="hl-0">,</span><br/><span class="hl-0">      </span><span class="hl-1">baseUrl:</span><span class="hl-0"> </span><span class="hl-1">process</span><span class="hl-0">.</span><span class="hl-1">env</span><span class="hl-0">.</span><span class="hl-6">NEXT_PUBLIC_SCUTE_BASE_URL</span><span class="hl-0">,</span><br/><span class="hl-0">    })</span><br/><span class="hl-0">  );</span><br/><span class="hl-0">  </span><span class="hl-2">return</span><span class="hl-0"> </span><span class="hl-13">&lt;</span><span class="hl-12">AuthContextProvider</span><span class="hl-0"> </span><span class="hl-14">scuteClient</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-1">scuteClient</span><span class="hl-5">}</span><span class="hl-13">&gt;</span><span class="hl-5">{</span><span class="hl-1">children</span><span class="hl-5">}</span><span class="hl-13">&lt;/</span><span class="hl-12">AuthContextProvider</span><span class="hl-13">&gt;</span><span class="hl-0">;</span><br/><span class="hl-0">}</span>
 </code><button>Copy</button></pre>
-<a id="md:changesets-and-release-flow" class="tsd-anchor"></a><h3><a href="#md:changesets-and-release-flow"><code>changesets</code> and release flow</a></h3><a id="md:adding-new-changesets" class="tsd-anchor"></a><h4><a href="#md:adding-new-changesets">Adding new changesets</a></h4><p>To generate a new changeset, run <code>pnpm changeset</code> in the root of the repository. The generated markdown files in the <code>.changeset</code> directory should be committed to the repository.</p>
-<a id="md:releasing-changes" class="tsd-anchor"></a><h4><a href="#md:releasing-changes">Releasing changes</a></h4><ol>
-<li>Run <code>pnpm changeset version</code>. This will bump the versions of the packages previously specified with <code>pnpm changeset</code> (and any dependents of those) and update the changelog files.</li>
-<li>Run <code>pnpm install</code>. This will update the lockfile and rebuild packages.</li>
-<li>Commit the changes.</li>
-<li>Run <code>pnpm publish -r</code>. This command will publish all packages that have bumped versions not yet present in the registry.</li>
-<li>You can publish to local <code>verdaccio</code> registry server with <code>pnpm publish -r --registry http://localhost:4873</code> command.</li>
-</ol>
-<p>Docs</p>
-<p><a href="https://github.com/changesets/changesets/blob/main/docs/intro-to-using-changesets.md">https://github.com/changesets/changesets/blob/main/docs/intro-to-using-changesets.md</a></p>
-<p><a href="https://pnpm.io/using-changesets">https://pnpm.io/using-changesets</a></p>
+<pre><code class="language-tsx"><span class="hl-7">// app/layout.tsx</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">Providers</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;./providers&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-2">export</span><span class="hl-0"> </span><span class="hl-2">default</span><span class="hl-0"> </span><span class="hl-5">function</span><span class="hl-0"> </span><span class="hl-3">RootLayout</span><span class="hl-0">({ </span><span class="hl-1">children</span><span class="hl-0"> }: { </span><span class="hl-1">children</span><span class="hl-0">: </span><span class="hl-12">React</span><span class="hl-0">.</span><span class="hl-12">ReactNode</span><span class="hl-0"> }) {</span><br/><span class="hl-0">  </span><span class="hl-2">return</span><span class="hl-0"> (</span><br/><span class="hl-0">    </span><span class="hl-13">&lt;</span><span class="hl-17">html</span><span class="hl-0"> </span><span class="hl-14">lang</span><span class="hl-0">=</span><span class="hl-4">&quot;en&quot;</span><span class="hl-13">&gt;</span><br/><span class="hl-0">      </span><span class="hl-13">&lt;</span><span class="hl-17">body</span><span class="hl-13">&gt;</span><br/><span class="hl-0">        </span><span class="hl-13">&lt;</span><span class="hl-12">Providers</span><span class="hl-13">&gt;</span><span class="hl-5">{</span><span class="hl-1">children</span><span class="hl-5">}</span><span class="hl-13">&lt;/</span><span class="hl-12">Providers</span><span class="hl-13">&gt;</span><br/><span class="hl-0">      </span><span class="hl-13">&lt;/</span><span class="hl-17">body</span><span class="hl-13">&gt;</span><br/><span class="hl-0">    </span><span class="hl-13">&lt;/</span><span class="hl-17">html</span><span class="hl-13">&gt;</span><br/><span class="hl-0">  );</span><br/><span class="hl-0">}</span>
+</code><button>Copy</button></pre>
+<pre><code class="language-tsx"><span class="hl-7">// app/sign-in/page.tsx</span><br/><span class="hl-4">&quot;use client&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">useRouter</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;next/navigation&quot;</span><span class="hl-0">;</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">ScuteSignIn</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/auth-ui-react&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-2">export</span><span class="hl-0"> </span><span class="hl-2">default</span><span class="hl-0"> </span><span class="hl-5">function</span><span class="hl-0"> </span><span class="hl-3">SignInPage</span><span class="hl-0">() {</span><br/><span class="hl-0">  </span><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-6">router</span><span class="hl-0"> = </span><span class="hl-3">useRouter</span><span class="hl-0">();</span><br/><span class="hl-0">  </span><span class="hl-2">return</span><span class="hl-0"> (</span><br/><span class="hl-0">    </span><span class="hl-13">&lt;</span><span class="hl-12">ScuteSignIn</span><br/><span class="hl-0">      </span><span class="hl-14">appearance</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">logo:</span><span class="hl-11"> </span><span class="hl-4">&quot;/logo.svg&quot;</span><span class="hl-11">, </span><span class="hl-1">theme:</span><span class="hl-11"> </span><span class="hl-4">&quot;auto&quot;</span><span class="hl-11"> }</span><span class="hl-5">}</span><br/><span class="hl-0">      </span><span class="hl-14">legal</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">termsUrl:</span><span class="hl-11"> </span><span class="hl-4">&quot;/terms&quot;</span><span class="hl-11">, </span><span class="hl-1">privacyUrl:</span><span class="hl-11"> </span><span class="hl-4">&quot;/privacy&quot;</span><span class="hl-11"> }</span><span class="hl-5">}</span><br/><span class="hl-0">      </span><span class="hl-14">onSignedIn</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">() </span><span class="hl-5">=&gt;</span><span class="hl-11"> </span><span class="hl-1">router</span><span class="hl-11">.</span><span class="hl-3">replace</span><span class="hl-11">(</span><span class="hl-4">&quot;/dashboard&quot;</span><span class="hl-11">)</span><span class="hl-5">}</span><br/><span class="hl-0">    </span><span class="hl-13">/&gt;</span><br/><span class="hl-0">  );</span><br/><span class="hl-0">}</span>
+</code><button>Copy</button></pre>
+<p>Magic links land on the page set as your app&#39;s callback URL: render <code>ScuteSignIn</code> (or <code>ScuteAuthGate</code>) there too, and it finishes the sign-in.</p>
+<a id="md:react-vite-and-others" class="tsd-anchor"></a><h2><a href="#md:react-vite-and-others">React (Vite and others)</a></h2><pre><code class="language-tsx"><span class="hl-7">// main.tsx</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">useState</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;react&quot;</span><span class="hl-0">;</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">createRoot</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;react-dom/client&quot;</span><span class="hl-0">;</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">AuthContextProvider</span><span class="hl-0">, </span><span class="hl-1">createClient</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/react-hooks&quot;</span><span class="hl-0">;</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">ScuteAuthGate</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;@scute/auth-ui-react&quot;</span><span class="hl-0">;</span><br/><span class="hl-2">import</span><span class="hl-0"> { </span><span class="hl-1">App</span><span class="hl-0"> } </span><span class="hl-2">from</span><span class="hl-0"> </span><span class="hl-4">&quot;./App&quot;</span><span class="hl-0">;</span><br/><br/><span class="hl-5">function</span><span class="hl-0"> </span><span class="hl-3">Root</span><span class="hl-0">() {</span><br/><span class="hl-0">  </span><span class="hl-5">const</span><span class="hl-0"> [</span><span class="hl-6">scuteClient</span><span class="hl-0">] = </span><span class="hl-3">useState</span><span class="hl-0">(() </span><span class="hl-5">=&gt;</span><br/><span class="hl-0">    </span><span class="hl-3">createClient</span><span class="hl-0">({</span><br/><span class="hl-0">      </span><span class="hl-1">appId:</span><span class="hl-0"> </span><span class="hl-2">import</span><span class="hl-0">.</span><span class="hl-1">meta</span><span class="hl-0">.</span><span class="hl-1">env</span><span class="hl-0">.</span><span class="hl-6">VITE_SCUTE_APP_ID</span><span class="hl-0">,</span><br/><span class="hl-0">      </span><span class="hl-1">baseUrl:</span><span class="hl-0"> </span><span class="hl-2">import</span><span class="hl-0">.</span><span class="hl-1">meta</span><span class="hl-0">.</span><span class="hl-1">env</span><span class="hl-0">.</span><span class="hl-6">VITE_SCUTE_BASE_URL</span><span class="hl-0">,</span><br/><span class="hl-0">    })</span><br/><span class="hl-0">  );</span><br/><span class="hl-0">  </span><span class="hl-2">return</span><span class="hl-0"> (</span><br/><span class="hl-0">    </span><span class="hl-13">&lt;</span><span class="hl-12">AuthContextProvider</span><span class="hl-0"> </span><span class="hl-14">scuteClient</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-1">scuteClient</span><span class="hl-5">}</span><span class="hl-13">&gt;</span><br/><span class="hl-0">      </span><span class="hl-13">&lt;</span><span class="hl-12">ScuteAuthGate</span><span class="hl-0"> </span><span class="hl-14">appearance</span><span class="hl-0">=</span><span class="hl-5">{</span><span class="hl-11">{ </span><span class="hl-1">theme:</span><span class="hl-11"> </span><span class="hl-4">&quot;auto&quot;</span><span class="hl-11">, </span><span class="hl-1">layout:</span><span class="hl-11"> </span><span class="hl-4">&quot;card&quot;</span><span class="hl-11"> }</span><span class="hl-5">}</span><span class="hl-13">&gt;</span><br/><span class="hl-0">        </span><span class="hl-13">&lt;</span><span class="hl-12">App</span><span class="hl-0"> </span><span class="hl-13">/&gt;</span><br/><span class="hl-0">      </span><span class="hl-13">&lt;/</span><span class="hl-12">ScuteAuthGate</span><span class="hl-13">&gt;</span><br/><span class="hl-0">    </span><span class="hl-13">&lt;/</span><span class="hl-12">AuthContextProvider</span><span class="hl-13">&gt;</span><br/><span class="hl-0">  );</span><br/><span class="hl-0">}</span><br/><br/><span class="hl-3">createRoot</span><span class="hl-0">(</span><span class="hl-1">document</span><span class="hl-0">.</span><span class="hl-3">getElementById</span><span class="hl-0">(</span><span class="hl-4">&quot;root&quot;</span><span class="hl-0">)!).</span><span class="hl-3">render</span><span class="hl-0">(</span><span class="hl-13">&lt;</span><span class="hl-12">Root</span><span class="hl-0"> </span><span class="hl-13">/&gt;</span><span class="hl-0">);</span>
+</code><button>Copy</button></pre>
+<a id="md:headless-usescuteauthflow" class="tsd-anchor"></a><h2><a href="#md:headless-usescuteauthflow">Headless: useScuteAuthFlow</a></h2><p><code>useScuteAuthFlow()</code> drives the same flow with no UI. Render by <code>view</code>:</p>
+<p><code>loading</code>, <code>login</code>, <code>magic_pending</code>, <code>magic_verifying</code>, <code>verification_required</code>, <code>otp_input</code>, <code>webauthn_verify</code>, <code>webauthn_register</code>, <code>webauthn_register_success</code>, <code>mfa_verify</code>, <code>mfa_enroll</code>, <code>mfa_enroll_suggest</code>, <code>error</code>, <code>authenticated</code>.</p>
+<p>It returns the state (<code>identifier</code>, <code>error</code>, <code>errorCode</code>, <code>submitting</code>, <code>resendIn</code>, <code>resent</code>, <code>resendError</code>, <code>verification</code>, <code>mfaChallenge</code>, <code>mfaAvailableMethods</code>, <code>passkeysSupported</code>, ...) and the actions (<code>submitIdentifier</code>, <code>submitOtp</code>, <code>submitVerificationCode</code>, <code>resend</code>, <code>submitMfaCode</code>, <code>resendMfaCode</code>, <code>switchMfaMethod</code>, <code>registerPasskey</code>, <code>skipPasskey</code>, <code>skipMfaEnrollment</code>, <code>signInWithOAuth</code>, <code>retry</code>, <code>signOut</code>). <code>errorCode</code> carries the API&#39;s code for a refusal: <code>user_banned</code>, <code>user_suspended</code>, <code>ip_blocked</code> or <code>country_blocked</code>.</p>
+<a id="md:notes" class="tsd-anchor"></a><h2><a href="#md:notes">Notes</a></h2><ul>
+<li>The stylesheet is an inline <code>&lt;style&gt;</code> element and the theme is set with inline CSS variables. A Content Security Policy that blocks inline styles (<code>style-src</code> without <code>&#39;unsafe-inline&#39;</code>) blocks them too.</li>
+<li>Passkeys need a secure page (https, or localhost while developing).</li>
+</ul>
 </section></div>
 <div class="col-sidebar">
 <div class="page-menu">
@@ -71,24 +226,22 @@
 <ul>
 <li>
 <ul>
-<li><a href="#md:scute-monorepo"><span>Scute <wbr/>Monorepo</span></a></li>
+<li><a href="#md:scuteauth-ui-react"><span>@scute/auth-<wbr/>ui-<wbr/>react</span></a></li>
 <li>
 <ul>
-<li><a href="#md:monorepo-structure"><span>Monorepo <wbr/>Structure</span></a></li>
-<li><a href="#md:examples"><span>Examples</span></a></li>
-<li><a href="#md:development-guide"><span>Development <wbr/>Guide</span></a></li>
+<li><a href="#md:install"><span>Install</span></a></li>
+<li><a href="#md:scutesignin"><span>Scute<wbr/>Sign<wbr/>In</span></a></li>
 <li>
 <ul>
-<li><a href="#md:verdaccio"><span>verdaccio</span></a></li>
-<li>
-<ul>
-<li><a href="#md:start-verdaccio-local-registry-server"><span>Start verdaccio <wbr/>Local <wbr/>Registry <wbr/>Server</span></a></li>
-<li><a href="#md:publish-packages-to-verdaccio-local-registry"><span>Publish packages to verdaccio local registry</span></a></li></ul></li>
-<li><a href="#md:changesets-and-release-flow"><span>changesets and release flow</span></a></li>
-<li>
-<ul>
-<li><a href="#md:adding-new-changesets"><span>Adding new changesets</span></a></li>
-<li><a href="#md:releasing-changes"><span>Releasing changes</span></a></li></ul></li></ul></li></ul></li></ul></li></ul></div></details></div>
+<li><a href="#md:props"><span>Props</span></a></li>
+<li><a href="#md:what-it-handles"><span>What it handles</span></a></li>
+<li><a href="#md:theming-further"><span>Theming further</span></a></li>
+<li><a href="#md:your-own-illustration"><span>Your own illustration</span></a></li></ul></li>
+<li><a href="#md:scuteauthgate"><span>Scute<wbr/>Auth<wbr/>Gate</span></a></li>
+<li><a href="#md:nextjs-app-router"><span>Next.js (<wbr/>App <wbr/>Router)</span></a></li>
+<li><a href="#md:react-vite-and-others"><span>React (<wbr/>Vite and others)</span></a></li>
+<li><a href="#md:headless-usescuteauthflow"><span>Headless: use<wbr/>Scute<wbr/>Auth<wbr/>Flow</span></a></li>
+<li><a href="#md:notes"><span>Notes</span></a></li></ul></li></ul></li></ul></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="../index.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-4"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-namespace)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M9.33 16V7.24H10.77L13.446 14.74C13.43 14.54 13.41 14.296 13.386 14.008C13.37 13.712 13.354 13.404 13.338 13.084C13.33 12.756 13.326 12.448 13.326 12.16V7.24H14.37V16H12.93L10.266 8.5C10.282 8.692 10.298 8.936 10.314 9.232C10.33 9.52 10.342 9.828 10.35 10.156C10.366 10.476 10.374 10.784 10.374 11.08V16H9.33Z" fill="var(--color-text)"></path></g></svg><span>Scute</span></a>
 <ul class="tsd-small-nested-navigation">
