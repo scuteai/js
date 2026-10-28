@@ -6,9 +6,19 @@
     "create-scute-app": "src/index.mjs"
   },
   "type": "module",
+  "exports": {
+    "./recipes": {
+      "types": "./src/recipes.d.ts",
+      "default": "./src/recipes.mjs"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "src"
   ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "keywords": [
     "scute",
     "auth",
