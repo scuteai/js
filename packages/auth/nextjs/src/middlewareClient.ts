@@ -3,6 +3,7 @@ import type { NextRequest, NextResponse } from "next/server";
 import { parse as parseCookies, serialize as serializeCookie } from "cookie";
 import { splitCookiesString } from "set-cookie-parser";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
+import { clientIpFor, nextRequestIp } from "./utils";
 
 class ScuteNextMiddlewareStorage extends ScuteCookieStorage {
   constructor(
@@ -112,6 +113,8 @@ export const createMiddlewareClient = (
 ) => {
   return createScuteClient({
     ...config,
+    // `request.ip` where Next.js provides it; otherwise pass `clientIp`.
+    clientIp: clientIpFor(config, nextRequestIp(context.req)),
     preferences: {
       ...config?.preferences,
       sessionStorageAdapter: new ScuteNextMiddlewareStorage(context, {

@@ -7,6 +7,7 @@ import type {
   NextApiResponse,
 } from "next";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
+import { clientIpFor } from "./utils";
 
 class ScuteNextServerStorage extends ScuteCookieStorage {
   constructor(
@@ -67,6 +68,9 @@ export const createPagesServerClient = (
 ) => {
   return createScuteClient({
     ...config,
+    // The address that connected to this server. Behind a proxy, pass
+    // `clientIp` (see the README).
+    clientIp: clientIpFor(config, context.req.socket?.remoteAddress),
     preferences: {
       ...config?.preferences,
       sessionStorageAdapter: new ScuteNextServerStorage(context, {
