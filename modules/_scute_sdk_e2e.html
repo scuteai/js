@@ -63,6 +63,68 @@ Optional, for the dual-app coexistence specs:<pre><code><span class="hl-6">NEXT_
 <li><strong>HTTPS / <code>SameSite=None; Secure</code></strong> — localhost-only. Tagged for the staging smoke.</li>
 </ul>
 <a id="md:wiring-this-into-ci" class="tsd-anchor"></a><h2><a href="#md:wiring-this-into-ci">Wiring this into CI</a></h2><p>Add a job that boots Rails (test mode), boots the example app, runs <code>pnpm test</code>. Recommended split from the unit <code>pnpm test</code> to keep the unit loop fast.</p>
+<hr>
+<a id="md:settings-suite-every-sign-in-and-mfa-setting-in-real-browsers" class="tsd-anchor"></a><h1><a href="#md:settings-suite-every-sign-in-and-mfa-setting-in-real-browsers">Settings suite: every sign-in and MFA setting, in real browsers</a></h1><p><code>settings/</code> drives <code>ScuteSignIn</code> and the SDK (the packages&#39; built <code>dist</code>, as
+an app ships them) in Chromium and WebKit against a real Scute API, and
+changes the app&#39;s settings between tests the way the dashboard does
+(<code>PATCH /v1/apps/:id</code>). It covers: email codes, sign-in links (the waiting
+page and the landing page), passkeys (Chromium&#39;s virtual authenticator),
+MFA policy, methods, switching, backup codes and the grace period, session
+lifetimes, refresh and sign-out, sessions ended on the server, refusals
+(sign-up off, banned, suspended, deactivated, IP rules, rate limits, attack
+protection&#39;s code step), the device fingerprint and trusted devices, and,
+read only, a dashboard&#39;s sign-in page.</p>
+<p>It never runs against production (it refuses <code>api.scute.io</code>) and never
+emails or texts anyone: every address is a test identity
+(<code>...+scute_test@example.com</code>, code <code>424242</code>, the app has <code>test_identities</code>
+on), and sign-in links are made on the server and opened by the test.</p>
+<a id="md:what-it-needs" class="tsd-anchor"></a><h2><a href="#md:what-it-needs">What it needs</a></h2><ul>
+<li>A Scute API that allows test identities (a sandbox workspace, or
+<code>SCUTE_TEST_IDENTITIES=enabled</code>).</li>
+<li>A way to run <code>rails runner</code> on that API. The suite keeps one runner up for
+the whole run and only calls the operations in <code>settings/lib/server.rb</code>,
+which touch nothing but the suite&#39;s own workspace
+(<code>e2e-mfa SDK browser tests</code>), its app (<code>e2e-mfa sdk browser</code>, origin
+<code>http://localhost:4317</code>) and the people the tests sign up.</li>
+</ul>
+<p>Configuration (environment variables, or a <code>KEY=VALUE</code> file outside the repo
+at <code>SCUTE_E2E_ENV_FILE</code>, default <code>../.sdk-live/e2e.env</code> next to the js
+checkout; never commit it):</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SCUTE_E2E_API_URL</code></td>
+<td>The API&#39;s base URL</td>
+</tr>
+<tr>
+<td><code>SCUTE_E2E_CONSOLE</code></td>
+<td>The command that runs <code>rails runner</code> there; <code>{script}</code> is replaced by the (quoted) script, e.g. <code>cd ../api &amp;&amp; bin/rails runner {script}</code></td>
+</tr>
+<tr>
+<td><code>SCUTE_E2E_PORT</code></td>
+<td>The test page&#39;s port (default 4317)</td>
+</tr>
+<tr>
+<td><code>SCUTE_E2E_BROKER_PORT</code></td>
+<td>The local runner broker&#39;s port (default 4318)</td>
+</tr>
+<tr>
+<td><code>SCUTE_E2E_DASHBOARD_URL</code></td>
+<td>Optional: a dashboard whose sign-in is checked, read only</td>
+</tr>
+</tbody></table>
+<a id="md:run-it-1" class="tsd-anchor"></a><h2><a href="#md:run-it-1">Run it</a></h2><pre><code class="language-bash"><span class="hl-3">pnpm</span><span class="hl-0"> </span><span class="hl-4">test:e2e:settings</span><span class="hl-0">            </span><span class="hl-7"># from the repo root: builds the packages, then runs</span><br/><span class="hl-7"># or, in packages/auth/__e2e__ after a build:</span><br/><span class="hl-3">pnpm</span><span class="hl-0"> </span><span class="hl-4">test:settings</span><br/><span class="hl-3">pnpm</span><span class="hl-0"> </span><span class="hl-4">test:settings</span><span class="hl-0"> </span><span class="hl-5">--</span><span class="hl-0"> </span><span class="hl-5">--project</span><span class="hl-0"> </span><span class="hl-4">chromium</span><span class="hl-0"> </span><span class="hl-4">mfa</span><span class="hl-0">   </span><span class="hl-7"># one browser, one file</span>
+</code><button>Copy</button></pre>
+<p>Playwright starts the test page (Vite, <code>settings/app</code>) and the runner
+broker (<code>settings/lib/broker.mjs</code>, about 30 seconds to start). Tests run one
+at a time: they share one app and reset its settings first. Tests tagged
+<code>@webkit</code> also run in WebKit. Each test fails if its page sends more than
+150 API requests (a refresh or poll loop).</p>
 </section></div>
 <div class="col-sidebar">
 <div class="page-menu">
@@ -93,7 +155,12 @@ Optional, for the dual-app coexistence specs:<pre><code><span class="hl-6">NEXT_
 <li><a href="#md:run-it"><span>Run it</span></a></li>
 <li><a href="#md:test-surface"><span>Test surface</span></a></li>
 <li><a href="#md:what-this-suite-deliberately-doesn39t-cover"><span>What this suite deliberately doesn&#39;t cover</span></a></li>
-<li><a href="#md:wiring-this-into-ci"><span>Wiring this into CI</span></a></li></ul></li></ul></li></ul></div></details></div>
+<li><a href="#md:wiring-this-into-ci"><span>Wiring this into CI</span></a></li></ul></li>
+<li><a href="#md:settings-suite-every-sign-in-and-mfa-setting-in-real-browsers"><span>Settings suite: every sign-<wbr/>in and MFA setting, in real browsers</span></a></li>
+<li>
+<ul>
+<li><a href="#md:what-it-needs"><span>What it needs</span></a></li>
+<li><a href="#md:run-it-1"><span>Run it</span></a></li></ul></li></ul></li></ul></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="../index.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-4"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-namespace)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M9.33 16V7.24H10.77L13.446 14.74C13.43 14.54 13.41 14.296 13.386 14.008C13.37 13.712 13.354 13.404 13.338 13.084C13.33 12.756 13.326 12.448 13.326 12.16V7.24H14.37V16H12.93L10.266 8.5C10.282 8.692 10.298 8.936 10.314 9.232C10.33 9.52 10.342 9.828 10.35 10.156C10.366 10.476 10.374 10.784 10.374 11.08V16H9.33Z" fill="var(--color-text)"></path></g></svg><span>Scute</span></a>
 <ul class="tsd-small-nested-navigation">
