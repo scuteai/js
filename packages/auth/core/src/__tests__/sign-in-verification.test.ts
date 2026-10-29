@@ -92,7 +92,7 @@ describe("verifyMagicLinkToken with attack protection", () => {
     const { client } = await setup();
     server.on("PATCH", AUTHENTICATE, { status: 202, body: REQUIRED });
     const result = await client.signInWithMagicLinkToken(magicLinkToken());
-    expect(result.data).toMatchObject({ verificationRequired: true });
+    expect("data" in result ? result.data : null).toMatchObject({ verificationRequired: true });
     expect(localStorage.getItem(KEYS.access)).toBeNull();
   });
 });
