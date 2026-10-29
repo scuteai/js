@@ -41,6 +41,7 @@
     "scrub-oauth-token",
     "sdk-hardening-v2",
     "signin-app-data",
+    "signin-settings-e2e",
     "sso-required-error"
   ]
 }

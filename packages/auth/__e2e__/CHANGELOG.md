@@ -1,5 +1,14 @@
 # @scute/sdk-e2e
 
+## 0.1.1-next.0
+
+### Patch Changes
+
+- Updated dependencies [f405658]
+  - @scute/auth-ui-react@0.4.0-next.5
+  - @scute/js-core@0.10.0-next.5
+  - @scute/react-hooks@0.9.0-next.5
+
 ## 0.1.0
 
 ### Minor Changes
