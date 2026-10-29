@@ -38,6 +38,7 @@
     "mcp-gateway-human-tools",
     "mcp-gateway",
     "mfa-reverify",
+    "nextjs-csrf-after-sign-out",
     "scrub-oauth-token",
     "sdk-hardening-v2",
     "signin-app-data",
