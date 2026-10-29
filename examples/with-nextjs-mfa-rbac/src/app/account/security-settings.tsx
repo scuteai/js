@@ -63,9 +63,10 @@ export function SecuritySettings({ email }: { email: string }) {
           ))}
       </ul>
 
+      {/* Some refusals come without a message: say something useful anyway. */}
       {secure.error && !secure.activeMethod && (
         <p role="alert" className="error">
-          {secure.error.message}
+          {secure.error.message || "That didn't work. Try again."}
         </p>
       )}
     </div>
@@ -166,7 +167,7 @@ function MethodRow({ method, enrolled, secure, email }: { method: SecureMethod; 
 
           {secure.error && (
             <p role="alert" className="error">
-              {secure.error.message}
+              {secure.error.message || "That didn't work. Try again."}
             </p>
           )}
 
