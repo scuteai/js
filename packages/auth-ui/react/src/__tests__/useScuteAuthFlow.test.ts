@@ -333,7 +333,8 @@ describe("magic link callback", () => {
     expect(result.current.flow.mfaChallenge).toEqual(mfaRequiredData.mfaChallenge);
     expect(result.current.flow.mfaAvailableMethods).toEqual(["totp", "backup_code"]);
     expect(result.current.flow.mfaGracePeriod).toBe(false);
-    expect(client.getAppData).not.toHaveBeenCalled();
+    // Read once at start (what the app takes to sign in), not for a passkey offer.
+    expect(client.getAppData).toHaveBeenCalledTimes(1);
     expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
   });
 
@@ -609,6 +610,68 @@ describe("magic link polling", () => {
       await vi.advanceTimersByTimeAsync(20_000);
     });
     expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(3);
+  });
+
+  it("asks for MFA when the account needs it, instead of signing in", async () => {
+    const client = createFakeClient();
+    magicLinkSignIn(client, "ml_mfa");
+    client.getMagicLinkStatus.mockResolvedValueOnce({
+      data: {
+        mfa_required: true,
+        app_user_id: "au_1",
+        mfa_challenge: { token: "chl_1", method: "totp" },
+        available_methods: ["totp", "backup_codes"],
+      },
+      error: null,
+    });
+    const { result } = await atMagicPending(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    expect(result.current.flow.view).toBe("mfa_verify");
+    expect(result.current.flow.mfaChallenge).toEqual({ token: "chl_1", method: "totp" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops with a message when the API wants MFA finished on the device that opened the link", async () => {
+    const client = createFakeClient();
+    magicLinkSignIn(client);
+    client.getMagicLinkStatus.mockResolvedValueOnce({
+      data: null,
+      error: { message: "", code: 403, json: { error: "Finish signing in on the device that opened the link", error_code: "mfa_required" } },
+    });
+    const { result } = await atMagicPending(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(result.current.flow.view).toBe("error");
+    expect(result.current.flow.errorCode).toBe("mfa_required");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
+    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+  });
+
+  it("stops with a message when the link was opened too long ago for this page", async () => {
+    const client = createFakeClient();
+    magicLinkSignIn(client);
+    client.getMagicLinkStatus.mockResolvedValueOnce({ data: { message: "ok" }, error: null });
+    const { result } = await atMagicPending(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    expect(result.current.flow.view).toBe("error");
+    expect(result.current.flow.error).toBe("The sign-in link timed out. Please try again.");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
   });
 
   it("does not poll on MAGIC_PENDING until a magic link id is known", async () => {
@@ -1018,6 +1081,18 @@ describe("MFA views", () => {
     const { client, result } = await renderAtLogin();
     act(() => client.emit(event));
     expect(result.current.flow.view).toBe(view);
+  });
+
+  it("the grace period nudge stays up when the sign-in completes, until Continue", async () => {
+    const { client, result } = await renderAtLogin();
+    client.pendingMfaEnrollmentSuggestion = { mfa_grace_days_remaining: 5, available_methods: ["totp"] };
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED));
+    await act(async () => client.emitSignedIn());
+    await flush();
+    expect(result.current.flow.view).toBe("mfa_enroll_suggest");
+    expect(result.current.flow.mfaGraceDaysRemaining).toBe(5);
+    act(() => result.current.flow.skipMfaEnrollment());
+    expect(result.current.flow.view).toBe("authenticated");
   });
 
   it("submitMfaCode verifies against the stored challenge token and authenticates", async () => {

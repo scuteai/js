@@ -46,6 +46,7 @@ import {
   identifyAuthenticationError,
   identifyRegistrationError,
   InvalidMagicLinkError,
+  MagicLinkWindowClosedError,
   LoginRequiredError,
   InvalidAuthTokenError,
   NewDeviceError,
@@ -253,29 +254,46 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         DEFAULT_PREFERENCES.fingerprinting;
 
       if (fingerprinting) {
-        setTimeout(() => {
-          import("@fingerprintjs/fingerprintjs").then(async ({ load }) => {
-            const fp = await load();
-            const { visitorId } = await fp.get();
+        // The device fingerprint goes on every request that changes
+        // something. It loads in the background; a request sent before it is
+        // ready waits for it (FINGERPRINT_WAIT_MS at most), so the first one
+        // (a sign-in link opened right as the page loads) carries it too.
+        let visitorId: string | null = null;
+        const loaded = new Promise<void>((resolve) => {
+          setTimeout(() => {
+            import("@fingerprintjs/fingerprintjs")
+              .then(async ({ load }) => {
+                const fp = await load();
+                visitorId = (await fp.get()).visitorId;
+              })
+              .catch(() => {})
+              .finally(resolve);
+          }, 0);
+        });
+        const ready = Promise.race([
+          loaded,
+          new Promise<void>((resolve) => setTimeout(resolve, FINGERPRINT_WAIT_MS)),
+        ]);
 
-            this.wretcher._middlewares.push((next) => (url, opts) => {
-              const options: RequestInit = opts;
+        this.wretcher._middlewares.push((next) => async (url, opts) => {
+          const options: RequestInit = opts;
 
-              if (
-                !options.method ||
-                options.method === "GET" ||
-                options.method === "get"
-              ) {
-                return next(url, opts);
-              }
+          if (
+            !options.method ||
+            options.method === "GET" ||
+            options.method === "get"
+          ) {
+            return next(url, opts);
+          }
 
-              options.headers = new Headers(options.headers);
-              options.headers.set("X-Fingerprint", visitorId);
+          if (!visitorId) await ready;
+          if (visitorId) {
+            options.headers = new Headers(options.headers);
+            options.headers.set("X-Fingerprint", visitorId);
+          }
 
-              return next(url, opts);
-            });
-          });
-        }, 0);
+          return next(url, opts);
+        });
       }
     }
 
@@ -747,10 +765,56 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       await this.getMagicLinkStatus(id);
 
     if (magicStatusError) {
-      return { error: magicStatusError };
+      return { data: null, error: magicStatusError };
     }
 
-    return this.signInWithTokenPayload(payload);
+    return this.signInWithMagicLinkStatus(payload);
+  }
+
+  /**
+   * Finish a sign-in from a magic link status answer
+   * ({@link getMagicLinkStatus} once the link was opened): signs in, or asks
+   * for MFA (`data.mfaRequired`, MFA_REQUIRED), or answers
+   * MagicLinkWindowClosedError when the link was opened too long ago.
+   */
+  async signInWithMagicLinkStatus(payload: ScuteTokenPayload | ScuteMfaRequiredResponse | { message?: string } | null) {
+    // The account needs MFA: this device asks for it too (the link only
+    // passed the first factor).
+    if (payload && "mfa_required" in payload && (payload as any).mfa_required) {
+      return { data: this._mfaRequired(payload as unknown as ScuteMfaRequiredResponse), error: null };
+    }
+
+    // The link was opened too long ago for this device to pick it up.
+    if (!payload || !(payload as ScuteTokenPayload).access) {
+      return { data: null, error: new MagicLinkWindowClosedError() };
+    }
+
+    const { error } = await this.signInWithTokenPayload(payload as ScuteTokenPayload);
+    return { data: null, error };
+  }
+
+  /**
+   * A sign-in stopped for MFA: keeps the challenge for verifyMfaChallenge and
+   * switchMfaMethod, says so with MFA_REQUIRED (or
+   * MFA_ENROLLMENT_REQUIRED), and answers what the caller shows.
+   */
+  private _mfaRequired(mfaPayload: ScuteMfaRequiredResponse) {
+    this._pendingMfaChallenge = mfaPayload;
+
+    if (mfaPayload.mfa_enrollment_required) {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
+    } else {
+      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+    }
+
+    return {
+      mfaRequired: true as const,
+      mfaEnrollmentRequired: !!mfaPayload.mfa_enrollment_required,
+      mfaGracePeriod: !!mfaPayload.mfa_grace_period,
+      mfaGraceDaysRemaining: mfaPayload.mfa_grace_days_remaining,
+      mfaChallenge: mfaPayload.mfa_challenge,
+      availableMethods: mfaPayload.available_methods,
+    };
   }
 
   /**
@@ -1473,6 +1537,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         available_methods: (payload as any).available_methods,
       };
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED);
+    } else {
+      // A suggestion belongs to the sign-in that brought it.
+      this._pendingMfaEnrollmentSuggestion = null;
     }
 
     const session = (await this.setSession(payload)) as AuthenticatedSession;
@@ -2470,6 +2537,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
  * Create a new ScuteClient.
  * @returns {ScuteClient}
  */
+/** How long a request waits for the device fingerprint before going without it. */
+const FINGERPRINT_WAIT_MS = 2000;
+
 export const createClient = (
   ...params: ConstructorParameters<typeof ScuteClient>
 ) => new ScuteClient(...params);

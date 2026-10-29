@@ -383,6 +383,30 @@ describe("passkeys", () => {
   });
 });
 
+describe("what the app takes to sign in", () => {
+  it.each([
+    [["email"], "Email", "email"],
+    [["phone"], "Phone number", "tel"],
+    [["email", "phone"], "Email or phone number", "text"],
+  ])("allowed_identifiers %j: the field is %s", async (allowed, label, type) => {
+    const client = createFakeClient();
+    client.getAppData.mockResolvedValue({ data: { allowed_identifiers: allowed }, error: null });
+    renderSignIn(client);
+    const input = await screen.findByLabelText(label);
+    expect(input.getAttribute("type")).toBe(type);
+  });
+
+  it("signs in with a phone number when the app takes one", async () => {
+    const client = createFakeClient();
+    client.getAppData.mockResolvedValue({ data: { allowed_identifiers: ["phone"] }, error: null });
+    renderSignIn(client);
+    const input = await screen.findByLabelText("Phone number");
+    fireEvent.change(input, { target: { value: "+1 201 555 0142" } });
+    await act(async () => fireEvent.submit(input.closest("form")!));
+    expect(client.signInOrUp).toHaveBeenCalledWith("+1 201 555 0142");
+  });
+});
+
 describe("MFA step", () => {
   async function atMfa(client: FakeClient, challenge: Record<string, unknown>, methods: string[]) {
     client.signInOrUp.mockImplementation(async () => {
@@ -393,6 +417,31 @@ describe("MFA step", () => {
     await act(async () => submitEmail());
     await screen.findByRole("heading", { name: "One more step" });
   }
+
+  it("under StrictMode, a wrong code empties the boxes and says so (no endless Checking)", async () => {
+    const client = createFakeClient({
+      verifyMfaChallenge: vi.fn(async () => ({ error: { message: "", json: { error: "Invalid code" } } })),
+    });
+    client.signInOrUp.mockImplementation(async () => {
+      client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      return { data: { mfaRequired: true, mfaChallenge: { token: "chl_1", method: "totp" }, availableMethods: ["totp"] }, error: null };
+    });
+    const Wrapper = makeWrapper(client, { strict: true });
+    render(
+      <Wrapper>
+        <ScuteSignIn />
+      </Wrapper>
+    );
+    await screen.findByRole("heading", { name: "Sign in" });
+    await act(async () => submitEmail());
+    await screen.findByRole("heading", { name: "One more step" });
+    await act(async () => {
+      fireEvent.paste(boxes("Authenticator app")[0], { clipboardData: { getData: () => "000000" } });
+    });
+    await screen.findByText("That code didn't work. Try again.");
+    expect(screen.getByRole("button", { name: "Verify" })).toBeTruthy();
+    expect(boxes("Authenticator app").every((b) => (b as HTMLInputElement).value === "" && !(b as HTMLInputElement).disabled)).toBe(true);
+  });
 
   it("asks for the authenticator code, sends it, and lists the other ways in", async () => {
     const client = createFakeClient({ verifyMfaChallenge: vi.fn(async () => ({ error: { message: "Invalid" } })) });
@@ -433,7 +482,8 @@ describe("MFA step", () => {
     await act(async () => {
       fireEvent.paste(inputs[0], { clipboardData: { getData: () => "ab12-cd34" } });
     });
-    expect(client.verifyMfaChallenge).toHaveBeenCalledWith("chl_2", "AB12CD34");
+    // Sent as the code is shown (XXXX-XXXX), which every API version takes.
+    expect(client.verifyMfaChallenge).toHaveBeenCalledWith("chl_2", "AB12-CD34");
     await screen.findByRole("heading", { name: "You're in" });
   });
 

@@ -240,7 +240,7 @@ function Step({ auth, copy, methods, ...email }: { auth: ScuteAuthFlow } & Pick<
             {" "}Cancel it and we will send a link or a code instead.
           </Lead>
           <Waiting>Waiting for your passkey</Waiting>
-          <TextButton onClick={auth.retry}>Use a different email</TextButton>
+          <Different auth={auth} />
         </>
       );
     case "webauthn_register":
@@ -310,6 +310,43 @@ function Step({ auth, copy, methods, ...email }: { auth: ScuteAuthFlow } & Pick<
 
 // ── Steps ──
 
+// The first step's field, for what the app takes: email, a phone number, or either.
+const FIELDS = {
+  email: {
+    label: "Email",
+    placeholder: "name@company.com",
+    type: "email",
+    autoComplete: "email webauthn",
+    subtitle: "Enter your email and we will send you a link or a code. No account yet? This makes one.",
+  },
+  phone: {
+    label: "Phone number",
+    placeholder: "+1 555 123 4567",
+    type: "tel",
+    autoComplete: "tel webauthn",
+    subtitle: "Enter your phone number and we will text you a code. No account yet? This makes one.",
+  },
+  either: {
+    label: "Email or phone number",
+    placeholder: "name@company.com or +1 555 123 4567",
+    type: "text",
+    autoComplete: "username webauthn",
+    subtitle: "Enter your email or phone number and we will send you a link or a code. No account yet? This makes one.",
+  },
+} as const;
+
+const fieldFor = (types: ReadonlyArray<string> | undefined) => {
+  const phone = !!types?.includes("phone");
+  const email = !types?.length || types.includes("email");
+  return FIELDS[phone && email ? "either" : phone ? "phone" : "email"];
+};
+
+/** "Use a different email" (or number), for the identifier this sign-in used. */
+function Different({ auth }: { auth: ScuteAuthFlow }) {
+  const number = !!auth.identifier && !auth.identifier.includes("@");
+  return <TextButton onClick={auth.retry}>{number ? "Use a different number" : "Use a different email"}</TextButton>;
+}
+
 function EmailStep({ auth, copy, google, defaultEmail, defaultEmailUsed }: {
   auth: ScuteAuthFlow; copy: NonNullable<ScuteSignInProps["copy"]>; google: boolean;
 } & EmailDefault) {
@@ -323,6 +360,7 @@ function EmailStep({ auth, copy, google, defaultEmail, defaultEmailUsed }: {
   }, [defaultEmail]); // eslint-disable-line react-hooks/exhaustive-deps
   const error = errorText(auth.error, auth.errorCode);
   const busy = auth.submitting;
+  const field = fieldFor(auth.identifierTypes);
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -337,16 +375,16 @@ function EmailStep({ auth, copy, google, defaultEmail, defaultEmailUsed }: {
     <>
       <form onSubmit={submit}>
         <Title focus={false}>{copy.title ?? "Sign in"}</Title>
-        <Lead>{copy.subtitle ?? "Enter your email and we will send you a link or a code. No account yet? This makes one."}</Lead>
-        <label htmlFor="scute-signin-email" className="scute-signin__label">{copy.emailLabel ?? "Email"}</label>
+        <Lead>{copy.subtitle ?? field.subtitle}</Lead>
+        <label htmlFor="scute-signin-email" className="scute-signin__label">{copy.emailLabel ?? field.label}</label>
         <input
           id="scute-signin-email"
           name="email"
-          type="email"
-          autoComplete="email webauthn"
+          type={field.type}
+          autoComplete={field.autoComplete}
           autoFocus={!preview}
           required
-          placeholder={copy.emailPlaceholder ?? "name@company.com"}
+          placeholder={copy.emailPlaceholder ?? field.placeholder}
           value={email}
           readOnly={busy}
           aria-invalid={!!error || undefined}
@@ -404,7 +442,7 @@ function InboxStep({ auth }: { auth: ScuteAuthFlow }) {
       </Lead>
       <Waiting>Waiting for you to open the link</Waiting>
       <Resend auth={auth} what="link" className="scute-signin__mt-28" />
-      <TextButton onClick={auth.retry}>Use a different email</TextButton>
+      <Different auth={auth} />
     </>
   );
 }
@@ -426,9 +464,15 @@ function useCode(length: number, submit: (code: string) => Promise<boolean>, err
   const [wrong, setWrong] = useState(preview && !!error);
   const [focusKey, setFocusKey] = useState(0);
   const submitting = useRef(false);
+  // Set again on every mount: StrictMode (and a remount) runs the cleanup
+  // once without the component going away, and a ref left false would keep
+  // the boxes on "Checking" forever after a wrong code.
   const mounted = useRef(true);
-  useEffect(() => () => {
-    mounted.current = false;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
   const verify = async (chars: string[]) => {
@@ -489,7 +533,7 @@ function CodeStep({ auth }: { auth: ScuteAuthFlow }) {
       )}
       <VerifyButton busy={c.busy} full={c.full} />
       <Resend auth={auth} what="code" className="scute-signin__mt-12" />
-      <TextButton onClick={auth.retry}>Use a different email</TextButton>
+      <Different auth={auth} />
     </form>
   );
 }
@@ -512,7 +556,7 @@ function VerificationStep({ auth }: { auth: ScuteAuthFlow }) {
         </ErrorBox>
       )}
       <VerifyButton busy={c.busy} full={c.full} />
-      <TextButton onClick={auth.retry}>Use a different email</TextButton>
+      <Different auth={auth} />
     </form>
   );
 }
@@ -574,7 +618,7 @@ function MfaStep({ auth }: { auth: ScuteAuthFlow }) {
           </div>
         </div>
       )}
-      <TextButton onClick={auth.retry}>Use a different email</TextButton>
+      <Different auth={auth} />
     </form>
   );
 }

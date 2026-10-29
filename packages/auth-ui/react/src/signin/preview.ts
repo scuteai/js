@@ -31,6 +31,7 @@ export function previewFlow(p: ScuteSignInPreview): ScuteAuthFlow {
     errorCode: p.errorCode ?? null,
     submitting: false,
     passkeysSupported: true,
+    identifierTypes: ["email"],
     isAuthenticated: false,
     isLoading: false,
     // Only the email is drawn (the "authenticated" step).
