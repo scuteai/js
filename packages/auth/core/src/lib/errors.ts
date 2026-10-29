@@ -448,7 +448,8 @@ export type CustomScuteErrorCode =
   | "login-required"
   | "invalid-auth-token"
   | "unknown-sign-in"
-  | "invalid-magic-link";
+  | "invalid-magic-link"
+  | "magic-link-window-closed";
 
 export class CustomScuteError extends ScuteError {
   constructor(
@@ -522,6 +523,21 @@ export class InvalidMagicLinkError extends CustomScuteError {
   constructor() {
     super("Invalid magic link.", "invalid-magic-link", "invalid_magic_link");
     Object.setPrototypeOf(this, InvalidMagicLinkError.prototype);
+  }
+}
+
+/**
+ * The sign-in link was opened, but too long ago for the device that asked
+ * for it to pick up the sign-in (signInWithMagicLinkId). Start again.
+ */
+export class MagicLinkWindowClosedError extends CustomScuteError {
+  constructor() {
+    super(
+      "The sign-in link was opened too long ago for this page to finish the sign-in.",
+      "magic-link-window-closed",
+      "magic_link_window_closed"
+    );
+    Object.setPrototypeOf(this, MagicLinkWindowClosedError.prototype);
   }
 }
 

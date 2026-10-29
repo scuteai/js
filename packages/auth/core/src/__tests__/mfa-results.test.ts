@@ -25,6 +25,7 @@ import {
   BaseHttpError,
   IdentifierNotRecognizedError,
   InvalidMagicLinkError,
+  MagicLinkWindowClosedError,
   UnknownSignInError,
   WebAuthnError,
 } from "../lib/errors";
@@ -298,6 +299,44 @@ describe("signInWithMagicLinkToken", () => {
     const { client } = await setup();
     const result = await client.signInWithMagicLink("https://app.test/cb?other=1");
     expect(result.error).toBeInstanceOf(InvalidMagicLinkError);
+  });
+});
+
+describe("signInWithMagicLinkId (the waiting device)", () => {
+  const STATUS = `${AUTH_PREFIX}/magic_links/status`;
+
+  it("asks for MFA on this device when the status answers mfa_required, without a session", async () => {
+    const { client, rec } = await setup();
+    server.on("POST", STATUS, { body: mfaPayload() });
+
+    const result = await client.signInWithMagicLinkId("ml_1");
+
+    expect(result).toStrictEqual({ data: EXPECTED_MFA_RESULT, error: null });
+    expect(client.pendingMfaChallenge).toEqual(mfaPayload());
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.MFA_REQUIRED]);
+    expect(localStorage.getItem(KEYS.access)).toBeNull();
+  });
+
+  it("answers MagicLinkWindowClosedError for the late answer without tokens", async () => {
+    const { client, rec } = await setup();
+    server.on("POST", STATUS, { body: { message: "ok" } });
+
+    const result = await client.signInWithMagicLinkId("ml_1");
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(MagicLinkWindowClosedError);
+    expect(rec.names()).toEqual([]);
+    expect(localStorage.getItem(KEYS.access)).toBeNull();
+  });
+
+  it("signs in with the tokens", async () => {
+    const { client, rec } = await setup();
+    server.on("POST", STATUS, { body: tokenPair() });
+
+    const result = await client.signInWithMagicLinkId("ml_1");
+
+    expect(result).toStrictEqual({ data: null, error: null });
+    expect(rec.names()).toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
   });
 });
 

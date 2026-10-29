@@ -30,6 +30,17 @@ function errorCodeOf(err: any): string | null {
   return typeof err?.code === "string" ? err.code : null;
 }
 
+// What went wrong in the API's own words (the `error` of its JSON body),
+// else the error's message. An HTTP error's message is the status text,
+// which says little and is empty over HTTP/2.
+function messageOf(err: any): string {
+  const body = err?.json;
+  for (const m of [body?.error, body?.error?.message, body?.message]) {
+    if (typeof m === "string" && m.trim()) return m;
+  }
+  return typeof err?.message === "string" ? err.message : "";
+}
+
 // A passkey prompt that was cancelled, timed out or failed: not fatal, the
 // sign-in falls back to a link or a code.
 function isPasskeyPromptError(err: any): boolean {
@@ -40,6 +51,9 @@ function isPasskeyPromptError(err: any): boolean {
     code === "ERROR_CEREMONY_ABORTED" || code === "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY" ||
     String(err.message ?? "").includes("Technical Error");
 }
+
+// Steps shown to someone already signed in, which a sign-in event must not skip.
+const KEEP_WHEN_SIGNED_IN: readonly string[] = ["webauthn_register", "webauthn_register_success", "mfa_enroll_suggest"];
 
 /**
  * Auth flow views — represents the current step in the auth lifecycle.
@@ -114,6 +128,8 @@ export function useScuteAuthFlow() {
   const [resendError, setResendError] = useState<string | null>(null);
   const [mfaResent, setMfaResent] = useState(false);
   const [mfaSwitching, setMfaSwitching] = useState(false);
+  // What people sign in with on this app (allowed_identifiers): email, phone or both.
+  const [identifierTypes, setIdentifierTypes] = useState<Array<"email" | "phone">>(["email"]);
 
   const initRef = useRef(false);
   const magicVerifyRef = useRef(false);
@@ -146,7 +162,7 @@ export function useScuteAuthFlow() {
 
   // Every failure shown by the flow: the message, and the API's code for it.
   const fail = useCallback((err: any, fallback: string) => {
-    setError(err?.message || fallback);
+    setError(messageOf(err) || fallback);
     setErrorCode(errorCodeOf(err));
   }, []);
   const clearError = useCallback(() => {
@@ -173,12 +189,12 @@ export function useScuteAuthFlow() {
     try {
       const result = await scuteClient.signInWithTokenPayload(payload);
       if (result?.error) {
-        setError(result.error.message || "Sign-in failed");
+        setError(messageOf(result.error) || "Sign-in failed");
       } else {
         exchangedPayloadRef.current = payload;
       }
     } catch (err: any) {
-      setError(err?.message || "Sign-in failed");
+      setError(messageOf(err) || "Sign-in failed");
     } finally {
       offeringPasskeyRef.current = false;
     }
@@ -245,6 +261,11 @@ export function useScuteAuthFlow() {
 
     (async () => {
       try { await scuteClient["_initialize"](); } catch {}
+      try {
+        const allowed = (await scuteClient.getAppData())?.data?.allowed_identifiers;
+        const types = Array.isArray(allowed) ? allowed.filter((t): t is "email" | "phone" => t === "email" || t === "phone") : [];
+        if (types.length) setIdentifierTypes(types);
+      } catch {}
 
       const magicToken = scuteClient.getMagicLinkToken();
       if (magicToken) {
@@ -272,7 +293,9 @@ export function useScuteAuthFlow() {
           (event === AUTH_CHANGE_EVENTS.SIGNED_IN || event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED)) {
         return;
       }
-      if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && view !== "webauthn_register" && view !== "webauthn_register_success") {
+      // The passkey offer and the MFA nudge come with a session already: the
+      // person moves on from them.
+      if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && !KEEP_WHEN_SIGNED_IN.includes(view)) {
         setView("authenticated");
       }
       if (event === AUTH_CHANGE_EVENTS.MAGIC_PENDING || event === AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING) {
@@ -387,9 +410,19 @@ export function useScuteAuthFlow() {
       if (stopped) return;
       if (result && !result.error && result.data) {
         stopped = true;
-        await scuteClient.signInWithTokenPayload(result.data);
+        // Signed in (SIGNED_IN moves the flow on), MFA needed here too
+        // (MFA_REQUIRED shows the step), or opened too long ago.
+        const finished = await scuteClient.signInWithMagicLinkStatus(result.data);
+        if (finished.data?.mfaRequired) {
+          handleMfaResponse(finished.data);
+        } else if ((finished.error as any)?.code === "magic-link-window-closed") {
+          setError(MAGIC_LINK_TIMEOUT_MESSAGE);
+          setErrorCode(null);
+          setView("error");
+        }
         return;
       }
+      // Not opened yet (or no answer): ask again.
       timer = setTimeout(poll, MAGIC_LINK_POLL_INTERVAL_MS);
     };
 
@@ -399,11 +432,11 @@ export function useScuteAuthFlow() {
       stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [view, magicLinkId, scuteClient]);
+  }, [view, magicLinkId, scuteClient, handleMfaResponse]);
 
   // ── 5. Track authenticated state ──
   useEffect(() => {
-    if (isAuthenticated && view !== "webauthn_register" && view !== "webauthn_register_success" && view !== "magic_verifying") {
+    if (isAuthenticated && !KEEP_WHEN_SIGNED_IN.includes(view) && view !== "magic_verifying") {
       setView("authenticated");
     }
   }, [isAuthenticated]);
@@ -465,7 +498,7 @@ export function useScuteAuthFlow() {
         return;
       }
       if (signError) {
-        setError(signError.message);
+        setError(messageOf(signError));
         setErrorCode(errorCodeOf(signError));
         return;
       }
@@ -490,7 +523,7 @@ export function useScuteAuthFlow() {
     clearError();
     try {
       const result = await scuteClient.verifyOtp(code, identifier);
-      if (result?.error) { setError(result.error.message); setErrorCode(errorCodeOf(result.error)); return false; }
+      if (result?.error) { setError(messageOf(result.error)); setErrorCode(errorCodeOf(result.error)); return false; }
       if (result?.data && "mfaRequired" in result.data && result.data.mfaRequired) {
         setMfaChallenge(result.data.mfaChallenge);
         setMfaAvailableMethods(result.data.availableMethods || []);
@@ -556,14 +589,14 @@ export function useScuteAuthFlow() {
       // event: the flow is already on the step.
       if (view === "magic_pending") {
         const { data, error: sendError } = await scuteClient.sendLoginMagicLink(identifier, undefined, false);
-        if (sendError) failure = sendError.message || "We couldn't send a new link";
+        if (sendError) failure = messageOf(sendError) || "We couldn't send a new link";
         else if (data?.magic_link) setMagicLinkId(String(data.magic_link.id));
       } else {
         const { error: sendError } = await scuteClient.sendLoginOtp(identifier, undefined, false);
-        if (sendError) failure = sendError.message || "We couldn't send a new code";
+        if (sendError) failure = messageOf(sendError) || "We couldn't send a new code";
       }
     } catch (err: any) {
-      failure = err?.message || "We couldn't send it again";
+      failure = messageOf(err) || "We couldn't send it again";
     }
     const at = Date.now();
     setLastSentAt(at);
@@ -584,12 +617,17 @@ export function useScuteAuthFlow() {
     if (!mfaChallenge) return false;
     clearError();
     try {
+      // Backup codes are shown as XXXX-XXXX; the boxes drop the dash.
+      const method = String(mfaChallenge.method ?? "");
+      const sent = (method === "backup_code" || method === "backup_codes") && /^[A-Za-z0-9]{8}$/.test(code)
+        ? `${code.slice(0, 4)}-${code.slice(4)}`.toUpperCase()
+        : code;
       // verifyMfaChallenge signs in on success; SIGNED_IN moves the flow on.
-      const { error: mfaError } = await scuteClient.verifyMfaChallenge(mfaChallenge.token, code);
-      if (mfaError) { setError(mfaError.message); setErrorCode(errorCodeOf(mfaError)); return false; }
+      const { error: mfaError } = await scuteClient.verifyMfaChallenge(mfaChallenge.token, sent);
+      if (mfaError) { setError(messageOf(mfaError)); setErrorCode(errorCodeOf(mfaError)); return false; }
       return true;
     } catch (err: any) {
-      setError(err?.message || "MFA verification failed");
+      setError(messageOf(err) || "MFA verification failed");
       return false;
     }
   }, [mfaChallenge, scuteClient, clearError]);
@@ -602,7 +640,7 @@ export function useScuteAuthFlow() {
     try {
       const { data, error: resendErr } = await scuteClient.resendChallenge(mfaChallenge.token);
       if (resendErr || !data?.challenge) {
-        const message = resendErr?.message || "We couldn't send a new code";
+        const message = messageOf(resendErr) || "We couldn't send a new code";
         fail(resendErr, message);
         return message;
       }
@@ -611,7 +649,7 @@ export function useScuteAuthFlow() {
       return null;
     } catch (err: any) {
       fail(err, "We couldn't send a new code");
-      return err?.message || "We couldn't send a new code";
+      return messageOf(err) || "We couldn't send a new code";
     }
   }, [mfaChallenge, scuteClient, fail, clearError]);
 
@@ -624,7 +662,7 @@ export function useScuteAuthFlow() {
     try {
       const { data, error: switchErr } = await scuteClient.switchMfaMethod(mfaChallenge.token, method);
       if (switchErr || !data) {
-        const message = switchErr?.message || "We couldn't switch methods";
+        const message = messageOf(switchErr) || "We couldn't switch methods";
         fail(switchErr, message);
         return message;
       }
@@ -632,7 +670,7 @@ export function useScuteAuthFlow() {
       return null;
     } catch (err: any) {
       fail(err, "We couldn't switch methods");
-      return err?.message || "We couldn't switch methods";
+      return messageOf(err) || "We couldn't switch methods";
     } finally {
       setMfaSwitching(false);
     }
@@ -648,12 +686,12 @@ export function useScuteAuthFlow() {
     try {
       if (authPayload && exchangedPayloadRef.current !== authPayload) {
         const { error: signInError } = await scuteClient.signInWithTokenPayload(authPayload);
-        if (signInError) { setError(signInError.message); return; }
+        if (signInError) { setError(messageOf(signInError)); return; }
         exchangedPayloadRef.current = authPayload;
       }
       const { error: addError } = await scuteClient.addDevice();
       // The user is signed in by now: show the error; skipPasskey still continues.
-      if (addError) { setError(addError.message); setErrorCode(errorCodeOf(addError)); return; }
+      if (addError) { setError(messageOf(addError)); setErrorCode(errorCodeOf(addError)); return; }
       setView("webauthn_register_success");
       const suggestion = scuteClient.pendingMfaEnrollmentSuggestion;
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -669,7 +707,7 @@ export function useScuteAuthFlow() {
         }
       }, 800);
     } catch (err: any) {
-      setError(err?.message || "Failed to register passkey");
+      setError(messageOf(err) || "Failed to register passkey");
     }
   }, [authPayload, scuteClient]);
 
@@ -684,17 +722,26 @@ export function useScuteAuthFlow() {
       try {
         const result = await scuteClient.signInWithTokenPayload(authPayload);
         if (result?.error) {
-          setError(result.error.message || "Failed to sign in");
+          setError(messageOf(result.error) || "Failed to sign in");
           return;
         }
       } catch (err: any) {
-        setError(err?.message || "Failed to sign in");
+        setError(messageOf(err) || "Failed to sign in");
         return;
       }
       exchangedPayloadRef.current = authPayload;
     }
-    // The register view ignores SIGNED_IN, so move on here.
-    setView("authenticated");
+    // The register view ignores SIGNED_IN, so move on here: to the MFA nudge
+    // when this sign-in brought one, as after adding a passkey.
+    const suggestion = scuteClient.pendingMfaEnrollmentSuggestion;
+    if (suggestion) {
+      setMfaAvailableMethods(suggestion.available_methods || []);
+      setMfaGracePeriod(true);
+      setMfaGraceDaysRemaining(suggestion.mfa_grace_days_remaining);
+      setView("mfa_enroll_suggest");
+    } else {
+      setView("authenticated");
+    }
   }, [authPayload, isAuthenticated, scuteClient]);
 
   const retry = useCallback(() => {
@@ -718,6 +765,8 @@ export function useScuteAuthFlow() {
     submitting,
     /** This browser can make a passkey (a secure page with the WebAuthn API). */
     passkeysSupported,
+    /** What the app takes to sign in (its allowed_identifiers): "email", "phone" or both. */
+    identifierTypes,
     // Follows the real session (useAuth), not the view.
     isAuthenticated,
     isLoading,

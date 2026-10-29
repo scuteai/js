@@ -106,6 +106,20 @@ export function createFakeClient(overrides: Record<string, unknown> = {}) {
     }),
     signInOrUp: vi.fn(async () => ({ data: null, error: null })),
     getMagicLinkStatus: vi.fn(async () => ({ data: null, error: { message: "pending" } })),
+    // Like the real client: MFA, the closed window, or a sign-in.
+    signInWithMagicLinkStatus: vi.fn(async (data: any) => {
+      if (data?.mfa_required) {
+        client.pendingMfaChallenge = data;
+        client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+        return {
+          data: { mfaRequired: true, mfaChallenge: data.mfa_challenge, availableMethods: data.available_methods },
+          error: null,
+        };
+      }
+      if (!data?.access) return { data: null, error: { code: "magic-link-window-closed", message: "closed" } };
+      const signedIn = await client.signInWithTokenPayload(data);
+      return { data: null, error: signedIn.error };
+    }),
     verifyOtp: vi.fn(),
     verifyMfaChallenge: vi.fn(),
     addDevice: vi.fn(async () => ({ data: { id: "cred_1" }, error: null })),
