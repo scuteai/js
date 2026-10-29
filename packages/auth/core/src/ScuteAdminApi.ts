@@ -26,6 +26,23 @@ import type {
   AuthzPermissions,
 } from "./ScuteAuthzApi";
 import type { AuthzFilter } from "./lib/authzFilter";
+import type {
+  AuthzDecisionsPage,
+  AuthzDecisionsParams,
+  AuthzPermissionChanges,
+  AuthzPermissionInput,
+  AuthzPolicyPermission,
+  AuthzPolicyResource,
+  AuthzPolicyRole,
+  AuthzResourceInput,
+  AuthzRoleChanges,
+  AuthzRoleGrant,
+  AuthzRoleInput,
+  AuthzSettings,
+  AuthzSettingsChanges,
+  AuthzStepUpVerified,
+  AuthzUserRoles,
+} from "./lib/types/authzPolicy";
 
 /** A conversation on Scute's auth MCP server, as your backend sees it. */
 /** One edit to the policy, for a backtest (RB-45). */
@@ -756,6 +773,196 @@ class ScuteAdminApi extends ScuteBaseHttp {
       { reviewer_id: options.reviewerId, note: options.note },
       this._authorizationHeader
     );
+  }
+
+  /**
+   * Check the code a user typed against a step-up challenge (the `token`
+   * `authzStartStepUp` returned). Needs the secret key, so it runs on your
+   * server. When the code is right the answer is `{ status: "completed" }`;
+   * then call `authzCheck` again with `challenge: token`. A wrong code is an
+   * error (422) whose `json` says how many attempts are left
+   * (`remaining_attempts`).
+   */
+  async authzVerifyStepUp(token: string, code: string) {
+    return this.post<AuthzStepUpVerified>(
+      `${this._authPath}/challenges/${encodeURIComponent(token)}/verify`,
+      { code },
+      this._authorizationHeader
+    );
+  }
+
+  // ── Decision log ──
+
+  /**
+   * The decision log, newest first. Filter by user, agent, task, decision,
+   * permission, resource, reason and time. When `next` is in the answer, pass
+   * it as `before` to read the older page. Scute writes an entry a moment
+   * after the check, and keeps only a share of the "allow" answers (the
+   * `log_allow_rate` setting).
+   */
+  async authzDecisions(params: AuthzDecisionsParams = {}) {
+    const query = new URLSearchParams();
+    if (params.userId) query.set("user_id", String(params.userId));
+    if (params.agentId) query.set("agent_id", String(params.agentId));
+    if (params.taskId) query.set("task_id", String(params.taskId));
+    if (params.decision) query.set("decision", params.decision);
+    if (params.permission) query.set("permission", params.permission);
+    if (params.resource) query.set("resource", params.resource);
+    if (params.reason) query.set("reason", params.reason);
+    if (params.since) query.set("since", new Date(params.since).toISOString());
+    if (params.until) query.set("until", new Date(params.until).toISOString());
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.before) query.set("before", String(params.before));
+    const qs = query.toString() ? `?${query}` : "";
+    return this.get<AuthzDecisionsPage>(`${this._appsPath}/authz/decisions${qs}`, this._authorizationHeader);
+  }
+
+  // ── Policy: resources, permissions, roles (secret key) ──
+  //
+  // Set up what your app guards and who may do what. Slugs are lowercase.
+  // Each action of a resource is a permission ("project" + "edit" is
+  // "project:edit"); roles bundle permissions; users hold roles. Changes take
+  // effect on the next check. Needs a secret key of an owner or admin.
+
+  /** The resources, with their actions. */
+  async authzResources() {
+    const { data, error } = await this.get<{ resources: AuthzPolicyResource[] }>(
+      `${this._appsPath}/authz/resources`,
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.resources, error: null };
+  }
+
+  /** Add a resource. Its `actions` become permissions ("project:view"). */
+  async authzCreateResource(input: AuthzResourceInput) {
+    return this.post<AuthzPolicyResource>(`${this._appsPath}/authz/resources`, input, this._authorizationHeader);
+  }
+
+  /**
+   * Change a resource. `actions` replaces the list; dropping an action
+   * deletes its permission, and when a role grants it you must pass
+   * `force: true` (the grants go with it).
+   */
+  async authzUpdateResource(
+    slug: string,
+    changes: { name?: string; description?: string; actions?: string[]; force?: boolean }
+  ) {
+    return this.patch<AuthzPolicyResource>(
+      `${this._appsPath}/authz/resources/${encodeURIComponent(slug)}`,
+      changes,
+      this._authorizationHeader
+    );
+  }
+
+  /** Delete a resource. When roles grant its permissions or objects exist, pass `force: true` to remove them too. */
+  async authzDeleteResource(slug: string, options: { force?: boolean } = {}) {
+    return this.delete(
+      `${this._appsPath}/authz/resources/${encodeURIComponent(slug)}${options.force ? "?force=true" : ""}`,
+      this._authorizationHeader
+    );
+  }
+
+  /** All permissions: the resources' actions and your custom ones. */
+  async authzPermissions() {
+    const { data, error } = await this.get<{ permissions: AuthzPolicyPermission[] }>(
+      `${this._appsPath}/authz/permissions`,
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.permissions, error: null };
+  }
+
+  /** Add a custom permission, not tied to a resource ("export_reports"). Resource permissions come from a resource's actions. */
+  async authzCreatePermission(input: AuthzPermissionInput) {
+    return this.post<AuthzPolicyPermission>(`${this._appsPath}/authz/permissions`, input, this._authorizationHeader);
+  }
+
+  /**
+   * Change a permission: turn it off, or make it ask for a fresh
+   * verification (`requires_verification`, `verification_method`,
+   * `verification_ttl` in seconds) or an approval (`requires_approval`).
+   */
+  async authzUpdatePermission(slug: string, changes: AuthzPermissionChanges) {
+    return this.patch<AuthzPolicyPermission>(
+      `${this._appsPath}/authz/permissions/${encodeURIComponent(slug)}`,
+      changes,
+      this._authorizationHeader
+    );
+  }
+
+  /** Delete a custom permission. When roles grant it, pass `force: true` to remove it from them too. */
+  async authzDeletePermission(slug: string, options: { force?: boolean } = {}) {
+    return this.delete(
+      `${this._appsPath}/authz/permissions/${encodeURIComponent(slug)}${options.force ? "?force=true" : ""}`,
+      this._authorizationHeader
+    );
+  }
+
+  /** The roles, with their permissions and how many users hold each. */
+  async authzRoles() {
+    const { data, error } = await this.get<{ roles: AuthzPolicyRole[] }>(
+      `${this._appsPath}/authz/roles`,
+      this._authorizationHeader
+    );
+    return error ? { data: null, error } : { data: data.roles, error: null };
+  }
+
+  /**
+   * Add a role. `permissions` lists slugs; an entry can carry a condition:
+   * `{ permission: "invoice:approve", when: { lt: [{ var: "resource.amount" }, 5000] } }`.
+   * A default role (`is_default`) is held by everyone who signs in.
+   */
+  async authzCreateRole(input: AuthzRoleInput) {
+    return this.post<AuthzPolicyRole>(`${this._appsPath}/authz/roles`, input, this._authorizationHeader);
+  }
+
+  /** Change a role. `permissions` replaces the role's whole set. */
+  async authzUpdateRole(slug: string, changes: AuthzRoleChanges) {
+    return this.patch<AuthzPolicyRole>(
+      `${this._appsPath}/authz/roles/${encodeURIComponent(slug)}`,
+      changes,
+      this._authorizationHeader
+    );
+  }
+
+  /** Delete a role. When people hold it, name the role they move to with `reassignTo`. */
+  async authzDeleteRole(slug: string, options: { reassignTo?: string } = {}) {
+    const qs = options.reassignTo ? `?reassign_to=${encodeURIComponent(options.reassignTo)}` : "";
+    return this.delete(`${this._appsPath}/authz/roles/${encodeURIComponent(slug)}${qs}`, this._authorizationHeader);
+  }
+
+  /** The roles a user holds (and the default roles everyone holds). */
+  async authzUserRoles(userId: UniqueIdentifier) {
+    return this.get<AuthzUserRoles>(
+      `${this._appsPath}/authz/users/${encodeURIComponent(userId)}/roles`,
+      this._authorizationHeader
+    );
+  }
+
+  /** Give a user a role, for good or until `expiresAt`. Giving it again changes the expiry. */
+  async authzAssignRole(userId: UniqueIdentifier, role: string, options: { expiresAt?: string | Date } = {}) {
+    return this.post<AuthzRoleGrant>(
+      `${this._appsPath}/authz/users/${encodeURIComponent(userId)}/roles`,
+      { role, expires_at: options.expiresAt ? new Date(options.expiresAt).toISOString() : undefined },
+      this._authorizationHeader
+    );
+  }
+
+  /** Take a role from a user. A role an identity provider manages can't be removed here. */
+  async authzRevokeRole(userId: UniqueIdentifier, role: string) {
+    return this.delete(
+      `${this._appsPath}/authz/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(role)}`,
+      this._authorizationHeader
+    );
+  }
+
+  /** The app's authorization settings (client checks, decision log, requests, impersonation). */
+  async authzSettings() {
+    return this.get<AuthzSettings>(`${this._appsPath}/authz/settings`, this._authorizationHeader);
+  }
+
+  /** Change settings; only the fields you pass change. */
+  async authzUpdateSettings(changes: AuthzSettingsChanges) {
+    return this.patch<AuthzSettings>(`${this._appsPath}/authz/settings`, changes, this._authorizationHeader);
   }
 
   /**

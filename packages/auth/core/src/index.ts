@@ -30,6 +30,26 @@ export type {
   ScuteElementsApiConfig,
 } from "./ScuteElementsApi";
 export type {
+  AuthzDecisionsPage,
+  AuthzDecisionsParams,
+  AuthzLoggedDecision,
+  AuthzPermissionChanges,
+  AuthzPermissionInput,
+  AuthzPolicyPermission,
+  AuthzPolicyResource,
+  AuthzPolicyRole,
+  AuthzResourceInput,
+  AuthzRoleChanges,
+  AuthzRoleGrant,
+  AuthzRoleInput,
+  AuthzRolePermissionInput,
+  AuthzSettings,
+  AuthzSettingsChanges,
+  AuthzStepUpVerified,
+  AuthzUserRoles,
+  AuthzVerificationMethod,
+} from "./lib/types/authzPolicy";
+export type {
   AuthzAccessRequest,
   AuthzAccessRequestInput,
   AuthzDecision,
