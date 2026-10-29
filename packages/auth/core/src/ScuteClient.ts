@@ -253,29 +253,46 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         DEFAULT_PREFERENCES.fingerprinting;
 
       if (fingerprinting) {
-        setTimeout(() => {
-          import("@fingerprintjs/fingerprintjs").then(async ({ load }) => {
-            const fp = await load();
-            const { visitorId } = await fp.get();
+        // The device fingerprint goes on every request that changes
+        // something. It loads in the background; a request sent before it is
+        // ready waits for it (FINGERPRINT_WAIT_MS at most), so the first one
+        // (a sign-in link opened right as the page loads) carries it too.
+        let visitorId: string | null = null;
+        const loaded = new Promise<void>((resolve) => {
+          setTimeout(() => {
+            import("@fingerprintjs/fingerprintjs")
+              .then(async ({ load }) => {
+                const fp = await load();
+                visitorId = (await fp.get()).visitorId;
+              })
+              .catch(() => {})
+              .finally(resolve);
+          }, 0);
+        });
+        const ready = Promise.race([
+          loaded,
+          new Promise<void>((resolve) => setTimeout(resolve, FINGERPRINT_WAIT_MS)),
+        ]);
 
-            this.wretcher._middlewares.push((next) => (url, opts) => {
-              const options: RequestInit = opts;
+        this.wretcher._middlewares.push((next) => async (url, opts) => {
+          const options: RequestInit = opts;
 
-              if (
-                !options.method ||
-                options.method === "GET" ||
-                options.method === "get"
-              ) {
-                return next(url, opts);
-              }
+          if (
+            !options.method ||
+            options.method === "GET" ||
+            options.method === "get"
+          ) {
+            return next(url, opts);
+          }
 
-              options.headers = new Headers(options.headers);
-              options.headers.set("X-Fingerprint", visitorId);
+          if (!visitorId) await ready;
+          if (visitorId) {
+            options.headers = new Headers(options.headers);
+            options.headers.set("X-Fingerprint", visitorId);
+          }
 
-              return next(url, opts);
-            });
-          });
-        }, 0);
+          return next(url, opts);
+        });
       }
     }
 
@@ -2519,6 +2536,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
  * Create a new ScuteClient.
  * @returns {ScuteClient}
  */
+/** How long a request waits for the device fingerprint before going without it. */
+const FINGERPRINT_WAIT_MS = 2000;
+
 export const createClient = (
   ...params: ConstructorParameters<typeof ScuteClient>
 ) => new ScuteClient(...params);

@@ -422,6 +422,15 @@ export function useScuteAuthFlow() {
         }
         return;
       }
+      // The account needs MFA and the API wants it finished on the device
+      // that opened the link: say so, and stop waiting.
+      if (result?.error && errorCodeOf(result.error) === "mfa_required") {
+        stopped = true;
+        setError(messageOf(result.error) || "Finish signing in on the device where you opened the link.");
+        setErrorCode("mfa_required");
+        setView("error");
+        return;
+      }
       // Not opened yet (or no answer): ask again.
       timer = setTimeout(poll, MAGIC_LINK_POLL_INTERVAL_MS);
     };

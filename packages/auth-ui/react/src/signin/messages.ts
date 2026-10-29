@@ -32,6 +32,10 @@ export const REFUSALS: Record<string, Failure> = {
     title: "This account was deactivated",
     message: "It can't sign in anymore. Contact the app's support team if you think this is a mistake.",
   },
+  mfa_required: {
+    title: "Finish on the other device",
+    message: "This account asks for a second step. Finish signing in on the device where you opened the link.",
+  },
   verification_unavailable: {
     title: "We couldn't send your code",
     message: "This sign-in needs a code to confirm it's you, and we couldn't send one. Start again from your email.",

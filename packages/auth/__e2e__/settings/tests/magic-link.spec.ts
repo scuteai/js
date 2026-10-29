@@ -118,8 +118,11 @@ test.describe("Sign-in links", () => {
     const other = await openLinkElsewhere(browser, setup, sent[0].token);
     await other.expectView("mfa_verify");
 
-    // The waiting page keeps polling; it must not get a session that skipped MFA.
-    await signin.page.waitForTimeout(8_000);
+    // The waiting page must not get a session that skipped MFA: it says to
+    // finish on the other device and stops waiting.
+    await signin.expectView("error");
+    await expect(signin.page.getByText("Finish on the other device")).toBeVisible();
+    await signin.expectNoSpinnerAfter(4_000);
     await signin.expectSignedOut();
     await expectNoSession(signin);
     expect((await server.sessions(email)).filter((s) => s.type === "xlogin")).toEqual([]);

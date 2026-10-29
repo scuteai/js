@@ -637,6 +637,26 @@ describe("magic link polling", () => {
     expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
   });
 
+  it("stops with a message when the API wants MFA finished on the device that opened the link", async () => {
+    const client = createFakeClient();
+    magicLinkSignIn(client);
+    client.getMagicLinkStatus.mockResolvedValueOnce({
+      data: null,
+      error: { message: "", code: 403, json: { error: "Finish signing in on the device that opened the link", error_code: "mfa_required" } },
+    });
+    const { result } = await atMagicPending(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(result.current.flow.view).toBe("error");
+    expect(result.current.flow.errorCode).toBe("mfa_required");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
+    expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+  });
+
   it("stops with a message when the link was opened too long ago for this page", async () => {
     const client = createFakeClient();
     magicLinkSignIn(client);

@@ -192,10 +192,7 @@ test.describe("MFA", () => {
     expect(refused.reason).toBeTruthy();
   });
 
-  // Decision needed: the API checks mfa_methods_allowed only when a factor is
-  // set up, so a method switched off later is still challenged and offered.
-  // Enforcing it at sign-in can lock out people whose only factor it is.
-  test.fixme("allowed methods: a method switched off after enrollment is not offered at sign-in", async ({
+  test("allowed methods: a method switched off after enrollment is not offered at sign-in", async ({
     signin,
     settings,
   }) => {
