@@ -172,14 +172,20 @@ export const test = base.extend<Fixtures>({
     await page.route(
       (url) => url.href.startsWith(setup.apiUrl),
       async (route) => {
-        let response = await route.fetch();
-        for (let attempt = 0; attempt < 2 && response.status() === 429; attempt++) {
-          const body = await response.json().catch(() => null);
-          if (body?.rule !== "api/ip") break;
-          await new Promise((r) => setTimeout(r, Math.min(Number(body.retry_after) || 30, 65) * 1000 + 500));
-          response = await route.fetch();
+        try {
+          let response = await route.fetch();
+          for (let attempt = 0; attempt < 2 && response.status() === 429; attempt++) {
+            const body = await response.json().catch(() => null);
+            if (body?.rule !== "api/ip") break;
+            await new Promise((r) => setTimeout(r, Math.min(Number(body.retry_after) || 30, 65) * 1000 + 500));
+            response = await route.fetch();
+          }
+          await route.fulfill({ response });
+        } catch {
+          // The page closed with the request in flight (the test ended), or
+          // the request failed: let the browser see it as it is.
+          await route.continue().catch(() => {});
         }
-        await route.fulfill({ response });
       }
     );
     await use(new SignInPage(page, setup));
