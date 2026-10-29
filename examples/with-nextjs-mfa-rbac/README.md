@@ -25,7 +25,7 @@ The step-by-step tutorial for this app is in the Scute docs: [MFA and RBAC with 
   | --- | --- |
   | `@scute/auth-ui-react` | `0.4.0-next.5` |
   | `@scute/react-hooks` | `0.9.0-next.5` |
-  | `@scute/nextjs-handlers` | `0.9.0-next.5` |
+  | `@scute/nextjs-handlers` | `0.9.0-next.6` |
 
   They are prereleases, published under the `next` tag. Inside this repository the example uses the local packages (`workspace:*`). In your own app, install them with `npm install @scute/auth-ui-react@next @scute/react-hooks@next @scute/nextjs-handlers@next`.
 
