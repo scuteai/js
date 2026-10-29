@@ -476,3 +476,171 @@ describe("ScuteAuthGate", () => {
     expect(document.querySelector(".scute-signin")).toBeNull();
   });
 });
+
+describe("defaultEmail", () => {
+  it("starts the field with it, and sends it as is", async () => {
+    const { client } = await atEmail(createFakeClient(), { defaultEmail: "grace@example.com" });
+    const input = screen.getByLabelText("Email") as HTMLInputElement;
+    expect(input.value).toBe("grace@example.com");
+    await act(async () => {
+      fireEvent.submit(input.closest("form")!);
+    });
+    expect(client.signInOrUp).toHaveBeenCalledWith("grace@example.com");
+  });
+
+  it("fills the field when it arrives after the step showed, unless the visitor typed", async () => {
+    const client = createFakeClient();
+    const Wrapper = makeWrapper(client);
+    const { rerender } = render(<Wrapper><ScuteSignIn /></Wrapper>);
+    await screen.findByRole("heading", { name: "Sign in" });
+    rerender(<Wrapper><ScuteSignIn defaultEmail="late@example.com" /></Wrapper>);
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("late@example.com");
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "typed@example.com" } });
+    rerender(<Wrapper><ScuteSignIn defaultEmail="later@example.com" /></Wrapper>);
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("typed@example.com");
+  });
+
+  it("is not offered again after Use a different email", async () => {
+    const client = createFakeClient();
+    client.signInOrUp.mockImplementation(async () => {
+      client.emit(AUTH_CHANGE_EVENTS.MAGIC_PENDING);
+      return { data: { magic_link: { id: "ml_1" } }, error: null };
+    });
+    await atEmail(client, { defaultEmail: "grace@example.com" });
+    await act(async () => {
+      fireEvent.submit(screen.getByLabelText("Email").closest("form")!);
+    });
+    await screen.findByRole("heading", { name: "Check your inbox" });
+    fireEvent.click(screen.getByRole("button", { name: "Use a different email" }));
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("");
+  });
+
+  it("is passed on by ScuteAuthGate", async () => {
+    const Wrapper = makeWrapper(createFakeClient());
+    render(
+      <Wrapper>
+        <ScuteAuthGate defaultEmail="grace@example.com">
+          <p>App</p>
+        </ScuteAuthGate>
+      </Wrapper>
+    );
+    await screen.findByRole("heading", { name: "Sign in" });
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("grace@example.com");
+  });
+});
+
+describe("preview", () => {
+  // No AuthContextProvider: a preview needs no client.
+  const show = (props: ScuteSignInProps) => {
+    const utils = render(<ScuteSignIn {...props} />);
+    return { ...utils, root: () => utils.container.querySelector(".scute-signin") as HTMLElement };
+  };
+
+  it("draws the email step with the props, without a client, and takes no focus", () => {
+    const { root } = show({ preview: "login", copy: { title: "Sign in to Acme" }, appearance: { theme: "dark" }, methods: { google: true } });
+    expect(screen.getByRole("heading", { name: "Sign in to Acme" })).toBeTruthy();
+    expect(root().getAttribute("data-scute-theme")).toBe("dark");
+    expect(screen.getByRole("button", { name: "Continue with Google" })).toBeTruthy();
+    expect(document.activeElement).toBe(document.body);
+    // Its buttons do nothing.
+    fireEvent.submit(screen.getByLabelText("Email").closest("form")!);
+    expect(screen.getByRole("heading", { name: "Sign in to Acme" })).toBeTruthy();
+  });
+
+  it("shows defaultEmail, or a refusal under the field", () => {
+    const { unmount } = show({ preview: "login", defaultEmail: "ada@acme.test" });
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("ada@acme.test");
+    unmount();
+    show({ preview: { view: "login", email: "ada@acme.test", errorCode: "ip_blocked", error: "Forbidden" } });
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("ada@acme.test");
+    expect(screen.getByRole("alert").textContent).toMatch(/network you're on/);
+  });
+
+  it.each([
+    ["magic_pending", "Check your inbox"],
+    ["magic_verifying", "Signing you in"],
+    ["otp_input", "Enter the code"],
+    ["verification_required", "Confirm it's you"],
+    ["webauthn_verify", "Use your passkey"],
+    ["webauthn_register", "Add a passkey"],
+    ["mfa_verify", "One more step"],
+    ["mfa_enroll_suggest", "Set up two-step verification"],
+    ["authenticated", "You're in"],
+  ] as const)("draws %s", (view, title) => {
+    show({ preview: view });
+    expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+    expect(document.querySelector(`[data-scute-view="${view}"]`)).not.toBeNull();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("uses the sample data: the address, a wrong code, the MFA method and the others", () => {
+    const { rerender } = show({ preview: { view: "otp_input", email: "ada@acme.test" } });
+    expect(screen.getByText("ada@acme.test")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    rerender(<ScuteSignIn preview={{ view: "otp_input", email: "ada@acme.test", error: "Invalid code" }} />);
+    expect(screen.getByRole("alert").textContent).toBe("That code didn't work. Check the email and try again.");
+    rerender(<ScuteSignIn preview={{ view: "mfa_verify", mfaMethod: "backup_code", mfaMethods: ["totp", "backup_codes", "email"] }} />);
+    expect(boxes("Backup code")).toHaveLength(8);
+    expect(screen.getByRole("button", { name: "Authenticator app" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Email code" })).toBeTruthy();
+    rerender(<ScuteSignIn preview={{ view: "error", error: "Magic link not found or expired" }} />);
+    expect(screen.getByRole("heading", { name: "This link has expired" })).toBeTruthy();
+  });
+
+  it("never calls onSignedIn", () => {
+    const onSignedIn = vi.fn();
+    show({ preview: "authenticated", onSignedIn });
+    expect(screen.getByText("you@example.com")).toBeTruthy();
+    expect(onSignedIn).not.toHaveBeenCalled();
+  });
+});
+
+describe("fill layout", () => {
+  it("is the page layout sized to its container, not the window", async () => {
+    const { root } = await atEmail(createFakeClient(), { appearance: { layout: "fill" } });
+    expect(root().getAttribute("data-scute-layout")).toBe("fill");
+    const css = root().querySelector("style")!.textContent!;
+    // Its own rule (not the one it shares with "page").
+    const fill = css.match(/\}\s*\.scute-signin\[data-scute-layout="fill"\] \{([^}]*)\}/)![1];
+    expect(fill).toContain("height: 100%");
+    expect(fill).not.toContain("100vh");
+  });
+});
+
+describe("app settings that don't load", () => {
+  it("shows an error step instead of the email, and Try again loads them again", async () => {
+    const client = createFakeClient({
+      _initialize: vi.fn(async () => ({ error: { message: "Failed to fetch" } })),
+    });
+    let settings = { data: null as any, error: { message: "Failed to fetch" } as any };
+    client.getAppData.mockImplementation(async () => settings);
+    renderSignIn(client);
+    await screen.findByRole("heading", { name: "Sign-in isn't available right now" });
+    expect(screen.getByText(/couldn't load this app's sign-in settings/)).toBeTruthy();
+    expect(screen.queryByLabelText("Email")).toBeNull();
+
+    // Still failing: the same step again.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    });
+    await screen.findByRole("heading", { name: "Sign-in isn't available right now" });
+    expect(client.getAppData).toHaveBeenCalledWith(true);
+
+    settings = { data: { passkeys_enabled: true }, error: null };
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    });
+    await screen.findByRole("heading", { name: "Sign in" });
+    expect(screen.getByLabelText("Email")).toBeTruthy();
+  });
+
+  it("still finishes a magic link landing", async () => {
+    setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
+    const client = createFakeClient({
+      _initialize: vi.fn(async () => ({ error: { message: "Failed to fetch" } })),
+    });
+    renderSignIn(client);
+    await flush();
+    expect(client.verifyMagicLinkToken).toHaveBeenCalledWith(MAGIC_TOKEN);
+  });
+});

@@ -14,6 +14,7 @@ describe("@scute/auth-ui-react public surface", () => {
   it("exports exactly the headless hooks, the sign-in and the gate component", () => {
     expect(Object.keys(pkg).sort()).toEqual(
       [
+        "APP_SETTINGS_UNAVAILABLE",
         "RESEND_COOLDOWN_SECONDS",
         "ScuteAuthGate",
         "ScuteSignIn",
