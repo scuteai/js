@@ -273,7 +273,7 @@ describe("Pages API (Node)", () => {
     expect(res.statusCode).toBe(200);
     expect(setCookies()).toEqual([
       `${CSRF_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax`,
-      `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
+      `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`,
     ]);
     expect(res.getHeader("cookie")).toBeUndefined();
     expect(res.getHeader("content-type")).toBe("text/plain;charset=UTF-8");

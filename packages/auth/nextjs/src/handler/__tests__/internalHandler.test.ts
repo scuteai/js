@@ -170,7 +170,7 @@ describe("GET /auth/csrf", () => {
     expect(body).toMatch(/^[0-9a-f]{128}$/);
     expect(responseSetCookies).toEqual([
       `${CSRF_COOKIE}=${body}; Path=/; HttpOnly; SameSite=Lax`,
-      `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
+      `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`,
     ]);
     // nothing written through the session cookie store
     expect(setCookies).toEqual([]);
@@ -199,7 +199,7 @@ describe("GET /auth/csrf", () => {
     expect(body).toBe("legacy-token");
     expect(responseSetCookies).toEqual([
       `${CSRF_COOKIE}=legacy-token; Path=/; HttpOnly; SameSite=Lax`,
-      `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
+      `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`,
     ]);
   });
 
@@ -222,15 +222,25 @@ describe("GET /auth/csrf", () => {
     expect(body).toMatch(/^[0-9a-f]{128}$/);
   });
 
-  // Known limitation, tracked separately: an empty namespaced cookie is
-  // returned as an empty token instead of minting a new one.
-  it("returns an empty token when the namespaced cookie is present but empty", async () => {
-    const { body } = await run({
+  // An empty cookie (a deletion that lost its Max-Age, see csrf.ts) must not
+  // hand out an empty token: every CSRF check after it would fail.
+  it("mints a new token when the namespaced cookie is present but empty", async () => {
+    const { body, responseSetCookies } = await run({
       method: "GET",
       path: "/auth/csrf",
       cookies: { [CSRF_COOKIE]: "" },
     });
-    expect(body).toBe("");
+    expect(body).toMatch(/^[0-9a-f]{128}$/);
+    expect(responseSetCookies[0]).toBe(`${CSRF_COOKIE}=${body}; Path=/; HttpOnly; SameSite=Lax`);
+  });
+
+  it("mints a new token when both cookies are present but empty", async () => {
+    const { body } = await run({
+      method: "GET",
+      path: "/auth/csrf",
+      cookies: { [CSRF_COOKIE]: "", [LEGACY_CSRF_COOKIE]: "" },
+    });
+    expect(body).toMatch(/^[0-9a-f]{128}$/);
   });
 
   it("needs no CSRF header and makes no upstream token call", async () => {
@@ -597,8 +607,8 @@ describe("POST /auth/sign-out", () => {
     expect(res.status).toBe(200);
     expect(body).toBe("");
     expect(responseSetCookies).toEqual([
-      `${CSRF_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
-      `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
+      `${CSRF_COOKIE}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`,
+      `${LEGACY_CSRF_COOKIE}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`,
     ]);
     for (const name of [ACCESS_KEY, REFRESH_KEY, LEGACY_ACCESS_KEY, LEGACY_REFRESH_KEY]) {
       expect(isDeletion(lastCookie(setCookies, name))).toBe(true);

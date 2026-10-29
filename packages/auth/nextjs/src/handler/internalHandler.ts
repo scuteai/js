@@ -133,9 +133,11 @@ const internalHandler = async (
     // Prefer the namespaced cookie; fall through to the legacy unsuffixed
     // one so a mid-migration tab keeps its token instead of being forced
     // through a fresh round-trip on first read.
+    // An empty cookie counts as none: an empty token would fail every
+    // CSRF check after it (sign-in, refresh, sign-out).
     const token =
-      cookies[csrfCookieKey(appId)] ??
-      cookies[CSRF_TOKEN_KEY_LEGACY] ??
+      cookies[csrfCookieKey(appId)] ||
+      cookies[CSRF_TOKEN_KEY_LEGACY] ||
       createCsrfToken();
 
     const response = new Response(token, {
