@@ -18,6 +18,13 @@ const MAGIC_LINK_TIMEOUT_MESSAGE = "The sign-in link timed out. Please try again
  */
 export const RESEND_COOLDOWN_SECONDS = 30;
 
+/**
+ * `errorCode` when the app's sign-in settings didn't load (a wrong app ID,
+ * no connection): the flow shows "error", and `retry` loads them again.
+ */
+export const APP_SETTINGS_UNAVAILABLE = "app_settings_unavailable";
+const APP_SETTINGS_MESSAGE = "We couldn't load this app's sign-in settings";
+
 /** Sign-in refusals the API names with an error code (403). */
 export type SignInRefusalCode = "user_banned" | "user_suspended" | "ip_blocked" | "country_blocked";
 const REFUSAL_CODES: readonly string[] = ["user_banned", "user_suspended", "ip_blocked", "country_blocked"];
@@ -93,6 +100,8 @@ export type AuthFlowView =
  * - MFA: verify, resend, switch method (`submitMfaCode`, `resendMfaCode`,
  *   `switchMfaMethod`), enrollment required or suggested
  * - No passkey offer where the browser can't make one (`passkeysSupported`)
+ * - The app's settings not loading: view "error" with `errorCode`
+ *   "app_settings_unavailable" (`retry` loads them again)
  *
  * @example
  * ```tsx
@@ -260,7 +269,10 @@ export function useScuteAuthFlow() {
     initRef.current = true;
 
     (async () => {
-      try { await scuteClient["_initialize"](); } catch {}
+      let settingsError: any = null;
+      try {
+        settingsError = (await scuteClient["_initialize"]())?.error ?? null;
+      } catch {}
       try {
         const allowed = (await scuteClient.getAppData())?.data?.allowed_identifiers;
         const types = Array.isArray(allowed) ? allowed.filter((t): t is "email" | "phone" => t === "email" || t === "phone") : [];
@@ -270,6 +282,11 @@ export function useScuteAuthFlow() {
       const magicToken = scuteClient.getMagicLinkToken();
       if (magicToken) {
         setView("magic_verifying");
+      } else if (!isAuthenticated && settingsError) {
+        // Every sign-in needs them: say so now, not after the email.
+        setError(settingsError.message || APP_SETTINGS_MESSAGE);
+        setErrorCode(APP_SETTINGS_UNAVAILABLE);
+        setView("error");
       } else if (!isAuthenticated) {
         setView("login");
       }
@@ -754,6 +771,7 @@ export function useScuteAuthFlow() {
   }, [authPayload, isAuthenticated, scuteClient]);
 
   const retry = useCallback(() => {
+    const settingsFailed = errorCode === APP_SETTINGS_UNAVAILABLE;
     setError(null);
     setErrorCode(null);
     setIdentifier("");
@@ -761,8 +779,28 @@ export function useScuteAuthFlow() {
     setVerification(null);
     magicTokenRef.current = null;
     setMfaResent(false);
-    setView("login");
-  }, []);
+    if (!settingsFailed) {
+      setView("login");
+      return;
+    }
+    // The app's settings didn't load: fetch them again before the email.
+    setView("loading");
+    (async () => {
+      let settingsError: any;
+      try {
+        settingsError = (await scuteClient.getAppData(true))?.error ?? null;
+      } catch (err) {
+        settingsError = err ?? {};
+      }
+      if (settingsError) {
+        setError(settingsError.message || APP_SETTINGS_MESSAGE);
+        setErrorCode(APP_SETTINGS_UNAVAILABLE);
+        setView("error");
+      } else {
+        setView("login");
+      }
+    })();
+  }, [errorCode, scuteClient]);
 
   return {
     // State

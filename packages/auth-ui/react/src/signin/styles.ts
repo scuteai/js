@@ -82,12 +82,23 @@ export const SIGN_IN_CSS = `
   color: inherit;
 }
 
-/* Layouts: a page of its own, or a card inside the app's page. */
+/* Layouts: a page of its own (the window's height, or its container's for
+   "fill"), or a card inside the app's page. */
+.scute-signin[data-scute-layout="page"],
+.scute-signin[data-scute-layout="fill"] {
+  padding: 40px 16px 24px;
+  background: var(--scute-bg);
+}
 .scute-signin[data-scute-layout="page"] {
   min-height: 100vh;
   min-height: 100dvh;
-  padding: 40px 16px 24px;
-  background: var(--scute-bg);
+}
+.scute-signin[data-scute-layout="fill"] {
+  flex: 1 1 auto;
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 .scute-signin[data-scute-layout="card"] {
   max-width: 456px;
@@ -99,7 +110,8 @@ export const SIGN_IN_CSS = `
   box-shadow: var(--scute-shadow);
 }
 @media (min-width: 640px) {
-  .scute-signin[data-scute-layout="page"] { padding: 48px 24px 24px; }
+  .scute-signin[data-scute-layout="page"],
+  .scute-signin[data-scute-layout="fill"] { padding: 48px 24px 24px; }
   .scute-signin[data-scute-layout="card"] { padding: 40px 32px 28px; }
 }
 

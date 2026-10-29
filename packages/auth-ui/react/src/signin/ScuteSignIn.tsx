@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useScuteAuthFlow } from "../useScuteAuthFlow";
+import { APP_SETTINGS_UNAVAILABLE, useScuteAuthFlow } from "../useScuteAuthFlow";
 import { errorText, failureFor, isBackupCode, MFA_LABELS, MFA_LEADS, REFUSALS, switchableMethod } from "./messages";
 import {
   Button,
@@ -11,13 +11,16 @@ import {
   GoogleIcon,
   Icon,
   Lead,
+  PreviewContext,
   StepContext,
   TextButton,
   Title,
   Token,
   Waiting,
+  useInPreview,
   type StepInfo,
 } from "./parts";
+import { previewFlow, previewOf } from "./preview";
 import { SIGN_IN_CSS } from "./styles";
 import { themeVars } from "./theme";
 import type { ScuteSignInMood, ScuteSignInProps } from "./types";
@@ -31,7 +34,8 @@ export type ScuteAuthFlow = ReturnType<typeof useScuteAuthFlow>;
  * Email first, then whatever the app is set up for: a passkey, a magic
  * link or a 6-digit code, MFA, and a passkey offer for next time. Styled by
  * its own scoped stylesheet (no CSS import, no Tailwind needed) and themed
- * with `appearance`. Needs the Scute AuthContextProvider above it.
+ * with `appearance`. Needs the Scute AuthContextProvider above it, except
+ * with `preview` (one step drawn with sample data, no client).
  *
  * @example
  * ```tsx
@@ -42,7 +46,19 @@ export type ScuteAuthFlow = ReturnType<typeof useScuteAuthFlow>;
  * />
  * ```
  */
-export function ScuteSignIn({ onSignedIn, ...props }: ScuteSignInProps) {
+export function ScuteSignIn({ preview, ...props }: ScuteSignInProps) {
+  return preview ? <PreviewSignIn preview={preview} {...props} /> : <LiveSignIn {...props} />;
+}
+
+// The `preview` prop: one step with sample data, on a flow that does
+// nothing. A new step or new sample data starts the step afresh.
+function PreviewSignIn({ preview, onSignedIn: _unused, ...props }: ScuteSignInProps & { preview: NonNullable<ScuteSignInProps["preview"]> }) {
+  const p = previewOf(preview);
+  const stepKey = [p.view, p.email, p.error, p.errorCode, p.mfaMethod, p.verificationMethod].join("|");
+  return <SignInView auth={previewFlow(p)} preview stepKey={stepKey} {...props} />;
+}
+
+function LiveSignIn({ onSignedIn, ...props }: Omit<ScuteSignInProps, "preview">) {
   const auth = useScuteAuthFlow();
 
   // Once per sign-in, from an effect (not during render); the latest prop
@@ -110,7 +126,10 @@ export function SignInView({
   copy = {},
   legal = {},
   methods = {},
-}: Omit<ScuteSignInProps, "onSignedIn"> & { auth: ScuteAuthFlow }) {
+  defaultEmail,
+  preview = false,
+  stepKey,
+}: Omit<ScuteSignInProps, "onSignedIn" | "preview"> & { auth: ScuteAuthFlow; preview?: boolean; stepKey?: string }) {
   const { theme = "light", radius = "medium", layout = "page", className, logo, illustration } = appearance;
   const vars = useMemo(() => themeVars(appearance), [appearance.accentColor, appearance.fontFamily]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -128,6 +147,8 @@ export function SignInView({
       : MOODS[view] ?? "idle";
   const step: StepInfo = { view, mood, errorCount };
   const focusShown = useRef(false);
+  // Set once an email was sent, so "Use a different email" starts empty.
+  const defaultEmailUsed = useRef(false);
 
   return (
     <div
@@ -141,28 +162,30 @@ export function SignInView({
     >
       <style>{SIGN_IN_CSS}</style>
       <StepContext.Provider value={step}>
-        <FocusContext.Provider value={focusShown}>
-          {logo && (
-            <div className="scute-signin__logo" data-scute-auth-logo>
-              {typeof logo === "string" ? <img src={logo} alt="" /> : logo}
-            </div>
-          )}
-          {illustration !== false && (
-            <div className="scute-signin__illustration" aria-hidden={illustration === undefined || undefined}>
-              {illustration ?? (
-                <span className="scute-signin__icon" data-mood={mood}>
-                  <Icon name={ICONS[view] ?? "user"} />
-                </span>
-              )}
-            </div>
-          )}
-          <main className="scute-signin__main" data-scute-auth-container>
-            <div key={view} className="scute-signin__step" data-scute-view={view}>
-              <Step auth={auth} copy={copy} methods={methods} />
-            </div>
-          </main>
-          <Legal {...legal} />
-        </FocusContext.Provider>
+        <PreviewContext.Provider value={preview}>
+          <FocusContext.Provider value={focusShown}>
+            {logo && (
+              <div className="scute-signin__logo" data-scute-auth-logo>
+                {typeof logo === "string" ? <img src={logo} alt="" /> : logo}
+              </div>
+            )}
+            {illustration !== false && (
+              <div className="scute-signin__illustration" aria-hidden={illustration === undefined || undefined}>
+                {illustration ?? (
+                  <span className="scute-signin__icon" data-mood={mood}>
+                    <Icon name={ICONS[view] ?? "user"} />
+                  </span>
+                )}
+              </div>
+            )}
+            <main className="scute-signin__main" data-scute-auth-container>
+              <div key={stepKey ?? view} className="scute-signin__step" data-scute-view={view}>
+                <Step auth={auth} copy={copy} methods={methods} defaultEmail={defaultEmail} defaultEmailUsed={defaultEmailUsed} />
+              </div>
+            </main>
+            <Legal {...legal} />
+          </FocusContext.Provider>
+        </PreviewContext.Provider>
       </StepContext.Provider>
     </div>
   );
@@ -185,12 +208,15 @@ function Legal({ termsUrl, privacyUrl }: { termsUrl?: string; privacyUrl?: strin
   );
 }
 
-function Step({ auth, copy, methods }: { auth: ScuteAuthFlow } & Pick<ScuteSignInProps, "copy" | "methods">) {
+type EmailDefault = { defaultEmail?: string; defaultEmailUsed: { current: boolean } };
+
+function Step({ auth, copy, methods, ...email }: { auth: ScuteAuthFlow } & Pick<ScuteSignInProps, "copy" | "methods"> & EmailDefault) {
+  const preview = useInPreview();
   switch (auth.view) {
     case "loading":
       return <Waiting center>Loading</Waiting>;
     case "login":
-      return <EmailStep auth={auth} copy={copy ?? {}} google={!!methods?.google} />;
+      return <EmailStep auth={auth} copy={copy ?? {}} google={!!methods?.google} {...email} />;
     case "magic_pending":
       return <InboxStep auth={auth} />;
     case "magic_verifying":
@@ -261,7 +287,7 @@ function Step({ auth, copy, methods }: { auth: ScuteAuthFlow } & Pick<ScuteSignI
               : ""}
             . Set one up in your account settings.
           </Lead>
-          <Button variant="primary" autoFocus onClick={auth.skipMfaEnrollment} className="scute-signin__mt-28">
+          <Button variant="primary" autoFocus={!preview} onClick={auth.skipMfaEnrollment} className="scute-signin__mt-28">
             Continue
           </Button>
         </>
@@ -321,8 +347,17 @@ function Different({ auth }: { auth: ScuteAuthFlow }) {
   return <TextButton onClick={auth.retry}>{number ? "Use a different number" : "Use a different email"}</TextButton>;
 }
 
-function EmailStep({ auth, copy, google }: { auth: ScuteAuthFlow; copy: NonNullable<ScuteSignInProps["copy"]>; google: boolean }) {
-  const [email, setEmail] = useState(auth.identifier || "");
+function EmailStep({ auth, copy, google, defaultEmail, defaultEmailUsed }: {
+  auth: ScuteAuthFlow; copy: NonNullable<ScuteSignInProps["copy"]>; google: boolean;
+} & EmailDefault) {
+  const preview = useInPreview();
+  const [email, setEmail] = useState(() => auth.identifier || (defaultEmailUsed.current ? "" : defaultEmail ?? ""));
+  const edited = useRef(false);
+  // A default that arrives once the step is showing (read on the client
+  // from the URL or a cookie) fills the field until the visitor types.
+  useEffect(() => {
+    if (defaultEmail && !edited.current && !auth.identifier && !defaultEmailUsed.current) setEmail(defaultEmail);
+  }, [defaultEmail]); // eslint-disable-line react-hooks/exhaustive-deps
   const error = errorText(auth.error, auth.errorCode);
   const busy = auth.submitting;
   const field = fieldFor(auth.identifierTypes);
@@ -331,7 +366,9 @@ function EmailStep({ auth, copy, google }: { auth: ScuteAuthFlow; copy: NonNulla
     e.preventDefault();
     if (busy) return;
     const value = String(new FormData(e.currentTarget).get("email") ?? "").trim();
-    if (value) auth.submitIdentifier(value);
+    if (!value) return;
+    defaultEmailUsed.current = true;
+    auth.submitIdentifier(value);
   };
 
   return (
@@ -345,14 +382,17 @@ function EmailStep({ auth, copy, google }: { auth: ScuteAuthFlow; copy: NonNulla
           name="email"
           type={field.type}
           autoComplete={field.autoComplete}
-          autoFocus
+          autoFocus={!preview}
           required
           placeholder={copy.emailPlaceholder ?? field.placeholder}
           value={email}
           readOnly={busy}
           aria-invalid={!!error || undefined}
           aria-describedby={error ? "scute-signin-email-error" : undefined}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            edited.current = true;
+            setEmail(e.target.value);
+          }}
           className="scute-signin__input"
           data-scute-input
         />
@@ -415,11 +455,13 @@ const wrongCode = (auth: ScuteAuthFlow, fallback: string) =>
   auth.errorCode && REFUSALS[auth.errorCode] ? REFUSALS[auth.errorCode].message : fallback;
 
 // The code boxes, their Verify button and the wrong-code state, for every
-// code a sign-in asks for. Sends itself once the last box is filled.
-function useCode(length: number, submit: (code: string) => Promise<boolean>) {
+// code a sign-in asks for. Sends itself once the last box is filled. A
+// preview with an error starts on the wrong-code state.
+function useCode(length: number, submit: (code: string) => Promise<boolean>, error: string | null) {
+  const preview = useInPreview();
   const [code, setCode] = useState(() => blank(length));
   const [busy, setBusy] = useState(false);
-  const [wrong, setWrong] = useState(false);
+  const [wrong, setWrong] = useState(preview && !!error);
   const [focusKey, setFocusKey] = useState(0);
   const submitting = useRef(false);
   // Set again on every mount: StrictMode (and a remount) runs the cleanup
@@ -477,7 +519,7 @@ function VerifyButton({ busy, full }: { busy: boolean; full: boolean }) {
 }
 
 function CodeStep({ auth }: { auth: ScuteAuthFlow }) {
-  const c = useCode(6, auth.submitOtp);
+  const c = useCode(6, auth.submitOtp, auth.error);
   return (
     <form onSubmit={c.onSubmit}>
       <Title focus={false}>Enter the code</Title>
@@ -497,7 +539,7 @@ function CodeStep({ auth }: { auth: ScuteAuthFlow }) {
 }
 
 function VerificationStep({ auth }: { auth: ScuteAuthFlow }) {
-  const c = useCode(6, auth.submitVerificationCode);
+  const c = useCode(6, auth.submitVerificationCode, auth.error);
   const byText = auth.verification?.method === "sms_otp";
   return (
     <form onSubmit={c.onSubmit}>
@@ -522,7 +564,7 @@ function VerificationStep({ auth }: { auth: ScuteAuthFlow }) {
 function MfaStep({ auth }: { auth: ScuteAuthFlow }) {
   const method: string = auth.mfaChallenge?.method ?? "totp";
   const length = isBackupCode(method) ? 8 : 6;
-  const c = useCode(length, auth.submitMfaCode);
+  const c = useCode(length, auth.submitMfaCode, auth.error);
   // A new method (or a new code for it) starts with empty boxes.
   const lastMethod = useRef(method);
   useEffect(() => {
@@ -612,12 +654,13 @@ function AddPasskeyStep({ auth }: { auth: ScuteAuthFlow }) {
 }
 
 function FailureStep({ auth, failure }: { auth: ScuteAuthFlow; failure: { title: string; message: string } }) {
+  const preview = useInPreview();
   return (
     <div role="alert">
       <Title focus={false}>{failure.title}</Title>
       <Lead>{failure.message}</Lead>
-      <Button variant="primary" autoFocus onClick={auth.retry} className="scute-signin__mt-28">
-        Back to sign in
+      <Button variant="primary" autoFocus={!preview} onClick={auth.retry} className="scute-signin__mt-28">
+        {auth.errorCode === APP_SETTINGS_UNAVAILABLE ? "Try again" : "Back to sign in"}
       </Button>
     </div>
   );

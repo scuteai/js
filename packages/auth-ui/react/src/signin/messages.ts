@@ -40,6 +40,10 @@ export const REFUSALS: Record<string, Failure> = {
     title: "We couldn't send your code",
     message: "This sign-in needs a code to confirm it's you, and we couldn't send one. Start again from your email.",
   },
+  app_settings_unavailable: {
+    title: "Sign-in isn't available right now",
+    message: "We couldn't load this app's sign-in settings. Check your connection and try again.",
+  },
   ERROR_PASSKEYS_UNAVAILABLE: {
     title: "Passkeys aren't available here",
     message: "This page can't use passkeys. They need a secure connection (https) and a browser that supports them.",

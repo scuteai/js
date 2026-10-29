@@ -215,6 +215,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       appId,
       baseUrl,
       secretKey: config.secretKey,
+      clientIp: config.clientIp,
       errorReporting,
     });
 

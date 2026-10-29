@@ -1,5 +1,21 @@
 # @scute/auth-ui-react
 
+## 0.4.0-next.4
+
+### Minor Changes
+
+- e3441b8: `ScuteSignIn` takes `defaultEmail` (also on `ScuteAuthGate`): the email the field starts with, until the visitor edits it. New `preview` prop: draws one step with sample data (`"login"`, or `{ view, email, error, errorCode, mfaMethod, mfaMethods, ... }`) with no Scute client, no requests and no focus taken, for settings previews, docs and screenshots. New `"fill"` layout: the full-page look sized to its container instead of the window. When the app's settings don't load, the sign-in shows an error step with "Try again" instead of the email field (`useScuteAuthFlow` sets `errorCode` to `"app_settings_unavailable"`, exported as `APP_SETTINGS_UNAVAILABLE`, and `retry` loads them again).
+- b1039f4: New `ScuteSignIn` component: the complete sign-in (email, passkey, magic link or code, MFA, passkey offer) as one themeable component with its own scoped stylesheet, so it needs no CSS import or Tailwind. Theme it with `appearance` (logo, accent color, light, dark or auto, radius, font, illustration, page or card layout), and set `copy`, `legal` links and `methods` (Google). `ScuteAuthGate` now renders it when signed out and accepts the same `copy`, `legal` and `methods`; its `appearance`, `renderView` and `onAuthenticated` keep working.
+
+  `useScuteAuthFlow` closes its gaps against the API: `resend` for the login link or code (30 second cooldown, `resendIn`), attack protection's code step on a magic link (`verification_required` view, `submitVerificationCode`), no passkey offer where the browser can't make one (`passkeysSupported`), `errorCode` for sign-in refusals (`user_banned`, `user_suspended`, `ip_blocked`, `country_blocked`), MFA `resendMfaCode` and `switchMfaMethod`, the grace period read on `mfa_enrollment_suggested`, a fallback to a link or a code when the passkey prompt is cancelled, and `signInWithOAuth`. `submitOtp`, `submitMfaCode` and `submitVerificationCode` resolve to whether the code was accepted. The bundle now starts with `"use client"`.
+
+### Patch Changes
+
+- Updated dependencies [9f79ec8]
+- Updated dependencies [b1039f4]
+  - @scute/js-core@0.10.0-next.4
+  - @scute/react-hooks@0.9.0-next.4
+
 ## 0.4.0-next.3
 
 ### Patch Changes

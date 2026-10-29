@@ -1,5 +1,6 @@
 import type { NextApiRequest } from "next";
 import type { TLSSocket } from "tls";
+import { normalizeClientIp } from "@scute/js-core";
 
 export async function getBody(
   req: Request
@@ -81,3 +82,23 @@ export type Prettify<T> = {
 } & {};
 
 export type Promisable<T> = T | Promise<T>;
+
+/**
+ * The signing-in person's address for a server client: the `clientIp` the
+ * caller passed (null for none), else the one this request came from, when
+ * it is one address. Next.js has no setting for which proxies to trust, so
+ * proxy headers (X-Forwarded-For, X-Real-IP) are never read here; pass
+ * `clientIp` yourself when your platform or proxy gives you the address.
+ */
+export function clientIpFor(
+  config: { clientIp?: string | null } | undefined,
+  detected: unknown
+): string | null | undefined {
+  if (config?.clientIp !== undefined) return config.clientIp;
+  return normalizeClientIp(detected);
+}
+
+/** `request.ip`, which Next.js 14 and earlier fill in on platforms that set it. */
+export function nextRequestIp(request: unknown): unknown {
+  return (request as { ip?: unknown } | undefined)?.ip;
+}
