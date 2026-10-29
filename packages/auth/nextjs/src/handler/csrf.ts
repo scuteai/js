@@ -6,6 +6,12 @@ import {
   csrfCookieKey,
 } from "./constants";
 
+// A deletion carries Expires as well as Max-Age=0. Next.js route handlers
+// that also write through cookies() re-serialize the response's cookies and
+// drop "Max-Age=0" (a falsy value), which turned the deletion into an empty
+// cookie that outlived sign-out. The past Expires survives that.
+const EXPIRED = new Date(0);
+
 export const createCsrfToken = () => {
   const token = randomBytes(64).toString("hex");
   return token;
@@ -41,6 +47,7 @@ export const setCsrfToken = (
       path: "/",
       secure: process.env.NODE_ENV === "production",
       maxAge: 0,
+      expires: EXPIRED,
     })
   );
 };
@@ -55,6 +62,7 @@ export const deleteCsrfToken = (
     path: "/",
     secure: process.env.NODE_ENV === "production",
     maxAge: 0,
+    expires: EXPIRED,
   });
   response.headers.append("set-cookie", cookieStr);
   // Symmetric legacy clear — same reason as in setCsrfToken.
@@ -66,6 +74,7 @@ export const deleteCsrfToken = (
       path: "/",
       secure: process.env.NODE_ENV === "production",
       maxAge: 0,
+      expires: EXPIRED,
     })
   );
 };

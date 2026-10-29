@@ -1,3 +1,4 @@
+import { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 import {
   createCsrfToken,
   deleteCsrfToken,
@@ -40,7 +41,7 @@ describe("setCsrfToken", () => {
 
     expect(res.headers.getSetCookie()).toEqual([
       `${NS}=tok123; Path=/; HttpOnly; SameSite=Lax`,
-      `${LEGACY}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
+      `${LEGACY}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`,
     ]);
   });
 
@@ -51,7 +52,7 @@ describe("setCsrfToken", () => {
 
     expect(res.headers.getSetCookie()).toEqual([
       `${NS}=tok123; Path=/; HttpOnly; Secure; SameSite=Lax`,
-      `${LEGACY}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`,
+      `${LEGACY}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Lax`,
     ]);
   });
 
@@ -84,10 +85,29 @@ describe("deleteCsrfToken", () => {
     const res = new Response(null);
     deleteCsrfToken(res, APP);
     expect(res.headers.getSetCookie()).toEqual([
-      `${NS}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
-      `${LEGACY}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
+      `${NS}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`,
+      `${LEGACY}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`,
     ]);
     expect(res.headers.get("cookie")).toBeNull();
+  });
+
+  // Next.js route handlers that also write through cookies() re-serialize
+  // the response's cookies, and that drops "Max-Age=0". The deletion must
+  // still expire the cookie afterwards, not leave an empty one behind.
+  it("still deletes after Next.js re-serializes the response cookies", () => {
+    const res = new Response(null);
+    deleteCsrfToken(res, APP);
+    // What Next.js does (appendMutableCookies): read every cookie back and
+    // set it again.
+    const headers = new Headers(res.headers);
+    const cookies = new ResponseCookies(headers);
+    for (const cookie of cookies.getAll()) cookies.set(cookie);
+    const written = headers.getSetCookie();
+    expect(written).toHaveLength(2);
+    for (const line of written) {
+      expect(line).not.toContain("Max-Age=0");
+      expect(line).toContain("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    }
   });
 
   it("adds Secure in production", () => {
