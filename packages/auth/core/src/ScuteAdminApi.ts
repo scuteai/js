@@ -1,5 +1,6 @@
 import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
 import { accessTokenHeader, refreshTokenHeaders } from "./lib/helpers";
+import { SCUTE_CLIENT_IP_HEADER, requireClientIp } from "./lib/clientIp";
 
 import type {
   ListUsersRequestParams,
@@ -118,6 +119,7 @@ export type AgentConversation = {
 class ScuteAdminApi extends ScuteBaseHttp {
   protected appId: UniqueIdentifier;
   protected secretKey?: string;
+  protected clientIp?: string;
 
   constructor(config: ScuteAdminApiConfig) {
     const baseUrl = config.baseUrl || "https://api.scute.io";
@@ -130,6 +132,7 @@ class ScuteAdminApi extends ScuteBaseHttp {
     });
 
     this.appId = appId;
+    this.clientIp = requireClientIp(config.clientIp);
 
     if (secretKey) {
       this.setSecretKey(secretKey);
@@ -151,6 +154,32 @@ class ScuteAdminApi extends ScuteBaseHttp {
     }
 
     this.secretKey = secretKey;
+  }
+
+  /**
+   * The same API, sending `ip` as the signing-in person's address
+   * (`X-Scute-Client-IP`) on every call it makes with the secret key. Use it
+   * per request on your server, so a sign-in your server starts is checked
+   * against the workspace's IP rules (without it, it isn't):
+   *
+   * ```ts
+   * await admin.withClientIp(personIp).createUser(email);
+   * ```
+   *
+   * `ip` must be one address (IPv4 or IPv6); a list (like a raw
+   * X-Forwarded-For) or a range throws. null or undefined keeps the
+   * client's own `clientIp`, if any.
+   */
+  withClientIp(ip: string | null | undefined): this {
+    const clientIp = requireClientIp(ip);
+    if (!clientIp) return this;
+
+    const scoped: this = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
+    scoped.clientIp = clientIp;
+    // Calls that only carry the default headers send it too; the
+    // middlewares are kept.
+    scoped.wretcher = this.wretcher.headers(scoped._clientIpHeader);
+    return scoped;
   }
 
   /**
@@ -738,7 +767,19 @@ class ScuteAdminApi extends ScuteBaseHttp {
 
     return {
       Authorization: `Bearer ${this.secretKey}`,
+      ...this._clientIpHeader,
     };
+  }
+
+  /**
+   * The person's address, sent only with the secret key: Scute reads it only
+   * on calls from your server.
+   * @private
+   */
+  private get _clientIpHeader(): Record<string, string> {
+    if (!this.secretKey || !this.clientIp) return {};
+
+    return { [SCUTE_CLIENT_IP_HEADER]: this.clientIp };
   }
 
   private get _v1Path() {
