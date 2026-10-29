@@ -1,4 +1,4 @@
-# Scute with Next.js: sign-in, MFA and a protected page
+# Scute with Next.js: sign-in, MFA and roles
 
 A small Next.js (App Router) app that adds Scute from scratch:
 
@@ -7,7 +7,11 @@ A small Next.js (App Router) app that adds Scute from scratch:
 - **The grace-period nudge**: a person without a second step yet is let in with a reminder, until the days you allow run out.
 - **A custom second step** (headless): the same sign-in with the MFA step drawn by the app, for when you build your own UI.
 - **Protected server pages** (`/account`, `/projects`) that read the session on the server, and **sign-out**.
-- **A spot for roles and permissions**: `/projects` has view, edit and delete actions marked `TODO(RBAC)`.
+- **Roles and permissions (RBAC)**: two permissions (`project:view`, `project:edit`) and two roles (`viewer` for everyone, `editor`), set up by a seed script with the API.
+- **Checks on the server**: `/projects` renders only after Scute allows `project:view`, and `PATCH /api/projects/:id` renames a project only after Scute allows `project:edit`.
+- **Hiding what people can't use**: the Edit buttons show only to editors (`useCan` from `@scute/react-hooks`).
+- **Step-up** (optional): editing asks for a fresh email code first, then is allowed for five minutes.
+- **The decision log**: `/projects` lists the newest decisions Scute logged about you, with why.
 
 The step-by-step tutorial for this app is in the Scute docs: [MFA and RBAC with Next.js](https://docs.scute.io/guides/mfa-rbac-tutorial).
 
@@ -40,6 +44,8 @@ In the dashboard, open your app and set:
 
 Your app's ID is on its **Overview**.
 
+Roles and permissions are set with the API, by `scripts/seed-rbac.mjs` (see Run it): the dashboard doesn't edit them yet.
+
 ## Run it
 
 From the root of this repository:
@@ -49,10 +55,32 @@ npx pnpm@8.4.0 install
 npx pnpm@8.4.0 turbo run build --filter=with-nextjs-mfa-rbac^...
 cp examples/with-nextjs-mfa-rbac/env.example examples/with-nextjs-mfa-rbac/.env.local
 # fill in .env.local, then:
+npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac seed
 npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac dev
 ```
 
-The second command builds the Scute packages the example uses. Open http://localhost:3000.
+The second command builds the Scute packages the example uses. `seed` creates the roles and permissions in your Scute app (run it as often as you like: it updates what is there). Open http://localhost:3000.
+
+### The seed script
+
+`npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac seed` runs `node --env-file=.env.local scripts/seed-rbac.mjs` (Node.js 20.6 or later), which calls the API with your secret key:
+
+| Call | What it sets |
+| --- | --- |
+| `POST /v1/apps/:app_id/authz/resources` `{ slug: "project", actions: ["view", "edit"] }` | The two permissions, `project:view` and `project:edit`. |
+| `POST /v1/apps/:app_id/authz/roles` `{ slug: "viewer", is_default: true, permissions: ["project:view"] }` | `viewer`: a default role, so everyone who signs in holds it. |
+| `POST /v1/apps/:app_id/authz/roles` `{ slug: "editor", permissions: ["project:view", "project:edit"] }` | `editor`: given to people one by one. |
+| `PATCH /v1/apps/:app_id/authz/permissions/project:edit` `{ requires_verification }` | Step-up on editing: on with `--step-up`, off without. |
+| `PATCH /v1/apps/:app_id/authz/settings` `{ client_checks: true, log_allow_rate: 1 }` | Lets the browser ask about its own permissions (`useCan`), and keeps every allow in the decision log (the default keeps 10%). |
+
+More forms:
+
+```bash
+# give someone the editor role (they must have signed in once)
+npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac seed editor jane@example.com
+# turn step-up on for project:edit (run seed without it to turn it off)
+npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac seed --step-up
+```
 
 ### Environment variables
 
@@ -72,6 +100,22 @@ The second command builds the Scute packages the example uses. Open http://local
 6. Open **Custom second step** in the header and sign in again: the MFA step is now drawn by `src/app/sign-in/custom/page.tsx`.
 7. On **/account**, **Add a passkey**. Next time, sign in with the passkey: with "A passkey counts as both" on, no second step is asked.
 
+Then roles, with two people. In a private window (or another browser) sign in as a second person, so you have a viewer and an editor:
+
+8. As the first person, open **/projects**. You are a `viewer` (everyone is): the list shows, each project says **View only**, and there is no Edit button.
+9. Ask the server anyway. In the browser console on `/projects`:
+
+   ```js
+   await fetch("/api/projects/p_website", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Hacked" }) }).then((r) => r.status)
+   ```
+
+   It answers `403`: the route handler asked Scute, and Scute said no.
+10. Make the second person an editor: `npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac seed editor their@email.com`. Reload their **/projects**: Edit shows. Rename a project and save.
+11. Step-up: run `npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac seed --step-up`, then edit again as the editor. Saving now asks for a code Scute emails them; after it, editing works without a code for five minutes.
+12. Reload **/projects**: **Recent decisions about you** lists each check, allowed or refused, with why.
+
+Testing without real inboxes: with **Test identities** on for the app (sandbox workspaces), an email like `jane+scute_test@example.com` always gets the code `424242` and nothing is sent.
+
 ## Where things are
 
 | File | What it does |
@@ -83,7 +127,12 @@ The second command builds the Scute packages the example uses. Open http://local
 | `src/lib/session.ts` | Reads the session on the server (`createServerComponentClient`); `requireUser()` redirects signed-out visitors. |
 | `src/app/account/page.tsx` | A protected server page. |
 | `src/app/account/security-settings.tsx` | Setting up a second step with the `useSecureAccount()` hook: TOTP with a QR code, email, SMS, backup codes, passkey. |
-| `src/app/projects/page.tsx` | A protected page with view, edit and delete actions, waiting for roles and permissions (`TODO(RBAC)`). |
+| `scripts/seed-rbac.mjs` | Creates the permissions and roles in Scute, gives someone a role, turns step-up on or off. |
+| `src/lib/authz.ts` | Server-side checks with the secret key: `checkProject()` (`ScuteAdminApi.authzCheck`), `startStepUp()`, `verifyStepUp()` and `recentDecisions()` (the decision log). |
+| `src/app/projects/page.tsx` | A protected page that renders only after Scute allows `project:view`, and shows your roles and the decision log. |
+| `src/app/projects/project-list.tsx` | The list; `useCan("edit", "project")` shows Edit only to editors, and asks for the step-up code when the server wants one. |
+| `src/app/api/projects/[id]/route.ts` | `PATCH`: renames a project only after Scute allows `project:edit`, and runs the step-up. |
+| `src/lib/projects.ts` | Sample projects, in memory. |
 | `src/components/sign-out-button.tsx` | Sign-out. |
 
 ## What the sign-in can answer
@@ -99,6 +148,19 @@ The second command builds the Scute packages the example uses. Open http://local
 | "MFA method not allowed for this app" | The method is off under **What they can use** (`method_not_allowed`). | Turn it on in the dashboard. |
 | "This account can't sign in", "This account is suspended", "Sign-ins from your network (or country) are blocked" | The account or the network is refused (`user_banned`, `user_suspended`, `ip_blocked`, `country_blocked`). | Check the user and your workspace's rules in the dashboard. |
 | "Sign-in isn't available right now" (after a few seconds of loading) | The app's settings didn't load (`app_settings_unavailable`): this address isn't an allowed domain (the browser blocks the request), the app ID is wrong, or the API can't be reached. | Add the address under **Domains > Allowed domains**, check `.env.local`. |
+
+## When a permission check says no
+
+| You see | Why | What to do |
+| --- | --- | --- |
+| Everyone sees **View only**, even editors | `useCan` needs client checks on (`client_checks`); without them the API answers `client_checks_disabled` and the button stays hidden. | Run `seed` again: it turns them on. |
+| "You don't have access to projects" on `/projects` | No role grants `project:view` (the error says which permission). `No permission "project:view" is defined` means the seed didn't run against this app. | Run `seed`, and check `NEXT_PUBLIC_SCUTE_APP_ID` and `SCUTE_SECRET` belong to the same app. |
+| `No user jane@example.com in this app yet` from `seed editor ...` | The person hasn't signed in to this app. | Sign in once with that email, then run it again. |
+| Edit shows but saving says "can't edit projects" | The role changed after the page loaded, or the server and the browser are on different apps. | Reload the page. |
+| "That code didn't work" on the step-up | Wrong or expired code (10 minutes). | Use the newest code, or Cancel and save again for a new one. |
+| A decision isn't in the log yet | Scute writes the log a moment after each check. Plain allows are sampled (10% by default) unless `log_allow_rate` is 1, as the seed sets it. | Reload after a few seconds. |
+
+Roles and permissions can also carry conditions (a role allows something only when an attribute of the user, the object or the request holds), and roles can be held on one object (`project:42`) instead of app-wide. This example keeps to app-wide roles.
 
 ## Trust this device
 

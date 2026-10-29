@@ -1,54 +1,49 @@
 import { requireUser } from "@/lib/session";
+import { checkProject, recentDecisions } from "@/lib/authz";
+import { listProjects } from "@/lib/projects";
+import { ProjectList } from "./project-list";
 
-// Sample data. A real app loads this from its own database.
-const PROJECTS = [
-  { id: "p_website", name: "Website redesign" },
-  { id: "p_mobile", name: "Mobile app" },
-  { id: "p_billing", name: "Billing migration" },
-];
-
-// Protected like /account: signed-out visitors go to the sign-in first.
+// Protected like /account, and checked: the server asks Scute whether this
+// person may view projects before it renders any.
 export default async function ProjectsPage() {
-  await requireUser("/projects");
+  const user = await requireUser("/projects");
+  const view = await checkProject(user.id, "view");
 
-  // TODO(RBAC): decide on the server what this person may do, with Scute
-  // roles and permissions: "projects:view" to see the list, "projects:edit"
-  // to change a project, "projects:admin" to delete one or manage members.
-  // Until then everyone signed in gets every action.
-  const can = { view: true, edit: true, admin: true };
+  if (!view.allowed) {
+    return (
+      <section className="stack">
+        <h1>Projects</h1>
+        <p className="error">{view.explanation ?? "You don't have access to projects."}</p>
+      </section>
+    );
+  }
 
-  if (!can.view) return <p>You don&apos;t have access to projects.</p>;
+  const decisions = await recentDecisions(user.id);
 
   return (
     <section className="stack">
       <h1>Projects</h1>
-      <p className="muted">Signed-in people only. Roles and permissions come next.</p>
-      <ul className="methods">
-        {PROJECTS.map((p) => (
-          <li key={p.id} className="method">
-            <div className="method-head">
-              <strong>{p.name}</strong>
-              <div className="row">
-                <button type="button" className="secondary">
-                  View
-                </button>
-                {/* TODO(RBAC): only with "projects:edit". */}
-                {can.edit && (
-                  <button type="button" className="secondary">
-                    Edit
-                  </button>
-                )}
-                {/* TODO(RBAC): only with "projects:admin". */}
-                {can.admin && (
-                  <button type="button" className="secondary danger">
-                    Delete
-                  </button>
-                )}
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <p className="muted">
+        Your roles: <strong>{view.roles?.join(", ") || "none"}</strong>. Viewers see the list; editors can also
+        rename a project.
+      </p>
+      <ProjectList projects={listProjects()} />
+
+      <h2>Recent decisions about you</h2>
+      <p className="muted">From the app&apos;s decision log in Scute. New ones show up a few seconds after each check.</p>
+      {decisions.length === 0 ? (
+        <p className="muted">None yet.</p>
+      ) : (
+        <ul className="list decisions">
+          {decisions.map((d) => (
+            <li key={d.id}>
+              <span className={d.decision === "deny" ? "error" : undefined}>{d.decision}</span>{" "}
+              <code>{d.permission}</code>: {d.explanation}{" "}
+              <span className="muted">({new Date(d.at).toLocaleTimeString()})</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

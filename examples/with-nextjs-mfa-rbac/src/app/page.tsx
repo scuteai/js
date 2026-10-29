@@ -6,15 +6,16 @@ export default async function Home() {
 
   return (
     <section className="stack">
-      <h1>Scute MFA example</h1>
+      <h1>Scute MFA and RBAC example</h1>
       <p>
         Sign in with Scute&apos;s drop-in <code>ScuteSignIn</code>, set up a second step on your account,
-        and sign in again with it. The account and projects pages read the session on the server.
+        and sign in again with it. On the projects page, Scute roles decide who may view and who may edit,
+        checked on the server.
       </p>
       {user ? (
         <p>
           Signed in as <strong>{user.email}</strong>. Go to your <Link href="/account">account</Link> to set up
-          two-step verification.
+          two-step verification, or to <Link href="/projects">projects</Link> to see what your role allows.
         </p>
       ) : (
         <ul className="list">
