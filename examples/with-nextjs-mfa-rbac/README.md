@@ -15,6 +15,8 @@ A small Next.js (App Router) app that adds Scute from scratch:
 
 The step-by-step tutorial for this app is in the Scute docs: [MFA and RBAC with Next.js](https://docs.scute.io/guides/mfa-rbac-tutorial).
 
+To have a coding agent build it for you instead, use the three prompts in [PROMPTS.md](./PROMPTS.md).
+
 ## What you need
 
 - Node.js 20 or later.
