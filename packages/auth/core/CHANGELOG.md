@@ -1,5 +1,19 @@
 # @scute/js-core
 
+## 0.10.0-next.4
+
+### Minor Changes
+
+- 9f79ec8: Pass the signing-in person's IP address on calls made with the secret key, so sign-ins your server starts are checked against the workspace's IP rules (sent as `X-Scute-Client-IP`):
+
+  - `clientIp` in the `ScuteClient` and `ScuteAdminApi` config, and `admin.withClientIp(ip)` for one request. One IPv4 or IPv6 address; a list or a range throws.
+  - `isClientIp`, `normalizeClientIp` and `SCUTE_CLIENT_IP_HEADER` are exported.
+  - Next.js: `createPagesServerClient` sends the address that connected to the server, and `createMiddlewareClient` and `createPagesEdgeRuntimeClient` send `request.ip` where Next.js provides it. Proxy headers are never read; pass `clientIp` to any helper to set it yourself.
+
+- b1039f4: Attack protection's "verification required" answer to a magic link (202) no longer looks like a sign-in: `verifyMagicLinkToken` returns `{ verificationRequired: true, verification }`, emits the new `verification_required` event and signs nobody in. `verifySignInVerification(code)` verifies the code with the challenge token alone, then checks the same link again, which signs in (or asks for MFA). `pendingSignInVerification` holds the pending challenge.
+
+  Passkey registration on a page that can't use passkeys (an insecure context or a browser without WebAuthn) now fails with `PasskeysUnavailableError` (`ERROR_PASSKEYS_UNAVAILABLE`) instead of the misleading "User ID was not between 1 and 64 characters", and `identifyRegistrationError` measures a base64url user id in bytes. New helper: `passkeysAvailable()`.
+
 ## 0.10.0-next.3
 
 ### Minor Changes
