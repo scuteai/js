@@ -46,7 +46,7 @@ In the dashboard, open your app and set:
 
 Your app's ID is on its **Overview**.
 
-Roles and permissions are set with the API, by `scripts/seed-rbac.mjs` (see Run it): the dashboard doesn't edit them yet.
+Roles and permissions are set from code, by `scripts/seed-rbac.mjs` (see Run it), with helpers on `ScuteAdminApi`.
 
 ## Run it
 
@@ -65,15 +65,17 @@ The second command builds the Scute packages the example uses. `seed` creates th
 
 ### The seed script
 
-`npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac seed` runs `node --env-file=.env.local scripts/seed-rbac.mjs` (Node.js 20.6 or later), which calls the API with your secret key:
+`npx pnpm@8.4.0 --filter with-nextjs-mfa-rbac seed` runs `node --env-file=.env.local scripts/seed-rbac.mjs` (Node.js 20.6 or later), which sets the policy with `ScuteAdminApi` and your secret key. It needs a `@scute/nextjs-handlers` release newer than `0.9.0-next.6` (the policy helpers):
 
 | Call | What it sets |
 | --- | --- |
-| `POST /v1/apps/:app_id/authz/resources` `{ slug: "project", actions: ["view", "edit"] }` | The two permissions, `project:view` and `project:edit`. |
-| `POST /v1/apps/:app_id/authz/roles` `{ slug: "viewer", is_default: true, permissions: ["project:view"] }` | `viewer`: a default role, so everyone who signs in holds it. |
-| `POST /v1/apps/:app_id/authz/roles` `{ slug: "editor", permissions: ["project:view", "project:edit"] }` | `editor`: given to people one by one. |
-| `PATCH /v1/apps/:app_id/authz/permissions/project:edit` `{ requires_verification }` | Step-up on editing: on with `--step-up`, off without. |
-| `PATCH /v1/apps/:app_id/authz/settings` `{ client_checks: true, log_allow_rate: 1 }` | Lets the browser ask about its own permissions (`useCan`), and keeps every allow in the decision log (the default keeps 10%). |
+| `authzCreateResource({ slug: "project", name: "Project", actions: ["view", "edit"] })` | The two permissions, `project:view` and `project:edit`. |
+| `authzCreateRole({ slug: "viewer", name: "Viewer", is_default: true, permissions: ["project:view"] })` | `viewer`: a default role, so everyone who signs in holds it. |
+| `authzCreateRole({ slug: "editor", name: "Editor", permissions: ["project:view", "project:edit"] })` | `editor`: given to people one by one (`authzAssignRole`). |
+| `authzUpdatePermission("project:edit", { requires_verification })` | Step-up on editing: on with `--step-up`, off without. |
+| `authzUpdateSettings({ client_checks: true, log_allow_rate: 1 })` | Lets the browser ask about its own permissions (`useCan`), and keeps every allow in the decision log (the default keeps 10%). |
+
+When a resource or role already exists, the script updates it (`authzUpdateResource`, `authzUpdateRole`).
 
 More forms:
 
@@ -130,7 +132,7 @@ Testing without real inboxes: with **Test identities** on for the app (sandbox w
 | `src/app/account/page.tsx` | A protected server page. |
 | `src/app/account/security-settings.tsx` | Setting up a second step with the `useSecureAccount()` hook: TOTP with a QR code, email, SMS, backup codes, passkey. |
 | `scripts/seed-rbac.mjs` | Creates the permissions and roles in Scute, gives someone a role, turns step-up on or off. |
-| `src/lib/authz.ts` | Server-side checks with the secret key: `checkProject()` (`ScuteAdminApi.authzCheck`), `startStepUp()`, `verifyStepUp()` and `recentDecisions()` (the decision log). |
+| `src/lib/authz.ts` | Server-side checks with the secret key: `checkProject()` (`authzCheck`), `startStepUp()` (`authzStartStepUp`), `verifyStepUp()` (`authzVerifyStepUp`) and `recentDecisions()` (`authzDecisions`, the decision log). |
 | `src/app/projects/page.tsx` | A protected page that renders only after Scute allows `project:view`, and shows your roles and the decision log. |
 | `src/app/projects/project-list.tsx` | The list; `useCan("edit", "project")` shows Edit only to editors, and asks for the step-up code when the server wants one. |
 | `src/app/api/projects/[id]/route.ts` | `PATCH`: renames a project only after Scute allows `project:edit`, and runs the step-up. |

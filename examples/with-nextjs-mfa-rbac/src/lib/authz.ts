@@ -4,7 +4,7 @@
 // server enforces it. Import this only from server code: route handlers,
 // server actions, server components.
 
-import { ScuteAdminApi, type AuthzDecision, type UniqueIdentifier } from "@scute/nextjs-handlers";
+import { ScuteAdminApi, type AuthzDecision, type AuthzLoggedDecision, type UniqueIdentifier } from "@scute/nextjs-handlers";
 
 const baseUrl = process.env.NEXT_PUBLIC_SCUTE_BASE_URL || "https://api.scute.io";
 const appId = process.env.NEXT_PUBLIC_SCUTE_APP_ID!;
@@ -42,41 +42,22 @@ export async function startStepUp(userId: UniqueIdentifier, decision: AuthzDecis
 }
 
 /**
- * Check the code the user typed against the step-up challenge. The SDK has
- * no helper for this yet, so it calls the API's challenge endpoint (it needs
- * the secret key, so it runs here, never in the browser).
+ * Check the code the user typed against the step-up challenge. It needs the
+ * secret key, so it runs here, never in the browser. True when the code was
+ * right; a wrong or expired code is false.
  */
 export async function verifyStepUp(token: string, code: string) {
-  const res = await fetch(`${baseUrl}/v1/auth/${appId}/challenges/${encodeURIComponent(token)}/verify`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${secretKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ code }),
-    cache: "no-store",
-  });
-  return res.ok;
+  const { error } = await admin().authzVerifyStepUp(token, code);
+  return !error;
 }
 
-export type LoggedDecision = {
-  id: string;
-  at: string;
-  permission: string;
-  decision: AuthzDecision["decision"];
-  reason: string;
-  explanation?: string;
-};
+export type LoggedDecision = AuthzLoggedDecision;
 
 /**
  * The newest entries of the app's decision log for one user. Scute writes
- * the log a moment after each check. The SDK has no helper for this list
- * yet, so it calls the API.
+ * the log a moment after each check.
  */
 export async function recentDecisions(userId: UniqueIdentifier, limit = 5): Promise<LoggedDecision[]> {
-  const query = new URLSearchParams({ user_id: String(userId), limit: String(limit) });
-  const res = await fetch(`${baseUrl}/v1/apps/${appId}/authz/decisions?${query}`, {
-    headers: { Authorization: `Bearer ${secretKey}` },
-    cache: "no-store",
-  });
-  if (!res.ok) return [];
-  const body = (await res.json()) as { decisions?: LoggedDecision[] };
-  return body.decisions ?? [];
+  const { data } = await admin().authzDecisions({ userId, limit });
+  return data?.decisions ?? [];
 }
