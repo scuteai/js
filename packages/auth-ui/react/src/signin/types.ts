@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { AuthFlowView } from "../useScuteAuthFlow";
 
 /** How the sign-in looks. Every field is optional. */
 export type ScuteSignInAppearance = {
@@ -18,8 +19,12 @@ export type ScuteSignInAppearance = {
    * small neutral icon per step.
    */
   illustration?: ReactNode | false;
-  /** "page" (default): a full-height page. "card": a panel to place inside your own page. */
-  layout?: "page" | "card";
+  /**
+   * "page" (default): a page of its own, the window's height. "fill": the
+   * same page, sized to its container instead (a panel, a modal, a preview
+   * frame). "card": a panel to place inside your own page.
+   */
+  layout?: "page" | "fill" | "card";
   /** A class on the root element. */
   className?: string;
 };
@@ -45,11 +50,54 @@ export type ScuteSignInMethods = {
   google?: boolean;
 };
 
+/**
+ * One step drawn with sample data, for a preview (`preview` prop). Every
+ * field but `view` is optional.
+ */
+export type ScuteSignInPreview = {
+  /** The step to draw (see AuthFlowView). */
+  view: AuthFlowView;
+  /**
+   * The address the step shows. Default: none on the email step,
+   * "you@example.com" on the others.
+   */
+  email?: string;
+  /**
+   * A failure on the step: the line under the email field, a wrong code on
+   * a code step, or the reason on the "error" step.
+   */
+  error?: string;
+  /** The API's code for `error`, like "user_banned" or "ip_blocked": its own message then. */
+  errorCode?: string;
+  /** On "mfa_verify": the method asked for, "totp" (default), "email_otp", "sms_otp" or "backup_code". */
+  mfaMethod?: string;
+  /** On "mfa_verify": the methods the visitor has, offered under "Or use another way". */
+  mfaMethods?: string[];
+  /** On "verification_required": where the code went, "email_otp" (default) or "sms_otp". */
+  verificationMethod?: string;
+  /** On "mfa_enroll_suggest": days left before a second step is required. */
+  mfaGraceDaysRemaining?: number;
+};
+
 export type ScuteSignInProps = {
   appearance?: ScuteSignInAppearance;
   copy?: ScuteSignInCopy;
   legal?: ScuteSignInLegal;
   methods?: ScuteSignInMethods;
+  /**
+   * The email the field starts with, like an invited address or the last
+   * one used on this device. Shown until the visitor edits it; "Use a
+   * different email" later starts empty.
+   */
+  defaultEmail?: string;
+  /**
+   * Draw one step with sample data instead of running the sign-in: for a
+   * settings preview, docs or screenshots. Needs no Scute client or
+   * AuthContextProvider, sends nothing, and moves no focus; its buttons do
+   * nothing and a code is never accepted. A view name, or the view with
+   * its sample data.
+   */
+  preview?: AuthFlowView | ScuteSignInPreview;
   /** Called once each time someone finishes signing in, with the signed-in user. */
   onSignedIn?: (user: any) => void;
 };

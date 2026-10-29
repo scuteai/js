@@ -34,12 +34,18 @@ export function useScuteSignInStep(): StepInfo {
 // title (the first one leaves focus where the page put it).
 export const FocusContext = createContext<{ current: boolean }>({ current: false });
 
+// True when the sign-in is a preview (the `preview` prop): nothing in it
+// takes focus.
+export const PreviewContext = createContext(false);
+export const useInPreview = () => useContext(PreviewContext);
+
 /** The step's title: focused when the step opens, unless something in it takes focus itself. */
 export function Title({ children, focus = true }: { children: ReactNode; focus?: boolean }) {
   const ref = useRef<HTMLHeadingElement>(null);
   const shown = useContext(FocusContext);
+  const preview = useInPreview();
   useEffect(() => {
-    if (focus && shown.current) ref.current?.focus({ preventScroll: true });
+    if (focus && shown.current && !preview) ref.current?.focus({ preventScroll: true });
     shown.current = true;
     // Once per step.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,10 +162,11 @@ export function CodeBoxes({
 }) {
   const refs = useRef<Array<HTMLInputElement | null>>([]);
   const length = value.length;
+  const preview = useInPreview();
 
   useEffect(() => {
-    refs.current[0]?.focus();
-  }, [focusKey]);
+    if (!preview) refs.current[0]?.focus();
+  }, [focusKey, preview]);
 
   const fill = (text: string) => {
     const chars = [...text.replace(/\s|-/g, "")].filter((c) => (numeric ? /\d/.test(c) : /[a-z0-9]/i.test(c))).slice(0, length);

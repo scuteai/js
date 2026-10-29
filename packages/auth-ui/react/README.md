@@ -40,7 +40,7 @@ import { ScuteSignIn } from "@scute/auth-ui-react";
 | `appearance.radius` | `"none" \| "small" \| "medium" \| "large"` | `"medium"` | Corners of fields, buttons, code boxes and the card. |
 | `appearance.fontFamily` | `string` | inherited from the page | A CSS `font-family` for the whole sign-in. |
 | `appearance.illustration` | `ReactNode \| false` | a small neutral icon per step | Your own element above the step, or `false` for none. |
-| `appearance.layout` | `"page" \| "card"` | `"page"` | `"page"` fills the viewport; `"card"` is a panel for your own page. |
+| `appearance.layout` | `"page" \| "fill" \| "card"` | `"page"` | `"page"` fills the viewport; `"fill"` is the same page sized to its container (a panel, a modal, a preview frame); `"card"` is a panel for your own page. |
 | `appearance.className` | `string` | none | A class on the root element. |
 | `copy.title` | `string` | `"Sign in"` | First step's title. |
 | `copy.subtitle` | `string` | `"Enter your email and we will send you a link or a code. No account yet? This makes one."` | First step's lead. |
@@ -50,9 +50,11 @@ import { ScuteSignIn } from "@scute/auth-ui-react";
 | `legal.termsUrl` | `string` | none | Links "Terms" under the form. |
 | `legal.privacyUrl` | `string` | none | Links "Privacy Policy" under the form. The line shows when either is set. |
 | `methods.google` | `boolean` | `false` | Adds "Continue with Google". Set Google up for your app in Scute first. |
+| `defaultEmail` | `string` | none | The email the field starts with (an invited address, the last one used here). Shown until the visitor edits it; "Use a different email" starts empty. |
+| `preview` | `AuthFlowView \| ScuteSignInPreview` | none | Draws one step with sample data instead of running the sign-in. See [Previews](#previews). |
 | `onSignedIn` | `(user) => void` | none | Called once each time someone finishes signing in. |
 
-All prop types are exported: `ScuteSignInProps`, `ScuteSignInAppearance`, `ScuteSignInCopy`, `ScuteSignInLegal`, `ScuteSignInMethods`.
+All prop types are exported: `ScuteSignInProps`, `ScuteSignInAppearance`, `ScuteSignInCopy`, `ScuteSignInLegal`, `ScuteSignInMethods`, `ScuteSignInPreview`.
 
 ### What it handles
 
@@ -62,6 +64,7 @@ All prop types are exported: `ScuteSignInProps`, `ScuteSignInAppearance`, `Scute
 - **MFA**: authenticator app, email or text code (with resend), backup codes (8 characters), and switching between the methods the visitor has.
 - **Passkey offer** after a link or a code, skipped where the browser can't make a passkey (an http page, an old browser).
 - **Clear refusals**: banned or suspended accounts, and sign-ins blocked by IP or country rules, each get their own message. Every error step has a way back.
+- **Settings that don't load** (a wrong app ID, no connection): an error step with "Try again" instead of an email field that can't work.
 - **Accessibility**: labelled fields, the title of each new step takes focus, status lines are live regions, errors are alerts tied to their field, full keyboard use of the code boxes.
 
 ### Theming further
@@ -100,6 +103,22 @@ function Mascot() {
 <ScuteSignIn appearance={{ illustration: <Mascot /> }} />;
 ```
 
+### Previews
+
+`preview` draws one step with sample data and runs nothing: no Scute client or `AuthContextProvider` needed, no requests, no focus taken, buttons that do nothing and codes that are never accepted. Use it for a settings page that previews your sign-in, for docs or for screenshots.
+
+```tsx
+// The email step, as your users will see it.
+<ScuteSignIn preview="login" appearance={{ layout: "fill", accentColor: "#0f766e" }} copy={{ title: "Sign in to Acme" }} />
+
+// Any step, with its sample data.
+<ScuteSignIn preview={{ view: "otp_input", email: "ada@acme.com", error: "Invalid code" }} />
+<ScuteSignIn preview={{ view: "mfa_verify", mfaMethod: "totp", mfaMethods: ["totp", "email", "backup_codes"] }} />
+<ScuteSignIn preview={{ view: "error", errorCode: "ip_blocked" }} />
+```
+
+`ScuteSignInPreview` is `{ view, email?, error?, errorCode?, mfaMethod?, mfaMethods?, verificationMethod?, mfaGraceDaysRemaining? }`; `view` is any of the flow's steps (listed under [Headless](#headless-usescuteauthflow)).
+
 ## ScuteAuthGate
 
 Renders its children once the visitor is signed in, and `ScuteSignIn` until then.
@@ -119,7 +138,7 @@ import { ScuteAuthGate } from "@scute/auth-ui-react";
 | Prop | Type | What it does |
 | --- | --- | --- |
 | `children` | `ReactNode` | Your app, shown once signed in. |
-| `appearance`, `copy`, `legal`, `methods` | as `ScuteSignIn` | Passed to the sign-in. |
+| `appearance`, `copy`, `legal`, `methods`, `defaultEmail` | as `ScuteSignIn` | Passed to the sign-in. |
 | `onAuthenticated` | `(user) => void` | Called once each time the app is shown after a sign-in. |
 | `renderView` | `(view, auth) => ReactNode \| null` | Draw a step yourself; return `null` to keep the default for that step. `auth` is the `useScuteAuthFlow()` result. |
 
@@ -217,7 +236,7 @@ createRoot(document.getElementById("root")!).render(<Root />);
 
 `loading`, `login`, `magic_pending`, `magic_verifying`, `verification_required`, `otp_input`, `webauthn_verify`, `webauthn_register`, `webauthn_register_success`, `mfa_verify`, `mfa_enroll`, `mfa_enroll_suggest`, `error`, `authenticated`.
 
-It returns the state (`identifier`, `error`, `errorCode`, `submitting`, `resendIn`, `resent`, `resendError`, `verification`, `mfaChallenge`, `mfaAvailableMethods`, `passkeysSupported`, ...) and the actions (`submitIdentifier`, `submitOtp`, `submitVerificationCode`, `resend`, `submitMfaCode`, `resendMfaCode`, `switchMfaMethod`, `registerPasskey`, `skipPasskey`, `skipMfaEnrollment`, `signInWithOAuth`, `retry`, `signOut`). `errorCode` carries the API's code for a refusal: `user_banned`, `user_suspended`, `ip_blocked` or `country_blocked`.
+It returns the state (`identifier`, `error`, `errorCode`, `submitting`, `resendIn`, `resent`, `resendError`, `verification`, `mfaChallenge`, `mfaAvailableMethods`, `passkeysSupported`, ...) and the actions (`submitIdentifier`, `submitOtp`, `submitVerificationCode`, `resend`, `submitMfaCode`, `resendMfaCode`, `switchMfaMethod`, `registerPasskey`, `skipPasskey`, `skipMfaEnrollment`, `signInWithOAuth`, `retry`, `signOut`). `errorCode` carries the API's code for a refusal: `user_banned`, `user_suspended`, `ip_blocked` or `country_blocked`. When the app's settings don't load, the flow starts on `error` with `errorCode` `"app_settings_unavailable"` (exported as `APP_SETTINGS_UNAVAILABLE`), and `retry` loads them again.
 
 ## Notes
 

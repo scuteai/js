@@ -1,7 +1,7 @@
 // Headless hooks — bring your own UI
 
 // Auth flow (login / signup / passkey / MFA)
-export { useScuteAuthFlow, RESEND_COOLDOWN_SECONDS } from "./useScuteAuthFlow";
+export { useScuteAuthFlow, RESEND_COOLDOWN_SECONDS, APP_SETTINGS_UNAVAILABLE } from "./useScuteAuthFlow";
 export type { AuthFlowView, SignInRefusalCode } from "./useScuteAuthFlow";
 
 // Profile / account management
@@ -61,6 +61,7 @@ export type {
   ScuteSignInLegal,
   ScuteSignInMethods,
   ScuteSignInMood,
+  ScuteSignInPreview,
 } from "./signin/types";
 
 // Pre-built gate component — drop-in auth

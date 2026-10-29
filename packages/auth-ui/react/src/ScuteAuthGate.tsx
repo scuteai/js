@@ -24,6 +24,8 @@ export type ScuteAuthGateProps = {
   legal?: ScuteSignInLegal;
   /** Sign-in methods besides email (same as ScuteSignIn's). */
   methods?: ScuteSignInMethods;
+  /** The email the field starts with (same as ScuteSignIn's). */
+  defaultEmail?: string;
 };
 
 /**
@@ -40,7 +42,16 @@ export type ScuteAuthGateProps = {
  * </ScuteAuthGate>
  * ```
  */
-export function ScuteAuthGate({ children, onAuthenticated, renderView, appearance, copy, legal, methods }: ScuteAuthGateProps) {
+export function ScuteAuthGate({
+  children,
+  onAuthenticated,
+  renderView,
+  appearance,
+  copy,
+  legal,
+  methods,
+  defaultEmail,
+}: ScuteAuthGateProps) {
   const auth = useScuteAuthFlow();
   const isOpen = auth.isAuthenticated && auth.view === "authenticated";
 
@@ -74,5 +85,7 @@ export function ScuteAuthGate({ children, onAuthenticated, renderView, appearanc
   }
 
   // Default UI: the sign-in, on this gate's flow.
-  return <SignInView auth={auth} appearance={appearance} copy={copy} legal={legal} methods={methods} />;
+  return (
+    <SignInView auth={auth} appearance={appearance} copy={copy} legal={legal} methods={methods} defaultEmail={defaultEmail} />
+  );
 }
