@@ -1,5 +1,13 @@
 # @scute/nextjs-handlers
 
+## 0.9.0-next.5
+
+### Patch Changes
+
+- Updated dependencies [f405658]
+  - @scute/js-core@0.10.0-next.5
+  - @scute/react-hooks@0.9.0-next.5
+
 ## 0.9.0-next.4
 
 ### Minor Changes
