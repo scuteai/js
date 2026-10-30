@@ -222,6 +222,13 @@ export type ScuteMfaRequiredResponse = {
   app_user_id: string;
   mfa_challenge?: ScuteChallengeResponse;
   available_methods: string[];
+  /**
+   * With `mfa_enrollment_required`: a setup-only pass (D18). It sets up one
+   * of `available_methods` (enrollMfaWithSetupToken), and verifying that
+   * factor finishes the sign-in. Opaque, never a session.
+   */
+  setup_token?: string;
+  setup_expires_at?: string;
 };
 
 /**
@@ -244,6 +251,73 @@ export type ScuteVerificationRequiredResponse = {
   threats?: string[];
   verification?: ScuteSignInVerification;
 };
+
+/**
+ * The app wants the person's email or phone confirmed before the sign-in
+ * goes on (D15). With `challenge`, a code was sent to the one on file;
+ * with `setup_token` (and no challenge), the person has none: ask for it
+ * (addSignInContact), and a code goes to it.
+ */
+export type ScuteContactVerificationRequiredResponse = {
+  contact_verification_required: true;
+  field: ScuteIdentifierType;
+  app_user_id: string;
+  challenge?: ScuteChallengeResponse;
+  setup_token?: string;
+  setup_expires_at?: string;
+};
+
+/**
+ * A step-up, custom or identity challenge's link, opened where the
+ * workspace doesn't let such links sign in (D16): the challenge is passed
+ * and nobody is signed in.
+ */
+export type ScuteChallengeLinkCompletedResponse = {
+  status: "completed";
+  signed_in: false;
+  challenge?: Partial<ScuteChallengeResponse> & { intent?: string | null };
+  intent?: string | null;
+  intent_fields?: Record<string, unknown> | null;
+};
+
+/** A second factor a sign-in's setup-only pass can set up. */
+export type ScuteMfaSetupMethod = "totp" | "sms" | "email";
+
+/** A factor being set up (`enrollMfaWithSetupToken`). */
+export type ScuteMfaEnrollment = {
+  id: string;
+  method: string;
+  name: string | null;
+  verified: boolean;
+  is_default: boolean;
+  last_used_at?: string | null;
+  created_at?: string;
+};
+
+/**
+ * What a sign-in asks next instead of a session: a second factor
+ * (`mfaRequired`, with `mfaEnrollmentRequired` and `setupToken` when one has
+ * to be set up first), or a confirmed email or phone
+ * (`contactVerificationRequired`).
+ */
+export type ScuteSignInStep =
+  | {
+      mfaRequired: true;
+      mfaEnrollmentRequired: boolean;
+      mfaGracePeriod: boolean;
+      mfaGraceDaysRemaining?: number;
+      mfaChallenge?: ScuteChallengeResponse;
+      availableMethods: string[];
+      setupToken: string | null;
+      setupExpiresAt: string | null;
+    }
+  | {
+      contactVerificationRequired: true;
+      field: ScuteIdentifierType;
+      challenge: ScuteChallengeResponse | null;
+      setupToken: string | null;
+      setupExpiresAt: string | null;
+    };
 
 
 export type ScuteUserSession = {

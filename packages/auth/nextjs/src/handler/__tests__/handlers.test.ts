@@ -245,6 +245,16 @@ describe("App Router route handler", () => {
     expect(res.status).toBe(401);
   });
 
+  it("sends request.ip as the person's address on the refresh (D11), where Next.js provides it", async () => {
+    const headers = { "X-CSRF-Token": CSRF };
+    const { handler } = route({ [CSRF_COOKIE]: CSRF, [REFRESH_KEY]: makeRefresh() }, headers);
+    const req = makeNextRequest("/auth/refresh", { method: "POST", headers });
+    Object.defineProperty(req, "ip", { value: "203.0.113.24" });
+    const res = await handler(req);
+    expect(res.status).toBe(200);
+    expect(upstream.callsTo("/tokens/refresh", "POST")[0].headers.get("x-scute-client-ip")).toBe("203.0.113.24");
+  });
+
   it("uses the request URL and method for routing", async () => {
     const { handler } = route({}, {});
     expect((await handler(makeNextRequest("/auth/csrf", { method: "POST" }))).status).toBe(400);

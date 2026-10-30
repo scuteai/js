@@ -72,6 +72,8 @@ const EXPECTED_MFA_RESULT = {
   mfaGraceDaysRemaining: undefined,
   mfaChallenge: CHALLENGE,
   availableMethods: ["totp", "email_otp"],
+  setupToken: null,
+  setupExpiresAt: null,
 };
 
 const CURRENT_USER = `${AUTH_PREFIX}/current_user`;
@@ -160,6 +162,8 @@ describe("verifyMagicLinkToken", () => {
       mfaGraceDaysRemaining: undefined,
       mfaChallenge: undefined,
       availableMethods: undefined,
+      setupToken: null,
+      setupExpiresAt: null,
     });
     expect(client.pendingMfaChallenge?.app_user_id).toBe("au_9");
   });
@@ -619,7 +623,7 @@ describe("MFA follow-up helpers", () => {
     const { client, rec } = await setup();
     const pair = tokenPair();
     server.on("POST", `${AUTH_PREFIX}/challenges/ch_ms/session`, { body: pair });
-    expect(await client.claimMsAuthenticatorSession("ch_ms")).toEqual({ error: null });
+    expect(await client.claimMsAuthenticatorSession("ch_ms")).toEqual({ data: null, error: null });
     expect(localStorage.getItem(KEYS.access)).toBe(pair.access);
     expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN]);
   });

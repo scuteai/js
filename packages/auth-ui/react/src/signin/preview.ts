@@ -49,6 +49,25 @@ export function previewFlow(p: ScuteSignInPreview): ScuteAuthFlow {
     verification: view === "verification_required"
       ? { token: "preview", method: p.verificationMethod ?? "email_otp", expires_at: "" }
       : null,
+    mfaSetup: view === "mfa_enroll"
+      ? {
+          setupToken: "preview",
+          methods: (p.mfaMethods ?? ["totp", "sms", "email"]).filter(
+            (m): m is "totp" | "sms" | "email" => m === "totp" || m === "sms" || m === "email"
+          ),
+          method: null,
+          enrollmentId: null,
+          provisioningUri: null,
+          secret: null,
+          sentTo: null,
+        }
+      : null,
+    contactVerification: view === "contact_verify"
+      ? { field: "email", challenge: { token: "preview", status: "pending", purpose: "verify_contact", method: "email_otp", expires_at: "" }, setupToken: null, sentTo: null }
+      : null,
+    completedChallenge: view === "challenge_completed" ? { intent: null, intentFields: null } : null,
+    finishingOnOtherDevice: false,
+    emailSignIn: null,
 
     resendIn: 0,
     resending: false,
@@ -62,6 +81,13 @@ export function previewFlow(p: ScuteSignInPreview): ScuteAuthFlow {
     resendMfaCode: noFailure,
     switchMfaMethod: noFailure,
     submitVerificationCode: neverAccepted,
+    startMfaSetup: noFailure,
+    submitMfaSetupCode: neverAccepted,
+    restartMfaSetup: nothing,
+    submitContact: noFailure,
+    submitContactCode: neverAccepted,
+    resendContactCode: noFailure,
+    changeContact: nothing,
     resend: noFailure,
     signInWithOAuth: nothing,
     skipMfaEnrollment: nothing,

@@ -44,6 +44,22 @@ export const REFUSALS: Record<string, Failure> = {
     title: "Sign-in isn't available right now",
     message: "We couldn't load this app's sign-in settings. Check your connection and try again.",
   },
+  setup_expired: {
+    title: "This sign-in timed out",
+    message: "It took too long to finish, or this step was already used. Sign in again to continue.",
+  },
+  setup_send_limit: {
+    title: "Too many codes for this sign-in",
+    message: "We sent as many codes as one sign-in allows. Sign in again to get a new one.",
+  },
+  mfa_method_unavailable: {
+    title: "You can't finish signing in here",
+    message: "This app asks for a second step that can't be set up for this way of signing in. Contact the app's support team.",
+  },
+  session_idle: {
+    title: "You were signed out",
+    message: "You were signed out after being inactive. Sign in again.",
+  },
   ERROR_PASSKEYS_UNAVAILABLE: {
     title: "Passkeys aren't available here",
     message: "This page can't use passkeys. They need a secure connection (https) and a browser that supports them.",
@@ -61,6 +77,9 @@ export function errorText(error: string | null, code: string | null): string | n
 /** A title and message for the error step. */
 export function failureFor(error: string | null, code: string | null): Failure {
   if (code && REFUSALS[code]) return REFUSALS[code];
+  if (code === "sign_in_method_disabled") {
+    return { title: "This way of signing in is off", message: errorText(error, code) ?? GENERIC };
+  }
   if (code === "magic_link_not_found_or_expired" || /not found or expired|expired/i.test(error ?? "")) {
     return { title: "This link has expired", message: "Sign-in links work once and only for a short while. Ask for a new one." };
   }
@@ -105,3 +124,10 @@ const SWITCHABLE: Record<string, string> = {
 export const switchableMethod = (method: string): string | null => SWITCHABLE[method] ?? null;
 
 export const isBackupCode = (method: string) => method === "backup_code" || method === "backup_codes";
+
+/** The second factors a sign-in can set up (D18), as the person picks them. */
+export const MFA_SETUP_LABELS: Record<string, string> = {
+  totp: "Authenticator app",
+  sms: "Text message",
+  email: "Email",
+};

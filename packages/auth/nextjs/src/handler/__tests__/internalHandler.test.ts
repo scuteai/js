@@ -572,6 +572,28 @@ describe("POST /auth/refresh", () => {
     expect(res.status).toBe(401);
   });
 
+  it.each(["ip_blocked", "country_blocked"])(
+    "on a 403 %s refresh: 403 with the code, cookies kept, no sign-out (D11: the network, not the session)",
+    async (code) => {
+      const current = makeRefresh({ tag: "current" });
+      upstream.on("POST", `/v1/auth/${APP_ID}/tokens/refresh`, () =>
+        json({ error: "Sign-ins from this address are blocked", error_code: code }, 403)
+      );
+      const { res, body, setCookies } = await run({
+        path: "/auth/refresh",
+        cookies: { [REFRESH_KEY]: current, [ACCESS_KEY]: makeAccess({ expIn: -10 }) },
+        csrf: true,
+      });
+      expect(res.status).toBe(403);
+      expect(JSON.parse(body)).toEqual({ error_code: code });
+      expect(body).not.toContain(current);
+      for (const name of [ACCESS_KEY, REFRESH_KEY]) {
+        expect(isDeletion(lastCookie(setCookies, name))).toBe(false);
+      }
+      expect(upstream.callsTo("/current_user", "DELETE")).toEqual([]);
+    }
+  );
+
   it("does not forward the refresh token in any response header", async () => {
     const { res } = await run({
       path: "/auth/refresh",

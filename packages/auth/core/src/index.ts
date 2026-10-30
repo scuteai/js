@@ -88,6 +88,7 @@ export {
   sessionLoadingState,
 } from "./lib/ScuteSession";
 export type { Session } from "./lib/types/session";
+export type { SessionEndReason } from "./lib/ScuteSession";
 
 export {
   isBrowser,
@@ -112,4 +113,5 @@ export {
   SCUTE_ACCESS_STORAGE_KEY,
   SCUTE_REFRESH_STORAGE_KEY,
   SCUTE_REMEMBER_STORAGE_KEY,
+  SCUTE_SETUP_TOKEN_HEADER,
 } from "./lib/constants";
