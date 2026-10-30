@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { APP_SETTINGS_UNAVAILABLE, useScuteAuthFlow } from "../useScuteAuthFlow";
-import { errorText, failureFor, isBackupCode, MFA_LABELS, MFA_LEADS, REFUSALS, switchableMethod } from "./messages";
+import { errorText, failureFor, isBackupCode, MFA_LABELS, MFA_LEADS, MFA_SETUP_LABELS, REFUSALS, switchableMethod } from "./messages";
 import {
   Button,
   CodeBoxes,
@@ -95,6 +95,8 @@ const MOODS: Record<string, ScuteSignInMood> = {
   mfa_verify: "locked",
   mfa_enroll: "locked",
   mfa_enroll_suggest: "success",
+  contact_verify: "locked",
+  challenge_completed: "success",
   error: "error",
   authenticated: "success",
 };
@@ -112,6 +114,8 @@ const ICONS: Record<string, string> = {
   mfa_verify: "lock",
   mfa_enroll: "lock",
   mfa_enroll_suggest: "shield",
+  contact_verify: "mail",
+  challenge_completed: "check",
   error: "alert",
   authenticated: "check",
 };
@@ -266,17 +270,41 @@ function Step({ auth, copy, methods, ...email }: { auth: ScuteAuthFlow } & Pick<
         />
       );
     case "mfa_enroll":
+      return <MfaSetupStep auth={auth} />;
+    case "contact_verify":
+      return <ContactStep auth={auth} />;
+    case "challenge_completed":
       return (
-        <FailureStep
-          auth={auth}
-          failure={{
-            title: "Set up two-step verification first",
-            message:
-              "Your account needs a second step to sign in, and none is set up yet. Contact the app's support team to set one up.",
-          }}
-        />
+        <>
+          <Title>Verified</Title>
+          <Lead>You can close this page and go back to where you were.</Lead>
+        </>
       );
     case "mfa_enroll_suggest":
+      // Setting one up right here with the new session (D17).
+      if (auth.mfaSetup && !auth.mfaSetup.setupToken) {
+        return auth.mfaSetup.method && auth.mfaSetup.enrollmentId
+          ? <MfaSetupCode auth={auth} setup={auth.mfaSetup} />
+          : <MfaSetupChoose auth={auth} setup={auth.mfaSetup} />;
+      }
+      if (auth.mfaFactorNotAllowed) {
+        const canSetUp = auth.mfaAvailableMethods.some((m) => m === "totp" || m === "sms" || m === "email");
+        return (
+          <>
+            <Title>Set up another second step</Title>
+            <Lead>You&apos;re signed in. This app no longer accepts your second step. Set up another one.</Lead>
+            {canSetUp && (
+              <Button variant="primary" autoFocus={!preview} onClick={auth.setUpMfaNow} className="scute-signin__mt-28">
+                Set one up
+              </Button>
+            )}
+            <Button variant={canSetUp ? undefined : "primary"} autoFocus={!preview && !canSetUp} onClick={auth.skipMfaEnrollment}
+                    className={canSetUp ? "scute-signin__mt-12" : "scute-signin__mt-28"}>
+              Continue
+            </Button>
+          </>
+        );
+      }
       return (
         <>
           <Title>Set up two-step verification</Title>
@@ -341,6 +369,26 @@ const fieldFor = (types: ReadonlyArray<string> | undefined) => {
   return FIELDS[phone && email ? "either" : phone ? "phone" : "email"];
 };
 
+// The first step's lead, for what the app sends by email once known
+// (email_auth_type): a link or a code, not both.
+const EMAIL_SUBTITLES = {
+  email: {
+    link: "Enter your email and we will send you a sign-in link. No account yet? This makes one.",
+    code: "Enter your email and we will send you a sign-in code. No account yet? This makes one.",
+  },
+  either: {
+    link: "Enter your email or phone number. We will email you a sign-in link or text you a code. No account yet? This makes one.",
+    code: "Enter your email or phone number and we will send you a sign-in code. No account yet? This makes one.",
+  },
+} as const;
+
+const subtitleFor = (field: (typeof FIELDS)[keyof typeof FIELDS], emailSignIn: "link" | "code" | null | undefined) => {
+  if (!emailSignIn) return field.subtitle;
+  if (field === FIELDS.email) return EMAIL_SUBTITLES.email[emailSignIn];
+  if (field === FIELDS.either) return EMAIL_SUBTITLES.either[emailSignIn];
+  return field.subtitle;
+};
+
 /** "Use a different email" (or number), for the identifier this sign-in used. */
 function Different({ auth }: { auth: ScuteAuthFlow }) {
   const number = !!auth.identifier && !auth.identifier.includes("@");
@@ -375,7 +423,7 @@ function EmailStep({ auth, copy, google, defaultEmail, defaultEmailUsed }: {
     <>
       <form onSubmit={submit}>
         <Title focus={false}>{copy.title ?? "Sign in"}</Title>
-        <Lead>{copy.subtitle ?? field.subtitle}</Lead>
+        <Lead>{copy.subtitle ?? subtitleFor(field, auth.emailSignIn)}</Lead>
         <label htmlFor="scute-signin-email" className="scute-signin__label">{copy.emailLabel ?? field.label}</label>
         <input
           id="scute-signin-email"
@@ -434,6 +482,17 @@ function Resend({ auth, what, className }: { auth: ScuteAuthFlow; what: "link" |
 }
 
 function InboxStep({ auth }: { auth: ScuteAuthFlow }) {
+  // The link was opened on another device that is finishing its own steps (D2).
+  if (auth.finishingOnOtherDevice) {
+    return (
+      <>
+        <Title>Finish on the other device</Title>
+        <Lead>Finish signing in on the device where you opened the link. This page signs you in once you&apos;re done.</Lead>
+        <Waiting>Waiting for the other device</Waiting>
+        <Different auth={auth} />
+      </>
+    );
+  }
   return (
     <>
       <Title>Check your inbox</Title>
@@ -676,5 +735,237 @@ function FailureStep({ auth, failure }: { auth: ScuteAuthFlow; failure: { title:
         {auth.errorCode === APP_SETTINGS_UNAVAILABLE ? "Try again" : "Back to sign in"}
       </Button>
     </div>
+  );
+}
+
+// ── Setting up a second factor while signing in (D18) ──
+
+function MfaSetupStep({ auth }: { auth: ScuteAuthFlow }) {
+  const setup = auth.mfaSetup;
+  if (!setup) {
+    // No setup pass (an older API): only the app's support can help.
+    return (
+      <FailureStep
+        auth={auth}
+        failure={{
+          title: "Set up two-step verification first",
+          message:
+            "Your account needs a second step to sign in, and none is set up yet. Contact the app's support team to set one up.",
+        }}
+      />
+    );
+  }
+  if (!setup.methods.length) return <FailureStep auth={auth} failure={REFUSALS.mfa_method_unavailable} />;
+  if (setup.method && setup.enrollmentId) return <MfaSetupCode auth={auth} setup={setup} />;
+  return <MfaSetupChoose auth={auth} setup={setup} />;
+}
+
+type MfaSetup = NonNullable<ScuteAuthFlow["mfaSetup"]>;
+
+function MfaSetupChoose({ auth, setup }: { auth: ScuteAuthFlow; setup: MfaSetup }) {
+  const preview = useInPreview();
+  // A text or email code needs the address first.
+  const [picked, setPicked] = useState<"sms" | "email" | null>(null);
+  const error = errorText(auth.error, auth.errorCode);
+  const busy = auth.submitting;
+
+  if (picked) {
+    const phone = picked === "sms";
+    const submit = (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (busy) return;
+      const value = String(new FormData(e.currentTarget).get("destination") ?? "").trim();
+      if (value) auth.startMfaSetup(picked, value);
+    };
+    return (
+      <form onSubmit={submit}>
+        <Title focus={false}>{phone ? "Get codes by text message" : "Get codes by email"}</Title>
+        <Lead>{phone ? "Enter the phone number to text your sign-in codes to." : "Enter the email to send your sign-in codes to."}</Lead>
+        <label htmlFor="scute-signin-mfa-destination" className="scute-signin__label">{phone ? "Phone number" : "Email"}</label>
+        <input
+          id="scute-signin-mfa-destination"
+          name="destination"
+          type={phone ? "tel" : "email"}
+          autoComplete={phone ? "tel" : "email"}
+          autoFocus={!preview}
+          required
+          placeholder={phone ? FIELDS.phone.placeholder : FIELDS.email.placeholder}
+          readOnly={busy}
+          aria-invalid={!!error || undefined}
+          aria-describedby={error ? "scute-signin-mfa-destination-error" : undefined}
+          className="scute-signin__input"
+          data-scute-input
+        />
+        {error && <ErrorBox id="scute-signin-mfa-destination-error">{error}</ErrorBox>}
+        <Button type="submit" variant="primary" busy={busy} className="scute-signin__mt-24">Send a code</Button>
+        <TextButton onClick={() => setPicked(null)} disabled={busy}>Use another way</TextButton>
+      </form>
+    );
+  }
+
+  return (
+    <>
+      <Title focus={false}>Set up two-step verification</Title>
+      <Lead>
+        {setup.setupToken
+          ? "Your account needs a second step to sign in. Choose how you want to get your codes."
+          : "Choose how you want to get your codes."}
+      </Lead>
+      <div className="scute-signin__others-list scute-signin__mt-24" role="group" aria-label="Second step">
+        {setup.methods.map((m) => (
+          <Button
+            key={m}
+            align="start"
+            disabled={busy}
+            onClick={() => (m === "totp" ? auth.startMfaSetup("totp") : setPicked(m))}
+          >
+            {MFA_SETUP_LABELS[m] ?? m}
+          </Button>
+        ))}
+      </div>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {setup.setupToken ? <Different auth={auth} /> : <TextButton onClick={auth.skipMfaEnrollment} disabled={busy}>Not now</TextButton>}
+    </>
+  );
+}
+
+function MfaSetupCode({ auth, setup }: { auth: ScuteAuthFlow; setup: MfaSetup }) {
+  const c = useCode(6, auth.submitMfaSetupCode, auth.error);
+  const method = setup.method ?? "totp";
+  const label = MFA_LABELS[method] ?? method;
+  const link = setup.provisioningUri?.startsWith("otpauth://") ? setup.provisioningUri : null;
+  return (
+    <form onSubmit={c.onSubmit}>
+      <Title focus={false}>Set up two-step verification</Title>
+      {method === "totp" ? (
+        <>
+          <Lead>Add this account to your authenticator app, then enter the 6-digit code it shows.</Lead>
+          {link && (
+            <p className="scute-signin__status">
+              <a className="scute-signin__link" href={link}>Open in your authenticator app</a>
+            </p>
+          )}
+          {setup.secret && (
+            <p className="scute-signin__status">
+              Or enter this key: <Token>{setup.secret}</Token>
+            </p>
+          )}
+        </>
+      ) : (
+        <Lead>
+          Enter the 6-digit code we sent to {setup.sentTo ? <Token>{setup.sentTo}</Token> : method === "sms" ? "your phone" : "your email"}.
+        </Lead>
+      )}
+      <CodeBoxes label={label} value={c.code} disabled={c.busy} invalid={c.wrong} focusKey={c.focusKey}
+                 onChange={c.onChange} describedBy={c.wrong ? "scute-signin-mfa-setup-error" : undefined} />
+      {c.wrong && (
+        <ErrorBox id="scute-signin-mfa-setup-error">{wrongCode(auth, "That code didn't work. Try again.")}</ErrorBox>
+      )}
+      <VerifyButton busy={c.busy} full={c.full} />
+      <TextButton onClick={auth.restartMfaSetup} disabled={c.busy}>Use another way</TextButton>
+    </form>
+  );
+}
+
+// ── Confirming an email or phone while signing in (D15) ──
+
+function ContactStep({ auth }: { auth: ScuteAuthFlow }) {
+  const contact = auth.contactVerification;
+  if (!contact) {
+    return (
+      <FailureStep
+        auth={auth}
+        failure={{ title: "We couldn't continue", message: "This sign-in needs a confirmed email or phone number. Start again." }}
+      />
+    );
+  }
+  return contact.challenge ? <ContactCode auth={auth} contact={contact} /> : <ContactAdd auth={auth} contact={contact} />;
+}
+
+type Contact = NonNullable<ScuteAuthFlow["contactVerification"]>;
+
+function ContactAdd({ auth, contact }: { auth: ScuteAuthFlow; contact: Contact }) {
+  const preview = useInPreview();
+  const phone = contact.field === "phone";
+  const error = errorText(auth.error, auth.errorCode);
+  const busy = auth.submitting;
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (busy) return;
+    const value = String(new FormData(e.currentTarget).get("contact") ?? "").trim();
+    if (value) auth.submitContact(value);
+  };
+  return (
+    <form onSubmit={submit}>
+      <Title focus={false}>{phone ? "Add your phone number" : "Add your email"}</Title>
+      <Lead>
+        {phone
+          ? "This app needs a confirmed phone number to sign you in. Enter yours and we will text you a code."
+          : "This app needs a confirmed email to sign you in. Enter yours and we will send you a code."}
+      </Lead>
+      <label htmlFor="scute-signin-contact" className="scute-signin__label">{phone ? "Phone number" : "Email"}</label>
+      <input
+        id="scute-signin-contact"
+        name="contact"
+        type={phone ? "tel" : "email"}
+        autoComplete={phone ? "tel" : "email"}
+        autoFocus={!preview}
+        required
+        placeholder={phone ? FIELDS.phone.placeholder : FIELDS.email.placeholder}
+        readOnly={busy}
+        aria-invalid={!!error || undefined}
+        aria-describedby={error ? "scute-signin-contact-error" : undefined}
+        className="scute-signin__input"
+        data-scute-input
+      />
+      {error && <ErrorBox id="scute-signin-contact-error">{error}</ErrorBox>}
+      <Button type="submit" variant="primary" busy={busy} className="scute-signin__mt-24">Send a code</Button>
+      <Different auth={auth} />
+    </form>
+  );
+}
+
+function ContactCode({ auth, contact }: { auth: ScuteAuthFlow; contact: Contact }) {
+  const c = useCode(6, auth.submitContactCode, auth.error);
+  const phone = contact.field === "phone";
+  const [resent, setResent] = useState(false);
+  const [sideError, setSideError] = useState<string | null>(null);
+  const resend = async () => {
+    const failure = await auth.resendContactCode();
+    setSideError(failure);
+    setResent(!failure);
+  };
+  const shownError = c.wrong
+    ? wrongCode(auth, "That code didn't work. Check it and try again.")
+    : sideError ? errorText(sideError, null) : null;
+  return (
+    <form onSubmit={c.onSubmit}>
+      <Title focus={false}>{phone ? "Confirm your phone number" : "Confirm your email"}</Title>
+      <Lead>
+        {contact.sentTo ? (
+          <>We sent a 6-digit code to <Token>{contact.sentTo}</Token>.</>
+        ) : phone ? (
+          "We texted a 6-digit code to the phone number on your account."
+        ) : (
+          "We sent a 6-digit code to the email on your account."
+        )}
+      </Lead>
+      <CodeBoxes label="Confirmation code" value={c.code} disabled={c.busy} invalid={c.wrong} focusKey={c.focusKey}
+                 onChange={c.onChange} describedBy={shownError ? "scute-signin-contact-error" : undefined} />
+      {shownError && <ErrorBox id="scute-signin-contact-error">{shownError}</ErrorBox>}
+      <VerifyButton busy={c.busy} full={c.full} />
+      <p className="scute-signin__status" role="status">
+        {resent ? "We sent a new code. " : "No code? "}
+        <button type="button" className="scute-signin__text-btn scute-signin__inline-btn" onClick={resend}>
+          Send {resent ? "another" : "it again"}
+        </button>
+      </p>
+      {contact.setupToken && (
+        <TextButton onClick={auth.changeContact} disabled={c.busy}>
+          {phone ? "Change the number" : "Change the email"}
+        </TextButton>
+      )}
+      <Different auth={auth} />
+    </form>
   );
 }

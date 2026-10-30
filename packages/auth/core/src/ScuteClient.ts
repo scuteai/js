@@ -22,6 +22,7 @@ import {
   SCUTE_IMPERSONATION_HANDOFF_PARAM,
 } from "./lib/constants";
 import { scopedChannel } from "./lib/storage-keys";
+import { SCUTE_SETUP_TOKEN_HEADER } from "./lib/constants";
 
 import {
   accessTokenHeader,
@@ -96,6 +97,12 @@ import type {
   ScuteSignInVerification,
   ScuteVerificationRequiredResponse,
   ScuteSsoDiscovery,
+  ScuteContactVerificationRequiredResponse,
+  ScuteChallengeLinkCompletedResponse,
+  ScuteMfaEnrollment,
+  ScuteMfaSetupMethod,
+  ScuteSignInStep,
+  ScuteMfaEnrollmentSuggestion,
 } from "./lib/types/scute";
 
 const DEFAULT_PREFERENCES = {
@@ -661,8 +668,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
         return { data: null, error: verifyError };
       }
 
-      // MFA required after WebAuthn — pass through to caller
-      if ("data" in verifyResult && verifyResult.data && "mfaRequired" in verifyResult.data) {
+      // MFA or a contact to confirm after WebAuthn: pass through to caller
+      if ("data" in verifyResult && verifyResult.data && isSignInStep(verifyResult.data)) {
         return { data: verifyResult.data, error: null };
       }
 
@@ -733,12 +740,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     const { data, error: verifyError } = await this.verifyMagicLinkToken(token);
     if (verifyError) return { error: verifyError };
 
-    // If MFA or a verification code is required, the event was already
-    // emitted by verifyMagicLinkToken
-    if (data && "mfaRequired" in data && data.mfaRequired) {
+    // If MFA, a contact to confirm or a verification code is required, the
+    // event was already emitted by verifyMagicLinkToken. A challenge link
+    // that signs nobody in (D16) is done.
+    if (data && isSignInStep(data)) {
       return { data, error: null };
     }
     if (data && "verificationRequired" in data && data.verificationRequired) {
+      return { data, error: null };
+    }
+    if (data && "challengeCompleted" in data && data.challengeCompleted) {
       return { data, error: null };
     }
 
@@ -777,14 +788,19 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   /**
    * Finish a sign-in from a magic link status answer
    * ({@link getMagicLinkStatus} once the link was opened): signs in, or asks
-   * for MFA (`data.mfaRequired`, MFA_REQUIRED), or answers
-   * MagicLinkWindowClosedError when the link was opened too long ago.
+   * for MFA (`data.mfaRequired`, MFA_REQUIRED or MFA_ENROLLMENT_REQUIRED) or
+   * a contact to confirm (`data.contactVerificationRequired`,
+   * CONTACT_VERIFICATION_REQUIRED), or answers MagicLinkWindowClosedError
+   * when the link was opened too long ago.
    */
-  async signInWithMagicLinkStatus(payload: ScuteTokenPayload | ScuteMfaRequiredResponse | { message?: string } | null) {
-    // The account needs MFA: this device asks for it too (the link only
-    // passed the first factor).
-    if (payload && "mfa_required" in payload && (payload as any).mfa_required) {
-      return { data: this._mfaRequired(payload as unknown as ScuteMfaRequiredResponse), error: null };
+  async signInWithMagicLinkStatus(
+    payload: ScuteTokenPayload | ScuteMfaRequiredResponse | ScuteContactVerificationRequiredResponse | { message?: string } | null
+  ): Promise<{ data: ScuteSignInStep | null; error: ScuteError | null }> {
+    // The workspace has this device do its own steps too (D2 both_devices):
+    // MFA, a factor to set up, or a contact to confirm.
+    const step = this._signInStep(payload);
+    if (step) {
+      return { data: step, error: null };
     }
 
     // The link was opened too long ago for this device to pick it up.
@@ -798,11 +814,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   /**
    * A sign-in stopped for MFA: keeps the challenge for verifyMfaChallenge and
-   * switchMfaMethod, says so with MFA_REQUIRED (or
-   * MFA_ENROLLMENT_REQUIRED), and answers what the caller shows.
+   * switchMfaMethod (or the setup pass for enrollMfaWithSetupToken), says so
+   * with MFA_REQUIRED (or MFA_ENROLLMENT_REQUIRED), and answers what the
+   * caller shows.
    */
   private _mfaRequired(mfaPayload: ScuteMfaRequiredResponse) {
     this._pendingMfaChallenge = mfaPayload;
+    this._pendingContactVerification = null;
 
     if (mfaPayload.mfa_enrollment_required) {
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
@@ -817,7 +835,61 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       mfaGraceDaysRemaining: mfaPayload.mfa_grace_days_remaining,
       mfaChallenge: mfaPayload.mfa_challenge,
       availableMethods: mfaPayload.available_methods,
+      setupToken: mfaPayload.setup_token ?? null,
+      setupExpiresAt: mfaPayload.setup_expires_at ?? null,
     };
+  }
+
+  /**
+   * A sign-in stopped to confirm an email or phone (D15): keeps it for
+   * verifyContactVerification and addSignInContact, says so with
+   * CONTACT_VERIFICATION_REQUIRED, and answers what the caller shows.
+   */
+  private _contactVerificationRequired(payload: ScuteContactVerificationRequiredResponse) {
+    this._pendingContactVerification = payload;
+    this._pendingMfaChallenge = null;
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.CONTACT_VERIFICATION_REQUIRED);
+
+    return {
+      contactVerificationRequired: true as const,
+      field: payload.field,
+      challenge: payload.challenge ?? null,
+      setupToken: payload.setup_token ?? null,
+      setupExpiresAt: payload.setup_expires_at ?? null,
+    };
+  }
+
+  /**
+   * The step a sign-in answer asks for instead of a session (MFA, a factor
+   * to set up, a contact to confirm), recorded and announced; null when the
+   * answer is a session.
+   */
+  private _signInStep(payload: unknown): ScuteSignInStep | null {
+    const answer = payload as Record<string, unknown> | null;
+    if (!answer || typeof answer !== "object") return null;
+    if (answer.contact_verification_required) {
+      return this._contactVerificationRequired(answer as unknown as ScuteContactVerificationRequiredResponse);
+    }
+    if (answer.mfa_required) {
+      return this._mfaRequired(answer as unknown as ScuteMfaRequiredResponse);
+    }
+    return null;
+  }
+
+  /**
+   * A step's answer: the next step (`data`), or the session it carries
+   * (signed in, `data` null).
+   */
+  private async _finishSignIn(payload: unknown): Promise<{ data: ScuteSignInStep | null; error: ScuteError | null }> {
+    const step = this._signInStep(payload);
+    if (step) {
+      return { data: step, error: null };
+    }
+
+    this._pendingMfaChallenge = null;
+    this._pendingContactVerification = null;
+    const { error } = await this.signInWithTokenPayload(payload as ScuteTokenPayload);
+    return { data: null, error: error ?? null };
   }
 
   /**
@@ -911,25 +983,23 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       };
     }
 
-    // Check if MFA is required
-    if (authPayload && "mfa_required" in authPayload && authPayload.mfa_required) {
-      const mfaPayload = authPayload as unknown as ScuteMfaRequiredResponse;
-      this._pendingMfaChallenge = mfaPayload;
+    // MFA, a factor to set up, or a contact to confirm first.
+    const step = this._signInStep(authPayload);
+    if (step) {
+      return { data: step, error: null };
+    }
 
-      if (mfaPayload.mfa_enrollment_required) {
-        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
-      } else {
-        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
-      }
-
+    // The link of a step-up, custom or identity challenge where such links
+    // don't sign in (D16): the challenge is passed, nobody is signed in.
+    const completed = authPayload as ScuteChallengeLinkCompletedResponse;
+    if (completed && completed.status === "completed" && completed.signed_in === false) {
       return {
         data: {
-          mfaRequired: true,
-          mfaEnrollmentRequired: !!mfaPayload.mfa_enrollment_required,
-          mfaGracePeriod: !!mfaPayload.mfa_grace_period,
-          mfaGraceDaysRemaining: mfaPayload.mfa_grace_days_remaining,
-          mfaChallenge: mfaPayload.mfa_challenge,
-          availableMethods: mfaPayload.available_methods,
+          challengeCompleted: true as const,
+          signedIn: false as const,
+          challenge: completed.challenge ?? null,
+          intent: completed.intent ?? completed.challenge?.intent ?? null,
+          intentFields: completed.intent_fields ?? null,
         },
         error: null,
       };
@@ -955,7 +1025,11 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   private async _verifyMagicLinkTokenRequest(token: string) {
     return this.patch<
-      ScuteTokenPayload | ScuteMfaRequiredResponse | ScuteVerificationRequiredResponse
+      | ScuteTokenPayload
+      | ScuteMfaRequiredResponse
+      | ScuteVerificationRequiredResponse
+      | ScuteContactVerificationRequiredResponse
+      | ScuteChallengeLinkCompletedResponse
     >(
       "/magic_links/authenticate",
       { token }
@@ -987,28 +1061,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: verifyError };
     }
 
-    // Check if MFA is required
-    if (authPayload && "mfa_required" in authPayload && authPayload.mfa_required) {
-      const mfaPayload = authPayload as unknown as ScuteMfaRequiredResponse;
-      this._pendingMfaChallenge = mfaPayload;
-
-      if (mfaPayload.mfa_enrollment_required) {
-        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
-      } else {
-        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
-      }
-
-      return {
-        data: {
-          mfaRequired: true,
-          mfaEnrollmentRequired: !!mfaPayload.mfa_enrollment_required,
-          mfaGracePeriod: !!mfaPayload.mfa_grace_period,
-          mfaGraceDaysRemaining: mfaPayload.mfa_grace_days_remaining,
-          mfaChallenge: mfaPayload.mfa_challenge,
-          availableMethods: mfaPayload.available_methods,
-        },
-        error: null,
-      };
+    // MFA, a factor to set up, or a contact to confirm first.
+    const step = this._signInStep(authPayload);
+    if (step) {
+      return { data: step, error: null };
     }
 
     return {
@@ -1027,7 +1083,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @see {@link verifyOtp}
    */
   private async _verifyOtpRequest(otp: string, user_id: UniqueIdentifier) {
-    return this.post<ScuteTokenPayload | ScuteMfaRequiredResponse>(
+    return this.post<ScuteTokenPayload | ScuteMfaRequiredResponse | ScuteContactVerificationRequiredResponse>(
       "/otps/verify",
       {
         otp,
@@ -1040,8 +1096,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   /** Pending MFA challenge data, set when MFA is triggered during login. */
   private _pendingMfaChallenge: ScuteMfaRequiredResponse | null = null;
-  /** Pending MFA enrollment suggestion (grace period). */
-  private _pendingMfaEnrollmentSuggestion: { mfa_grace_days_remaining?: number; available_methods: string[] } | null = null;
+  /**
+   * Pending MFA enrollment suggestion: the grace period before MFA is
+   * required, or optional MFA whose factors the app no longer accepts
+   * (`mfa_factor_not_allowed`, D17).
+   */
+  private _pendingMfaEnrollmentSuggestion: ScuteMfaEnrollmentSuggestion | null = null;
 
   /** Attack protection's code step for a magic link sign-in, while pending. */
   private _pendingSignInVerification: {
@@ -1120,6 +1180,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (error) {
       return { data: null, error };
     }
+    // The sign-in may owe another step: a contact to confirm (D15).
+    const nextStep = this._signInStep(data);
+    if (nextStep) return { data: nextStep, error: null };
 
     this._pendingMfaChallenge = null;
     const result = await this.signInWithTokenPayload(data);
@@ -1232,7 +1295,100 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error };
     }
 
-    return this.signInWithTokenPayload(data);
+    return this._finishSignIn(data);
+  }
+
+  // -----------------------------------------------------------------------
+  // Confirm an email or phone while signing in (D15)
+  //
+  // An app that wants the person's email (or phone) confirmed first answers
+  // a sign-in with `contact_verification_required` instead of a session.
+  // With a challenge, a code went to the one on file; without one (a
+  // `setup_token`), the person names it first (addSignInContact). The code
+  // is verified with the challenge token alone, no app key.
+  // -----------------------------------------------------------------------
+
+  /** The pending "confirm your email or phone" step of a sign-in, if any. */
+  private _pendingContactVerification: ScuteContactVerificationRequiredResponse | null = null;
+
+  /** The pending "confirm your email or phone" step of a sign-in, if any (D15). */
+  get pendingContactVerification() {
+    return this._pendingContactVerification;
+  }
+
+  /**
+   * Name the email or phone a sign-in has to confirm, when the person has
+   * none (the step came with a `setup_token`): a code is sent to it.
+   * Errors: 400 invalid_identifier, 409 contact_taken, 401 setup_expired
+   * (sign in again), 429 setup_send_limit, 422 sms_unavailable or
+   * sms_country_not_allowed.
+   * @param identifier - The email or phone
+   * @param setupToken - Default: the pending step's
+   */
+  async addSignInContact(identifier: ScuteIdentifier, setupToken?: string) {
+    const token = setupToken ?? this._pendingContactVerification?.setup_token;
+    if (!token) {
+      return { data: null, error: new InvalidMagicLinkError() };
+    }
+
+    const { data, error } = await this.post<{ field: ScuteContactVerificationRequiredResponse["field"]; challenge: ScuteChallengeResponse }>(
+      "/sign_in/contact",
+      { setup_token: token, identifier }
+    );
+    if (error) {
+      return { data: null, error };
+    }
+
+    if (this._pendingContactVerification) {
+      this._pendingContactVerification = { ...this._pendingContactVerification, challenge: data.challenge };
+    }
+    return { data, error: null };
+  }
+
+  /**
+   * Verify the code of the "confirm your email or phone" step. Answers the
+   * next step (`data`: MFA, a factor to set up, another contact), or signs
+   * in (`data` null, SIGNED_IN). A wrong code is a 422 with
+   * `remaining_attempts`.
+   * @param code - The code that was sent
+   * @param challengeToken - Default: the pending step's challenge
+   */
+  async verifyContactVerification(code: string, challengeToken?: string) {
+    const token = challengeToken ?? this._pendingContactVerification?.challenge?.token;
+    if (!token) {
+      return { data: null, error: new InvalidMagicLinkError() };
+    }
+
+    const { data, error } = await this.post<unknown>(
+      `/challenges/${encodeURIComponent(token)}/verify`,
+      { code }
+    );
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this._finishSignIn(data);
+  }
+
+  /**
+   * Send the code of the "confirm your email or phone" step again.
+   * @param challengeToken - Default: the pending step's challenge
+   */
+  async resendContactVerification(challengeToken?: string) {
+    const token = challengeToken ?? this._pendingContactVerification?.challenge?.token;
+    if (!token) {
+      return { data: null, error: new InvalidMagicLinkError() };
+    }
+
+    const { data, error } = await this.resendChallenge(token);
+    if (error) {
+      return { data: null, error };
+    }
+
+    if (data?.challenge && this._pendingContactVerification) {
+      this._pendingContactVerification = { ...this._pendingContactVerification, challenge: data.challenge };
+    }
+    return { data, error: null };
   }
 
   // -----------------------------------------------------------------------
@@ -1353,6 +1509,59 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       { enrollment_id: enrollmentId, code },
       accessTokenHeader(tok.access)
     );
+  }
+
+  /**
+   * Set up a second factor during a sign-in that needs one first (D18): the
+   * sign-in answered `mfaEnrollmentRequired` with a `setupToken`. Works
+   * without a session. TOTP answers `provisioning_uri` and `secret`; sms and
+   * email send a code to `secretData` (the phone or the email). Errors:
+   * 401 setup_expired (sign in again), 422 method_not_allowed.
+   * @param setupToken - The sign-in's setup token
+   * @param method - One of the step's `availableMethods`
+   * @param secretData - The phone (sms) or email (email)
+   */
+  async enrollMfaWithSetupToken(
+    setupToken: string,
+    method: ScuteMfaSetupMethod,
+    secretData?: string,
+    name?: string
+  ) {
+    return this.post<{
+      enrollment: ScuteMfaEnrollment;
+      provisioning_uri?: string;
+      secret?: string;
+    }>(
+      "/mfa/enroll",
+      {
+        method,
+        ...(secretData ? { secret_data: secretData } : null),
+        ...(name ? { name } : null),
+      },
+      setupTokenHeader(setupToken)
+    );
+  }
+
+  /**
+   * Verify the factor set up with {@link enrollMfaWithSetupToken}: this
+   * finishes the sign-in (SIGNED_IN, `data` null), or answers the next step
+   * (`data`). The pass works once. Errors: 422 invalid_code (try again),
+   * 401 setup_expired (sign in again).
+   * @param setupToken - The sign-in's setup token
+   * @param enrollmentId - `enrollment.id` from enrollMfaWithSetupToken
+   * @param code - The code from the app, the text or the email
+   */
+  async verifyMfaEnrollmentWithSetupToken(setupToken: string, enrollmentId: string, code: string) {
+    const { data, error } = await this.post<ScuteTokenPayload & { enrollment?: ScuteMfaEnrollment }>(
+      "/mfa/enroll/verify",
+      { enrollment_id: enrollmentId, code },
+      setupTokenHeader(setupToken)
+    );
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this._finishSignIn(data);
   }
 
   /** Remove an enrolled MFA method by id. */
@@ -1505,31 +1714,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     if (finalizeError) return { data: null, error: finalizeError };
 
-    // Check if MFA is required after WebAuthn
-    if (payload && "mfa_required" in payload && (payload as any).mfa_required) {
-      const mfaPayload = payload as unknown as ScuteMfaRequiredResponse;
-      this._pendingMfaChallenge = mfaPayload;
-
-      if (mfaPayload.mfa_enrollment_required) {
-        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
-      } else {
-        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
-      }
-
-      return {
-        data: {
-          mfaRequired: true,
-          mfaEnrollmentRequired: !!mfaPayload.mfa_enrollment_required,
-          mfaGracePeriod: !!mfaPayload.mfa_grace_period,
-          mfaGraceDaysRemaining: mfaPayload.mfa_grace_days_remaining,
-          mfaChallenge: mfaPayload.mfa_challenge,
-          availableMethods: mfaPayload.available_methods,
-        },
-        error: null,
-      };
+    // MFA, a factor to set up, or a contact to confirm after WebAuthn.
+    const step = this._signInStep(payload);
+    if (step) {
+      return { data: step, error: null };
     }
 
-    return this.signInWithTokenPayload(payload);
+    return this.signInWithTokenPayload(payload as ScuteTokenPayload);
   }
 
   /**
@@ -1540,10 +1731,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     // Check if server suggested MFA enrollment (grace period) BEFORE sign-in
     // so the event fires before SIGNED_IN
     if ((payload as any).mfa_enrollment_suggested) {
-      this._pendingMfaEnrollmentSuggestion = {
-        mfa_grace_days_remaining: (payload as any).mfa_grace_days_remaining,
-        available_methods: (payload as any).available_methods,
-      };
+      this._pendingMfaEnrollmentSuggestion = mfaEnrollmentSuggestionOf(payload);
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED);
     } else {
       // A suggestion belongs to the sign-in that brought it.
@@ -2040,8 +2228,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: finalizeError };
     }
 
-    // Check if MFA is required after WebAuthn
-    if (data && "mfa_required" in data && (data as any).mfa_required) {
+    // MFA or a contact to confirm after WebAuthn: no session yet
+    if (data && ("mfa_required" in data || "contact_verification_required" in data)) {
       return { data: data as any, error: null };
     }
 
@@ -2078,7 +2266,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   private async _webauthnFinalizeLoginRequest(
     credential: webauthn.PublicKeyCredentialWithAssertionJSON
   ) {
-    return this.post<ScuteTokenPayload | ScuteMfaRequiredResponse>("/webauthn/login/finalize", credential);
+    return this.post<ScuteTokenPayload | ScuteMfaRequiredResponse | ScuteContactVerificationRequiredResponse>("/webauthn/login/finalize", credential);
   }
 
   /**
@@ -2632,6 +2820,27 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
  */
 /** How long a request waits for the device fingerprint before going without it. */
 const FINGERPRINT_WAIT_MS = 2000;
+
+/**
+ * The suggestion a sign-in brought with its session: the grace period, or
+ * optional MFA whose factors the app no longer accepts (D17).
+ */
+export const mfaEnrollmentSuggestionOf = (payload: unknown): ScuteMfaEnrollmentSuggestion => {
+  const answer = (payload ?? {}) as Record<string, any>;
+  return {
+    mfa_grace_days_remaining: typeof answer.mfa_grace_days_remaining === "number" ? answer.mfa_grace_days_remaining : undefined,
+    available_methods: Array.isArray(answer.available_methods) ? answer.available_methods : [],
+    mfa_factor_not_allowed: answer.mfa_factor_not_allowed === true,
+  };
+};
+
+/** A sign-in's setup-only pass, as a header (D18). */
+const setupTokenHeader = (setupToken: string) => ({ [SCUTE_SETUP_TOKEN_HEADER]: setupToken });
+
+/** Whether a sign-in answer is a step to take (MFA or a contact to confirm). */
+const isSignInStep = (data: object): data is ScuteSignInStep =>
+  ("mfaRequired" in data && !!(data as { mfaRequired?: boolean }).mfaRequired) ||
+  ("contactVerificationRequired" in data && !!(data as { contactVerificationRequired?: boolean }).contactVerificationRequired);
 
 export const createClient = (
   ...params: ConstructorParameters<typeof ScuteClient>

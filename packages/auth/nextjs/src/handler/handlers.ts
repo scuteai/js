@@ -8,7 +8,7 @@ import internalHandler from "./internalHandler";
 import { createPagesEdgeRuntimeClient } from "../pagesEdgeRuntimeClient";
 import { createPagesServerClient } from "../pagesServerClient";
 import { createRouteHandlerClient } from "../routeHandlerClient";
-import { getBody, getInitUrl, type Promisable } from "../utils";
+import { clientIpFor, getBody, getInitUrl, nextRequestIp, type Promisable } from "../utils";
 import type { ScuteNextjsClientConfig } from "../shared";
 
 type RouteHandlerContext = {
@@ -32,11 +32,14 @@ async function ScuteRouteHandler(
 
   const headers = await context.headers();
 
+  // The person's address on the calls made with the secret key (the
+  // refresh, D11): `request.ip` where Next.js provides it, as the edge
+  // handler does; `config.clientIp` wins.
   const scute = createRouteHandlerClient(
     {
       cookies: context.cookies,
     },
-    config
+    { ...config, clientIp: clientIpFor(config, nextRequestIp(req)) }
   );
 
   const response = await internalHandler(scute, {

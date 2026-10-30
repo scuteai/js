@@ -161,6 +161,18 @@ export abstract class ScuteSession {
     | (() => Promise<Partial<ScuteTokenPayload> | void>)
     | null = null;
 
+  /** Why the last session ended on its own, until a new one starts. */
+  protected _sessionEndReason: SessionEndReason | null = null;
+
+  /**
+   * Why the last session ended on its own (SESSION_EXPIRED), until a new one
+   * starts: "session_idle" when the app signed it out after being inactive
+   * (its idle timeout), else null.
+   */
+  get sessionEndReason(): SessionEndReason | null {
+    return this._sessionEndReason;
+  }
+
   /** @internal */
   protected _refreshDeferred: Deferred<
     Awaited<ReturnType<ScuteSession["__refresh"]>>
@@ -412,6 +424,8 @@ export abstract class ScuteSession {
 
       return unAuthenticatedState();
     }
+
+    this._sessionEndReason = null;
 
     if (this.refreshProxyCallback) {
       // server must not send this in proxy mode
@@ -763,6 +777,8 @@ export abstract class ScuteSession {
     // Only a rejected refresh ends the session. Network errors and 5xx keep
     // the stored tokens so the next refresh (or tick) can recover.
     if (isSessionRejected(error)) {
+      // D14: the app's idle timeout ended it; say why with the expiry.
+      this._sessionEndReason = errorCodeOf(error) === "session_idle" ? "session_idle" : null;
       await this._expireSession();
     }
 
@@ -1029,7 +1045,24 @@ export abstract class ScuteSession {
 const isSessionRejected = (error: unknown) =>
   error instanceof InvalidAuthTokenError ||
   (error instanceof BaseHttpError &&
-    (error.code === 401 || error.code === 403));
+    (error.code === 401 ||
+      (error.code === 403 && !NETWORK_REFUSALS.includes(errorCodeOf(error) ?? ""))));
+
+/**
+ * 403s that refuse the network the request came from, not the session
+ * (D11: the workspace's IP or country rules, checked on every refresh).
+ * The session stays: the same tokens work again from an allowed network.
+ */
+const NETWORK_REFUSALS: readonly string[] = ["ip_blocked", "country_blocked"];
+
+/** The API's `error_code` on a failed request, if any. */
+const errorCodeOf = (error: unknown): string | null => {
+  const code = (error as BaseHttpError | null)?.json?.error_code;
+  return typeof code === "string" ? code : null;
+};
+
+/** Why a session ended on its own (`sessionEndReason`). */
+export type SessionEndReason = "session_idle";
 
 /**
  * Runs `task` for a single-flight guard: settles `deferred` with the outcome

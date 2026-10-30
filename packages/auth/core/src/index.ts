@@ -10,6 +10,7 @@ import { ScuteCookieStorage } from "./lib/ScuteStorage";
 
 export * from "./lib/errors";
 export { SCUTE_CLIENT_IP_HEADER, isClientIp, normalizeClientIp } from "./lib/clientIp";
+export { mfaEnrollmentSuggestionOf } from "./ScuteClient";
 
 export {
   ScuteAdminApi,
@@ -88,6 +89,7 @@ export {
   sessionLoadingState,
 } from "./lib/ScuteSession";
 export type { Session } from "./lib/types/session";
+export type { SessionEndReason } from "./lib/ScuteSession";
 
 export {
   isBrowser,
@@ -113,4 +115,5 @@ export {
   SCUTE_ACCESS_STORAGE_KEY,
   SCUTE_REFRESH_STORAGE_KEY,
   SCUTE_REMEMBER_STORAGE_KEY,
+  SCUTE_SETUP_TOKEN_HEADER,
 } from "./lib/constants";

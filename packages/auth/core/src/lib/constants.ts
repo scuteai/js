@@ -26,6 +26,11 @@ export const AUTH_CHANGE_EVENTS = {
   MFA_VERIFIED: "mfa_verified",
   /** Attack protection asks for a code before a magic link sign-in goes on. */
   VERIFICATION_REQUIRED: "verification_required",
+  /**
+   * The app wants an email or phone confirmed before the sign-in goes on
+   * (D15): see `pendingContactVerification`.
+   */
+  CONTACT_VERIFICATION_REQUIRED: "contact_verification_required",
 } as const;
 
 export type AuthChangeEvent = ValueOf<typeof AUTH_CHANGE_EVENTS>;
@@ -61,3 +66,9 @@ export const SCUTE_REMEMBER_STORAGE_KEY = "sc-remember-me";
 
 export const _SCUTE_ACCESS_HEADER = "X-Authorization";
 export const _SCUTE_REFRESH_HEADER = "X-Refresh-Token";
+
+/**
+ * The header that carries a sign-in's setup-only pass (`setup_token`): it
+ * sets up a second factor (D18) and works on the MFA enroll routes only.
+ */
+export const SCUTE_SETUP_TOKEN_HEADER = "X-Scute-Setup-Token";

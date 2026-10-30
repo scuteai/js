@@ -159,6 +159,19 @@ const internalHandler = async (
 
     const { data, error } = await scute.refreshSession();
 
+    const refusal = networkRefusalOf(error);
+    if (refusal) {
+      // D11: the workspace's IP or country rules refused the network this
+      // refresh came from, not the session. Keep the cookies; the same
+      // session refreshes again from an allowed network.
+      return new Response(JSON.stringify({ error_code: refusal }), {
+        status: 403,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
     if (error) {
       // A backend-rejected refresh means the stored refresh token is dead:
       // a stale `sc-refresh-token__<appId>` cookie force-migrated from a
@@ -195,6 +208,13 @@ const internalHandler = async (
       status: 400,
     });
   }
+};
+
+/** A refresh refused for the network it came from (D11), not the session. */
+const networkRefusalOf = (error: unknown): "ip_blocked" | "country_blocked" | null => {
+  const json = (error as { code?: unknown; json?: { error_code?: unknown } } | null) ?? null;
+  const code = json?.json?.error_code;
+  return json?.code === 403 && (code === "ip_blocked" || code === "country_blocked") ? code : null;
 };
 
 const isSignInRequest = (url: URL, method: string) =>
