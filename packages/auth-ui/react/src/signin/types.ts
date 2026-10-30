@@ -77,6 +77,8 @@ export type ScuteSignInPreview = {
   verificationMethod?: string;
   /** On "mfa_enroll_suggest": days left before a second step is required. */
   mfaGraceDaysRemaining?: number;
+  /** On "mfa_verify": show "Trust this device" for this many days (the app allows device trust). */
+  deviceTrustDays?: number;
 };
 
 export type ScuteSignInProps = {

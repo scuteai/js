@@ -55,6 +55,10 @@ export type ScuteAppData = {
   user_meta_data_schema: ScuteUserMetaDataSchema[];
   oauth_providers?: ScuteOAuthProviderConfig[];
   passkeys_enabled?: boolean;
+  /** Whether people may trust a device on the MFA step ("Trust this device"). */
+  device_trust_enabled?: boolean;
+  /** How long a trusted device skips the new-device check, in days. */
+  device_trust_days?: number;
   base_url: string;
 };
 
@@ -129,6 +133,53 @@ export type ScuteImpersonateParams = {
   challenge?: string;
   /** An approved request's id, when user:impersonate needs approval. */
   approval?: UniqueIdentifier;
+};
+
+/**
+ * A one-time hand-off of a session as the user to your app
+ * (`admin.createImpersonationHandoff`, or the dashboard's "Sign in as this
+ * user"). Open `url` (your app's sign-in page with `?sct_imp=<code>`); the
+ * SDK there swaps the code for the session. It works once, until
+ * `expires_at` (a couple of minutes).
+ */
+export type ScuteImpersonationHandoff = {
+  session_id: UniqueIdentifier;
+  impersonation: Omit<ScuteImpersonationRecord, "session_id">;
+  handoff: {
+    code: string;
+    /** Null when the app has no address set. */
+    url: string | null;
+    expires_at: string;
+  };
+};
+
+/** One of the signed-in person's devices (`listTrustedDevices`). */
+export type ScuteTrustedDevice = {
+  id: UniqueIdentifier;
+  label: string | null;
+  city: string | null;
+  country_code: string | null;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+  trusted: boolean;
+  trusted_at: string | null;
+  trust_expires_at: string | null;
+  /** The device this session signed in from. */
+  current: boolean;
+};
+
+/** Why this session can't trust its device. */
+export type ScuteDeviceTrustRefusal = "device_trust_off" | "second_factor_required" | "device_unknown";
+
+export type ScuteTrustedDevices = {
+  devices: ScuteTrustedDevice[];
+  current_device: {
+    id: UniqueIdentifier | null;
+    trusted: boolean;
+    can_trust: boolean;
+    reason: ScuteDeviceTrustRefusal | null;
+  };
+  device_trust: { enabled: boolean; days: number };
 };
 
 export type ScuteSendMagicLinkResponse = {

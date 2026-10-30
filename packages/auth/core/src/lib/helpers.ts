@@ -206,14 +206,15 @@ export const httpUrlOrUndefined = (value: unknown): string | undefined => {
 
 /**
  * Removes Scute's one-time sign-in tokens from a URL: the magic-link token,
- * the OAuth/SAML handoff token and the skip flag. Call it synchronously as
+ * the OAuth/SAML handoff token, the sign-in-as-user hand-off code and the
+ * skip flag. Call it synchronously as
  * soon as a token is read, before any await, so the token can't stay in
  * browser history (or in referrers) if verification fails. SAML SSO and
  * social OAuth both land with `sct_oauth`, so it matters for SSO too.
  */
 export const scrubAuthTokensFromUrl = (href: string): string => {
   const url = new URL(href);
-  for (const param of ["sct_magic", "sct_oauth", "sct_sk"]) {
+  for (const param of ["sct_magic", "sct_oauth", "sct_imp", "sct_sk"]) {
     url.searchParams.delete(param);
   }
   return url.toString();

@@ -364,6 +364,25 @@ export const SIGN_IN_CSS = `
   padding-top: 20px;
   border-top: 1px solid var(--scute-line);
 }
+.scute-signin__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--scute-ink-muted);
+  cursor: pointer;
+}
+.scute-signin__check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--scute-accent-color);
+  cursor: pointer;
+}
+.scute-signin__check input:focus-visible { outline: 2px solid var(--scute-accent-color); outline-offset: 2px; }
 .scute-signin__others-label { font-size: 13px; line-height: 20px; color: var(--scute-ink-soft); }
 .scute-signin__others-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 

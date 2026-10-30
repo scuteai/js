@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   AUTH_CHANGE_EVENTS,
+  SCUTE_IMPERSONATION_HANDOFF_PARAM,
   ScuteClient,
   type Session,
   type ScuteUserData,
@@ -58,14 +59,51 @@ const ScuteClientContext = createContext<ScuteClient | undefined>(undefined);
 export type AuthContextProviderProps = {
   scuteClient: ScuteClient;
   children: ReactNode;
+  /**
+   * Take a "sign in as this user" hand-off (support access) when the page
+   * opens with `?sct_imp=<code>`: the code is removed from the address bar
+   * and swapped for the session as the user, and `useImpersonation` reports
+   * it for your banner. The code works once, for a couple of minutes.
+   * @default true
+   */
+  acceptImpersonationHandoff?: boolean;
 };
+
+// Reads the hand-off code from the address bar and removes it at once, so it
+// can't stay in the history or a referrer even when the swap fails.
+function takeHandoffCode(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get(SCUTE_IMPERSONATION_HANDOFF_PARAM);
+    if (!code) return null;
+    url.searchParams.delete(SCUTE_IMPERSONATION_HANDOFF_PARAM);
+    window.history?.replaceState?.(window.history.state, "", url.toString());
+    return code;
+  } catch {
+    return null;
+  }
+}
 
 export const AuthContextProvider = ({
   scuteClient,
   children,
+  acceptImpersonationHandoff = true,
 }: AuthContextProviderProps) => {
   const [session, setSession] = useState<Session>(sessionLoadingState());
   const [user, setUser] = useState<ScuteUserData | null>(null);
+
+  useEffect(() => {
+    if (!acceptImpersonationHandoff) return;
+    const code = takeHandoffCode();
+    if (!code) return;
+    scuteClient.signInWithImpersonationHandoff(code).then(
+      ({ error }) => {
+        if (error) console.warn("Scute: the sign-in-as-user link was used or has run out.", error);
+      },
+      () => {}
+    );
+  }, [scuteClient, acceptImpersonationHandoff]);
 
   useEffect(() => {
     const unsubscribe = scuteClient.onAuthStateChange(
