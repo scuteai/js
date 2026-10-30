@@ -170,3 +170,87 @@ describe("in the browser", () => {
     expect(server.callsTo("DELETE", CURRENT_USER)).toHaveLength(0);
   });
 });
+
+describe("hand-off to the app (sign in as this user from the dashboard)", () => {
+  const EXCHANGE = `${AUTH_PREFIX}/impersonation/exchange`;
+
+  it("the admin API asks for a one-time link instead of the token", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const base = `/v1/apps/${APP_ID}/users/user_2`;
+    const answer = {
+      session_id: "ses_1",
+      impersonation: { actor, reason: "Ticket 4411", started_at: "", expires_at: "" },
+      handoff: { code: "c0de", url: "https://app.test/login?sct_imp=c0de", expires_at: "" },
+    };
+    server.on("POST", `${base}/impersonate`, { status: 201, body: answer });
+    const admin = new ScuteAdminApi({ appId: APP_ID, baseUrl: BASE_URL, secretKey: "sk_test" });
+
+    const { data, error } = await admin.createImpersonationHandoff("user_2", { reason: "Ticket 4411", actor: { email: "support@acme.test" } });
+
+    expect(error).toBeNull();
+    expect(data?.handoff.url).toBe("https://app.test/login?sct_imp=c0de");
+    expect(server.callsTo("POST", `${base}/impersonate`)[0].body).toEqual({
+      reason: "Ticket 4411",
+      actor: { email: "support@acme.test" },
+      handoff: true,
+    });
+  });
+
+  it("reads the code from the link", () => {
+    const client = newClient();
+    expect(client.getImpersonationHandoffCode("https://app.test/login?sct_imp=c0de&next=%2F")).toBe("c0de");
+    expect(client.getImpersonationHandoffCode("https://app.test/login")).toBeNull();
+  });
+
+  it("swaps the code for the session as the user and switches to it, keeping the own session aside", async () => {
+    const own = { access: accessToken({ uuid: "user_9" }), refresh: refreshToken() };
+    seedSession(storage, own);
+    const tokens = impersonationTokens();
+    server.on("POST", EXCHANGE, { body: tokens });
+    const client = newClient();
+    const rec = recordEvents(client);
+
+    const { error } = await client.signInWithImpersonationHandoff("c0de");
+
+    expect(error).toBeNull();
+    expect(server.callsTo("POST", EXCHANGE)[0].body).toEqual({ code: "c0de" });
+    expect(storage.map.get(KEYS.access)).toBe(tokens.access);
+    expect(storage.map.has(KEYS.refresh)).toBe(false);
+    expect(JSON.parse(storage.map.get(IMPERSONATOR_KEY)!)).toEqual(own);
+    expect(await client.getImpersonation()).toMatchObject({ actor });
+    expect(rec.names()).toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
+  });
+
+  it("leaves the session alone when the code was used or ran out", async () => {
+    const own = { access: accessToken({ uuid: "user_9" }), refresh: refreshToken() };
+    seedSession(storage, own);
+    server.on("POST", EXCHANGE, {
+      status: 422,
+      body: { error: "This sign-in link was used or has run out. Start a new one.", error_code: "handoff_invalid" },
+    });
+    const client = newClient();
+
+    const { error } = await client.signInWithImpersonationHandoff("used");
+
+    expect(error).toBeTruthy();
+    expect(storage.map.get(KEYS.access)).toBe(own.access);
+    expect(storage.map.has(IMPERSONATOR_KEY)).toBe(false);
+  });
+
+  it("refuses an answer that isn't a session as the user", async () => {
+    server.on("POST", EXCHANGE, { body: { ...impersonationTokens(), access: accessToken() } });
+    const client = newClient();
+
+    const { error } = await client.signInWithImpersonationHandoff("c0de");
+
+    expect(error).toBeTruthy();
+    expect(storage.map.has(KEYS.access)).toBe(false);
+  });
+
+  it("has nothing to swap without a code", async () => {
+    const { error } = await newClient().signInWithImpersonationHandoff(null);
+
+    expect(error).toBeTruthy();
+    expect(server.callsTo("POST", EXCHANGE)).toHaveLength(0);
+  });
+});

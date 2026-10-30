@@ -61,7 +61,7 @@ All prop types are exported: `ScuteSignInProps`, `ScuteSignInAppearance`, `Scute
 - **Email**, then whatever the app is set up for: a passkey, a magic link (with polling, so opening the link on another device signs this page in), or a 6-digit code (paste or type, sends itself when full).
 - **Resend** of the link or the code, once every 30 seconds.
 - **Attack protection**: when Scute wants to confirm an unusual magic link sign-in, the visitor gets a code and enters it right there; the same link then signs in.
-- **MFA**: authenticator app, email or text code (with resend), backup codes (8 characters), and switching between the methods the visitor has.
+- **MFA**: authenticator app, email or text code (with resend), backup codes (8 characters), and switching between the methods the visitor has. When the app lets people trust devices, a "Trust this device for N days" checkbox (off until ticked) goes with the code.
 - **Passkey offer** after a link or a code, skipped where the browser can't make a passkey (an http page, an old browser).
 - **Clear refusals**: banned or suspended accounts, and sign-ins blocked by IP or country rules, each get their own message. Every error step has a way back.
 - **Settings that don't load** (a wrong app ID, no connection): an error step with "Try again" instead of an email field that can't work.
@@ -117,7 +117,7 @@ function Mascot() {
 <ScuteSignIn preview={{ view: "error", errorCode: "ip_blocked" }} />
 ```
 
-`ScuteSignInPreview` is `{ view, email?, error?, errorCode?, mfaMethod?, mfaMethods?, verificationMethod?, mfaGraceDaysRemaining? }`; `view` is any of the flow's steps (listed under [Headless](#headless-usescuteauthflow)).
+`ScuteSignInPreview` is `{ view, email?, error?, errorCode?, mfaMethod?, mfaMethods?, verificationMethod?, mfaGraceDaysRemaining?, deviceTrustDays? }`; `view` is any of the flow's steps (listed under [Headless](#headless-usescuteauthflow)).
 
 ## ScuteAuthGate
 
@@ -236,7 +236,7 @@ createRoot(document.getElementById("root")!).render(<Root />);
 
 `loading`, `login`, `magic_pending`, `magic_verifying`, `verification_required`, `otp_input`, `webauthn_verify`, `webauthn_register`, `webauthn_register_success`, `mfa_verify`, `mfa_enroll`, `mfa_enroll_suggest`, `error`, `authenticated`.
 
-It returns the state (`identifier`, `error`, `errorCode`, `submitting`, `resendIn`, `resent`, `resendError`, `verification`, `mfaChallenge`, `mfaAvailableMethods`, `passkeysSupported`, ...) and the actions (`submitIdentifier`, `submitOtp`, `submitVerificationCode`, `resend`, `submitMfaCode`, `resendMfaCode`, `switchMfaMethod`, `registerPasskey`, `skipPasskey`, `skipMfaEnrollment`, `signInWithOAuth`, `retry`, `signOut`). `errorCode` carries the API's code for a refusal: `user_banned`, `user_suspended`, `ip_blocked` or `country_blocked`. When the app's settings don't load, the flow starts on `error` with `errorCode` `"app_settings_unavailable"` (exported as `APP_SETTINGS_UNAVAILABLE`), and `retry` loads them again.
+It returns the state (`identifier`, `error`, `errorCode`, `submitting`, `resendIn`, `resent`, `resendError`, `verification`, `mfaChallenge`, `mfaAvailableMethods`, `deviceTrustOffered`, `deviceTrustDays`, `trustDevice`, `passkeysSupported`, ...) and the actions (`submitIdentifier`, `submitOtp`, `submitVerificationCode`, `resend`, `submitMfaCode`, `resendMfaCode`, `switchMfaMethod`, `setTrustDevice`, `registerPasskey`, `skipPasskey`, `skipMfaEnrollment`, `signInWithOAuth`, `retry`, `signOut`). `errorCode` carries the API's code for a refusal: `user_banned`, `user_suspended`, `ip_blocked` or `country_blocked`. When the app's settings don't load, the flow starts on `error` with `errorCode` `"app_settings_unavailable"` (exported as `APP_SETTINGS_UNAVAILABLE`), and `retry` loads them again.
 
 ## Notes
 

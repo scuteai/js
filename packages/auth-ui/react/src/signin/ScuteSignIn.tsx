@@ -652,6 +652,14 @@ function MfaStep({ auth }: { auth: ScuteAuthFlow }) {
     <form onSubmit={c.onSubmit}>
       <Title focus={false}>One more step</Title>
       <Lead>{MFA_LEADS[method] ?? `Enter the code from your ${label.toLowerCase()}.`}</Lead>
+      {auth.deviceTrustOffered && (
+        // Before the boxes: the code sends itself once the last box is filled.
+        <label className="scute-signin__check">
+          <input type="checkbox" checked={!!auth.trustDevice} disabled={c.busy}
+                 onChange={(e) => auth.setTrustDevice(e.target.checked)} />
+          {trustDeviceLabel(auth.deviceTrustDays)}
+        </label>
+      )}
       <CodeBoxes key={method} label={label} value={c.code.length === length ? c.code : blank(length)} numeric={!isBackupCode(method)}
                  disabled={c.busy} invalid={c.wrong} focusKey={c.focusKey} onChange={c.onChange}
                  describedBy={shownError ? "scute-signin-mfa-error" : undefined} />
@@ -680,6 +688,11 @@ function MfaStep({ auth }: { auth: ScuteAuthFlow }) {
       <Different auth={auth} />
     </form>
   );
+}
+
+function trustDeviceLabel(days: number | null | undefined) {
+  if (!days) return "Trust this device";
+  return `Trust this device for ${days} day${days === 1 ? "" : "s"}`;
 }
 
 function AddPasskeyStep({ auth }: { auth: ScuteAuthFlow }) {

@@ -694,3 +694,56 @@ describe("app settings that don't load", () => {
     expect(client.verifyMagicLinkToken).toHaveBeenCalledWith(MAGIC_TOKEN);
   });
 });
+
+describe("Trust this device (MFA step)", () => {
+  async function atMfaWith(appData: Record<string, unknown>) {
+    const client = createFakeClient({ verifyMfaChallenge: vi.fn(async () => ({ error: null, deviceTrusted: true })) });
+    client.getAppData.mockResolvedValue({ data: { ...appData }, error: null });
+    client.signInOrUp.mockImplementation(async () => {
+      client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+      return { data: { mfaRequired: true, mfaChallenge: { token: "chl_1", method: "totp" }, availableMethods: ["totp"] }, error: null };
+    });
+    await atEmail(client);
+    await act(async () => submitEmail());
+    await screen.findByRole("heading", { name: "One more step" });
+    return client;
+  }
+
+  it("is offered when the app lets people trust devices, off until ticked, and sent with the code", async () => {
+    const client = await atMfaWith({ allowed_identifiers: ["email"], device_trust_enabled: true, device_trust_days: 30 });
+    const box = screen.getByRole("checkbox", { name: "Trust this device for 30 days" }) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+
+    await act(async () => fireEvent.click(box));
+    expect(box.checked).toBe(true);
+    await act(async () => {
+      fireEvent.paste(boxes("Authenticator app")[0], { clipboardData: { getData: () => "246810" } });
+    });
+    expect(client.verifyMfaChallenge).toHaveBeenCalledWith("chl_1", "246810", { trustDevice: true });
+  });
+
+  it("sends an unticked box as no", async () => {
+    const client = await atMfaWith({ allowed_identifiers: ["email"], device_trust_enabled: true, device_trust_days: 1 });
+    expect(screen.getByRole("checkbox", { name: "Trust this device for 1 day" })).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.paste(boxes("Authenticator app")[0], { clipboardData: { getData: () => "246810" } });
+    });
+    expect(client.verifyMfaChallenge).toHaveBeenCalledWith("chl_1", "246810", { trustDevice: false });
+  });
+
+  it("isn't there when the app doesn't allow it, and nothing about trust is sent", async () => {
+    const client = await atMfaWith({ allowed_identifiers: ["email"], device_trust_enabled: false, device_trust_days: 30 });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+
+    await act(async () => {
+      fireEvent.paste(boxes("Authenticator app")[0], { clipboardData: { getData: () => "246810" } });
+    });
+    expect(client.verifyMfaChallenge).toHaveBeenCalledWith("chl_1", "246810");
+  });
+
+  it("shows in a preview with deviceTrustDays", () => {
+    render(<ScuteSignIn preview={{ view: "mfa_verify", deviceTrustDays: 14 }} />);
+    expect(screen.getByRole("checkbox", { name: "Trust this device for 14 days" })).toBeTruthy();
+  });
+});

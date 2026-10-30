@@ -19,6 +19,7 @@ import {
   SCUTE_MAGIC_PARAM,
   SCUTE_SKIP_PARAM,
   SCUTE_OAUTH_PKCE_PARAM,
+  SCUTE_IMPERSONATION_HANDOFF_PARAM,
 } from "./lib/constants";
 import { scopedChannel } from "./lib/storage-keys";
 import { SCUTE_SETUP_TOKEN_HEADER } from "./lib/constants";
@@ -80,6 +81,8 @@ import type {
   ScuteIdentifier,
   ScuteImpersonation,
   ScuteImpersonationTokens,
+  ScuteTrustedDevice,
+  ScuteTrustedDevices,
   ScuteMagicLinkIdResponse,
   ScuteSignInOptions,
   ScuteSignInOrUpOptions,
@@ -1163,11 +1166,15 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * Verify an MFA challenge.
    * @param token - Challenge token
    * @param code - Verification code (OTP, TOTP, or backup code)
+   * @param options.trustDevice - Trust this device ("Trust this device" on
+   *   the MFA step), when the app allows it (`appData.device_trust_enabled`).
+   *   The answer then says whether it is trusted now (`deviceTrusted`).
    */
-  async verifyMfaChallenge(token: string, code: string) {
-    const { data, error } = await this.post<ScuteTokenPayload>(
+  async verifyMfaChallenge(token: string, code: string, options?: { trustDevice?: boolean }) {
+    const trust = typeof options?.trustDevice === "boolean";
+    const { data, error } = await this.post<ScuteTokenPayload & { device_trusted?: boolean }>(
       `/challenges/${encodeURIComponent(token)}/verify`,
-      { code }
+      trust ? { code, trust_device: options!.trustDevice } : { code }
     );
 
     if (error) {
@@ -1178,7 +1185,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (nextStep) return { data: nextStep, error: null };
 
     this._pendingMfaChallenge = null;
-    return this.signInWithTokenPayload(data);
+    const result = await this.signInWithTokenPayload(data);
+    return trust ? { ...result, deviceTrusted: data.device_trusted === true } : result;
   }
 
   /**
@@ -1857,6 +1865,91 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_OUT, sessionUnAuthenticatedState());
     return true;
+  }
+
+  /**
+   * The one-time "sign in as this user" hand-off code in a URL (`sct_imp`),
+   * or null.
+   * @param url - Default `window.location.href`.
+   */
+  getImpersonationHandoffCode(url?: string | URL) {
+    return new URL(url ?? window.location.href).searchParams.get(SCUTE_IMPERSONATION_HANDOFF_PARAM);
+  }
+
+  /**
+   * Take a session as the user handed to this app by "Sign in as this user"
+   * (the dashboard, or `admin.createImpersonationHandoff`): swaps the
+   * one-time code for the session and switches to it like
+   * {@link beginImpersonation} (the current session is kept aside until
+   * stopImpersonating()). The React `AuthContextProvider` does this on its
+   * own when the page opens with `?sct_imp=`.
+   * @param code - The code; default: read from `window.location.href`.
+   */
+  async signInWithImpersonationHandoff(code?: string | null) {
+    const handoff = code ?? (isBrowser() ? this.getImpersonationHandoffCode() : null);
+    if (!handoff) {
+      return { error: new InvalidMagicLinkError() };
+    }
+
+    const { data, error } = await this.post<ScuteImpersonationTokens>("/impersonation/exchange", { code: handoff });
+    if (error) {
+      this._reportClientError(error, "impersonation-handoff");
+      return { error };
+    }
+
+    return this.beginImpersonation(data);
+  }
+
+  // ── Trusted devices ──
+  //
+  // A trusted device skips the "new device" check for the app's
+  // device_trust_days. Trusting takes a session from a sign-in that passed
+  // MFA; or tick it on the MFA step (verifyMfaChallenge's trustDevice).
+
+  /**
+   * The signed-in person's devices, which are trusted, and whether the one
+   * this session is on can be trusted (`current_device.can_trust`, else
+   * `reason`).
+   */
+  async listTrustedDevices() {
+    const { data: auth, error } = await this.getAuthToken();
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this.get<ScuteTrustedDevices>("/trusted_devices", accessTokenHeader(auth.access));
+  }
+
+  /**
+   * Trust the device this session signed in from. Refused with
+   * `device_trust_off`, `second_factor_required` (the sign-in didn't pass
+   * MFA) or `device_unknown` (no device fingerprint).
+   */
+  async trustThisDevice() {
+    const { data: auth, error } = await this.getAuthToken();
+    if (error) {
+      return { data: null, error };
+    }
+
+    const { data, error: trustError } = await this.post<{ device: ScuteTrustedDevice }>(
+      "/trusted_devices",
+      {},
+      accessTokenHeader(auth.access)
+    );
+    return trustError ? { data: null, error: trustError } : { data: data.device, error: null };
+  }
+
+  /**
+   * Stop trusting one of the signed-in person's devices.
+   * @param id - The device id from listTrustedDevices().
+   */
+  async untrustDevice(id: UniqueIdentifier) {
+    const { data: auth, error } = await this.getAuthToken();
+    if (error) {
+      return { data: null, error };
+    }
+
+    return this.delete(`/trusted_devices/${encodeURIComponent(id)}`, accessTokenHeader(auth.access));
   }
 
   /**

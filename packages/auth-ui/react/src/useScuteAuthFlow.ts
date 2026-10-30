@@ -159,7 +159,8 @@ export type AuthFlowView =
  * - Attack protection's code step on a magic link ("verification_required",
  *   `submitVerificationCode`)
  * - MFA: verify, resend, switch method (`submitMfaCode`, `resendMfaCode`,
- *   `switchMfaMethod`), enrollment required or suggested
+ *   `switchMfaMethod`), enrollment required or suggested, and "Trust this
+ *   device" where the app allows it (`deviceTrustOffered`, `trustDevice`)
  * - No passkey offer where the browser can't make one (`passkeysSupported`)
  * - The app's settings not loading: view "error" with `errorCode`
  *   "app_settings_unavailable" (`retry` loads them again)
@@ -220,6 +221,15 @@ export function useScuteAuthFlow() {
   const [mfaSwitching, setMfaSwitching] = useState(false);
   // What people sign in with on this app (allowed_identifiers): email, phone or both.
   const [identifierTypes, setIdentifierTypes] = useState<Array<"email" | "phone">>(["email"]);
+  // "Trust this device" on the MFA step: the app's days when it lets people
+  // trust devices (device_trust_enabled), else null; and the box itself.
+  const [deviceTrustDays, setDeviceTrustDays] = useState<number | null>(null);
+  const [trustDevice, setTrustDeviceState] = useState(false);
+  const trustDeviceRef = useRef(false);
+  const setTrustDevice = useCallback((value: boolean) => {
+    trustDeviceRef.current = value;
+    setTrustDeviceState(value);
+  }, []);
 
   const initRef = useRef(false);
   const magicVerifyRef = useRef(false);
@@ -418,9 +428,14 @@ export function useScuteAuthFlow() {
       setEmailSignIn(emailSignInOf((scuteClient as any).appData));
 
       try {
-        const allowed = (await scuteClient.getAppData())?.data?.allowed_identifiers;
+        const appData = (await scuteClient.getAppData())?.data;
+        const allowed = appData?.allowed_identifiers;
         const types = Array.isArray(allowed) ? allowed.filter((t): t is "email" | "phone" => t === "email" || t === "phone") : [];
         if (types.length) setIdentifierTypes(types);
+        if (appData?.device_trust_enabled === true) {
+          const days = Number(appData.device_trust_days);
+          setDeviceTrustDays(Number.isFinite(days) && days > 0 ? days : 30);
+        }
       } catch {}
 
       const magicToken = scuteClient.getMagicLinkToken();
@@ -841,14 +856,17 @@ export function useScuteAuthFlow() {
         ? `${code.slice(0, 4)}-${code.slice(4)}`.toUpperCase()
         : code;
       // verifyMfaChallenge signs in on success; SIGNED_IN moves the flow on.
-      const { error: mfaError } = await scuteClient.verifyMfaChallenge(mfaChallenge.token, sent);
+      // "Trust this device" goes with it only where the app offers it.
+      const { error: mfaError } = deviceTrustDays !== null
+        ? await scuteClient.verifyMfaChallenge(mfaChallenge.token, sent, { trustDevice: trustDeviceRef.current })
+        : await scuteClient.verifyMfaChallenge(mfaChallenge.token, sent);
       if (mfaError) { setError(messageOf(mfaError)); setErrorCode(errorCodeOf(mfaError)); return false; }
       return true;
     } catch (err: any) {
       setError(messageOf(err) || "MFA verification failed");
       return false;
     }
-  }, [mfaChallenge, scuteClient, clearError]);
+  }, [mfaChallenge, scuteClient, clearError, deviceTrustDays]);
 
   /** Send the MFA code again (methods that deliver one: email, text). */
   const resendMfaCode = useCallback(async (): Promise<string | null> => {
@@ -1195,6 +1213,15 @@ export function useScuteAuthFlow() {
     mfaGraceDaysRemaining,
     mfaResent,
     mfaSwitching,
+    /**
+     * "Trust this device" on the MFA step: offered when the app lets people
+     * trust devices; `deviceTrustDays` says for how long. `trustDevice` is
+     * the box (off by default); submitMfaCode sends it.
+     */
+    deviceTrustOffered: deviceTrustDays !== null,
+    deviceTrustDays,
+    trustDevice,
+    setTrustDevice,
 
     // Attack protection's code step (view "verification_required")
     verification,
