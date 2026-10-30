@@ -73,6 +73,8 @@ export type ScuteSignInPreview = {
   mfaMethod?: string;
   /** On "mfa_verify": the methods the visitor has, offered under "Or use another way". */
   mfaMethods?: string[];
+  /** On "mfa_enroll_suggest": the app no longer accepts the visitor's second step (not a grace period). */
+  mfaFactorNotAllowed?: boolean;
   /** On "verification_required": where the code went, "email_otp" (default) or "sms_otp". */
   verificationMethod?: string;
   /** On "mfa_enroll_suggest": days left before a second step is required. */

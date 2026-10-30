@@ -555,6 +555,7 @@ describe("MFA follow-up helpers", () => {
     expect(client.pendingMfaEnrollmentSuggestion).toEqual({
       mfa_grace_days_remaining: 5,
       available_methods: ["totp"],
+      mfa_factor_not_allowed: false,
     });
   });
 

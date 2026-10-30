@@ -280,6 +280,20 @@ export type ScuteChallengeLinkCompletedResponse = {
   intent_fields?: Record<string, unknown> | null;
 };
 
+/**
+ * The "set up a second step" nudge a sign-in brings with its session
+ * (MFA_ENROLLMENT_SUGGESTED, `pendingMfaEnrollmentSuggestion`): the grace
+ * period before MFA is required (`mfa_grace_days_remaining`), or optional
+ * MFA where the app no longer accepts the person's factors
+ * (`mfa_factor_not_allowed`, D17; no days then). `available_methods` is
+ * what may be set up.
+ */
+export type ScuteMfaEnrollmentSuggestion = {
+  mfa_grace_days_remaining?: number;
+  available_methods: string[];
+  mfa_factor_not_allowed: boolean;
+};
+
 /** A second factor a sign-in's setup-only pass can set up. */
 export type ScuteMfaSetupMethod = "totp" | "sms" | "email";
 

@@ -10,6 +10,7 @@ import { ScuteCookieStorage } from "./lib/ScuteStorage";
 
 export * from "./lib/errors";
 export { SCUTE_CLIENT_IP_HEADER, isClientIp, normalizeClientIp } from "./lib/clientIp";
+export { mfaEnrollmentSuggestionOf } from "./ScuteClient";
 
 export {
   ScuteAdminApi,

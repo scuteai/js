@@ -31,12 +31,14 @@ export type SignInRefusalCode = "user_banned" | "user_suspended" | "ip_blocked" 
 const REFUSAL_CODES: readonly string[] = ["user_banned", "user_suspended", "ip_blocked", "country_blocked"];
 
 /**
- * A second factor being set up while signing in (view "mfa_enroll", D18):
- * the sign-in's setup pass, what it may set up, and the factor started.
+ * A second factor being set up: while signing in with the sign-in's setup
+ * pass (view "mfa_enroll", D18), or right after signing in with the new
+ * session (view "mfa_enroll_suggest", `setUpMfaNow`, D17). What may be set
+ * up, and the factor started.
  */
 export type MfaSetupState = {
-  /** The sign-in's setup-only pass. */
-  setupToken: string;
+  /** The sign-in's setup-only pass; null when set up with the session. */
+  setupToken: string | null;
   /** What may be set up: "totp", "sms" or "email". */
   methods: ScuteMfaSetupMethod[];
   /** The factor started (startMfaSetup), else null. */
@@ -162,7 +164,10 @@ export type AuthFlowView =
  * - The app's settings not loading: view "error" with `errorCode`
  *   "app_settings_unavailable" (`retry` loads them again)
  * - Setting up a second factor when the sign-in needs one first (view
- *   "mfa_enroll" with `mfaSetup`: `startMfaSetup`, `submitMfaSetupCode`)
+ *   "mfa_enroll" with `mfaSetup`: `startMfaSetup`, `submitMfaSetupCode`,
+ *   D18), or right after signing in when the app no longer accepts the
+ *   person's second step (view "mfa_enroll_suggest" with
+ *   `mfaFactorNotAllowed`: `setUpMfaNow`, D17)
  * - Confirming an email or phone first (view "contact_verify":
  *   `submitContact`, `submitContactCode`, `resendContactCode`)
  * - A step-up or custom challenge link that signs nobody in (view
@@ -201,6 +206,8 @@ export function useScuteAuthFlow() {
   const [contactVerification, setContactVerification] = useState<ContactVerificationState | null>(null);
   const [completedChallenge, setCompletedChallenge] = useState<CompletedChallenge | null>(null);
   const [finishingOnOtherDevice, setFinishingOnOtherDevice] = useState(false);
+  // The nudge is because the app no longer accepts the person's factors (D17).
+  const [mfaFactorNotAllowed, setMfaFactorNotAllowed] = useState(false);
   // The app's email method (email_auth_type), once known: a link or a code.
   const [emailSignIn, setEmailSignIn] = useState<"link" | "code" | null>(null);
   const setupBusyRef = useRef(false);
@@ -277,6 +284,16 @@ export function useScuteAuthFlow() {
     if (data.mfaEnrollmentRequired) startSetupFrom(data.setupToken, data.availableMethods);
   }, [startSetupFrom]);
 
+  // The "set up a second step" nudge a sign-in brought with its session:
+  // the grace period, or factors the app no longer accepts (D17).
+  const applySuggestion = useCallback((suggestion: any) => {
+    const notAllowed = suggestion?.mfa_factor_not_allowed === true;
+    setMfaAvailableMethods(suggestion?.available_methods || []);
+    setMfaGracePeriod(!notAllowed);
+    setMfaGraceDaysRemaining(typeof suggestion?.mfa_grace_days_remaining === "number" ? suggestion.mfa_grace_days_remaining : undefined);
+    setMfaFactorNotAllowed(notAllowed);
+  }, []);
+
   // An email or phone to confirm first (D15).
   const handleContactStep = useCallback((data: any) => {
     setContactVerification({
@@ -344,6 +361,7 @@ export function useScuteAuthFlow() {
     setContactVerification(null);
     setCompletedChallenge(null);
     setFinishingOnOtherDevice(false);
+    setMfaFactorNotAllowed(false);
     magicTokenRef.current = null;
     // Signed out by the app's idle timeout (D14): say so on the email step.
     const idle = scuteClient.sessionEndReason === "session_idle";
@@ -474,11 +492,7 @@ export function useScuteAuthFlow() {
       }
       if (event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED) {
         const suggestion = scuteClient.pendingMfaEnrollmentSuggestion;
-        if (suggestion) {
-          setMfaAvailableMethods(suggestion.available_methods || []);
-          setMfaGracePeriod(true);
-          setMfaGraceDaysRemaining(suggestion.mfa_grace_days_remaining);
-        }
+        if (suggestion) applySuggestion(suggestion);
         setView("mfa_enroll_suggest");
       }
       // Only with a live session; otherwise SIGNED_IN moves the flow on.
@@ -487,7 +501,7 @@ export function useScuteAuthFlow() {
       }
     });
     return () => unsubscribe();
-  }, [scuteClient, view, resetAfterSignOut, startSetupFrom, handleContactStep]);
+  }, [scuteClient, view, resetAfterSignOut, startSetupFrom, handleContactStep, applySuggestion]);
 
   // ── 3. Process magic link from URL ──
   useEffect(() => {
@@ -793,8 +807,29 @@ export function useScuteAuthFlow() {
   // Only the optional suggestion can be skipped, not required enrollment.
   const skipMfaEnrollment = useCallback(() => {
     if (view !== "mfa_enroll_suggest") return;
+    setMfaSetup(null);
     setView("authenticated");
   }, [view]);
+
+  /**
+   * On the nudge (view "mfa_enroll_suggest"): set a second factor up right
+   * here with the new session (D17). Then `mfaSetup`, `startMfaSetup` and
+   * `submitMfaSetupCode` as for "mfa_enroll"; done, the flow goes on to
+   * "authenticated".
+   */
+  const setUpMfaNow = useCallback(() => {
+    if (view !== "mfa_enroll_suggest") return;
+    clearError();
+    setMfaSetup({
+      setupToken: null,
+      methods: mfaAvailableMethods.filter((m): m is ScuteMfaSetupMethod => SETUP_METHODS.includes(m)),
+      method: null,
+      enrollmentId: null,
+      provisioningUri: null,
+      secret: null,
+      sentTo: null,
+    });
+  }, [view, mfaAvailableMethods, clearError]);
 
   const submitMfaCode = useCallback(async (code: string): Promise<boolean> => {
     if (!mfaChallenge) return false;
@@ -879,9 +914,10 @@ export function useScuteAuthFlow() {
     setSubmitting(true);
     clearError();
     try {
-      const { data, error: enrollError } = await scuteClient.enrollMfaWithSetupToken(
-        mfaSetup.setupToken, method, destination?.trim() || undefined
-      );
+      const secretData = destination?.trim() || undefined;
+      const { data, error: enrollError } = mfaSetup.setupToken
+        ? await scuteClient.enrollMfaWithSetupToken(mfaSetup.setupToken, method, secretData)
+        : await scuteClient.enrollMfa({ method, ...(secretData ? { secret_data: secretData } : null) });
       if (enrollError || !data?.enrollment) {
         if (setupExpired(enrollError)) return messageOf(enrollError) || "This sign-in timed out";
         const message = messageOf(enrollError) || "We couldn't set that up";
@@ -917,6 +953,17 @@ export function useScuteAuthFlow() {
     setupBusyRef.current = true;
     clearError();
     try {
+      if (!mfaSetup.setupToken) {
+        // Set up with the session, after signing in (D17): done, move on.
+        const { error: verifyError } = await scuteClient.verifyMfaEnrollment(mfaSetup.enrollmentId, code);
+        if (verifyError) {
+          fail(verifyError, "That code didn't work");
+          return false;
+        }
+        setMfaSetup(null);
+        setView("authenticated");
+        return true;
+      }
       const { data, error: verifyError } = await scuteClient.verifyMfaEnrollmentWithSetupToken(
         mfaSetup.setupToken, mfaSetup.enrollmentId, code
       );
@@ -1045,9 +1092,7 @@ export function useScuteAuthFlow() {
       successTimerRef.current = setTimeout(() => {
         successTimerRef.current = null;
         if (suggestion) {
-          setMfaAvailableMethods(suggestion.available_methods || []);
-          setMfaGracePeriod(true);
-          setMfaGraceDaysRemaining(suggestion.mfa_grace_days_remaining);
+          applySuggestion(suggestion);
           setView("mfa_enroll_suggest");
         } else {
           setView("authenticated");
@@ -1056,7 +1101,7 @@ export function useScuteAuthFlow() {
     } catch (err: any) {
       setError(messageOf(err) || "Failed to register passkey");
     }
-  }, [authPayload, scuteClient]);
+  }, [authPayload, scuteClient, applySuggestion]);
 
   const skipPasskey = useCallback(async () => {
     setError(null);
@@ -1082,14 +1127,12 @@ export function useScuteAuthFlow() {
     // when this sign-in brought one, as after adding a passkey.
     const suggestion = scuteClient.pendingMfaEnrollmentSuggestion;
     if (suggestion) {
-      setMfaAvailableMethods(suggestion.available_methods || []);
-      setMfaGracePeriod(true);
-      setMfaGraceDaysRemaining(suggestion.mfa_grace_days_remaining);
+      applySuggestion(suggestion);
       setView("mfa_enroll_suggest");
     } else {
       setView("authenticated");
     }
-  }, [authPayload, isAuthenticated, scuteClient]);
+  }, [authPayload, isAuthenticated, scuteClient, applySuggestion]);
 
   const retry = useCallback(() => {
     const settingsFailed = errorCode === APP_SETTINGS_UNAVAILABLE;
@@ -1102,6 +1145,7 @@ export function useScuteAuthFlow() {
     setContactVerification(null);
     setCompletedChallenge(null);
     setFinishingOnOtherDevice(false);
+    setMfaFactorNotAllowed(false);
     magicTokenRef.current = null;
     setMfaResent(false);
     if (!settingsFailed) {
@@ -1155,8 +1199,13 @@ export function useScuteAuthFlow() {
     // Attack protection's code step (view "verification_required")
     verification,
 
-    /** A second factor to set up first (view "mfa_enroll"), when the sign-in gave a setup pass. */
+    /**
+     * A second factor being set up: on "mfa_enroll" with the sign-in's setup
+     * pass, or on "mfa_enroll_suggest" after `setUpMfaNow`.
+     */
     mfaSetup,
+    /** On "mfa_enroll_suggest": the app no longer accepts the person's second step (D17), not a grace period. */
+    mfaFactorNotAllowed,
     /** The email or phone to confirm first (view "contact_verify"). */
     contactVerification,
     /** The challenge link that was passed (view "challenge_completed"). */
@@ -1180,6 +1229,7 @@ export function useScuteAuthFlow() {
     resendMfaCode,
     switchMfaMethod,
     submitVerificationCode,
+    setUpMfaNow,
     startMfaSetup,
     submitMfaSetupCode,
     restartMfaSetup,

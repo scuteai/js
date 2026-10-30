@@ -99,6 +99,7 @@ import type {
   ScuteMfaEnrollment,
   ScuteMfaSetupMethod,
   ScuteSignInStep,
+  ScuteMfaEnrollmentSuggestion,
 } from "./lib/types/scute";
 
 const DEFAULT_PREFERENCES = {
@@ -1092,8 +1093,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
   /** Pending MFA challenge data, set when MFA is triggered during login. */
   private _pendingMfaChallenge: ScuteMfaRequiredResponse | null = null;
-  /** Pending MFA enrollment suggestion (grace period). */
-  private _pendingMfaEnrollmentSuggestion: { mfa_grace_days_remaining?: number; available_methods: string[] } | null = null;
+  /**
+   * Pending MFA enrollment suggestion: the grace period before MFA is
+   * required, or optional MFA whose factors the app no longer accepts
+   * (`mfa_factor_not_allowed`, D17).
+   */
+  private _pendingMfaEnrollmentSuggestion: ScuteMfaEnrollmentSuggestion | null = null;
 
   /** Attack protection's code step for a magic link sign-in, while pending. */
   private _pendingSignInVerification: {
@@ -1718,10 +1723,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     // Check if server suggested MFA enrollment (grace period) BEFORE sign-in
     // so the event fires before SIGNED_IN
     if ((payload as any).mfa_enrollment_suggested) {
-      this._pendingMfaEnrollmentSuggestion = {
-        mfa_grace_days_remaining: (payload as any).mfa_grace_days_remaining,
-        available_methods: (payload as any).available_methods,
-      };
+      this._pendingMfaEnrollmentSuggestion = mfaEnrollmentSuggestionOf(payload);
       this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED);
     } else {
       // A suggestion belongs to the sign-in that brought it.
@@ -2725,6 +2727,19 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
  */
 /** How long a request waits for the device fingerprint before going without it. */
 const FINGERPRINT_WAIT_MS = 2000;
+
+/**
+ * The suggestion a sign-in brought with its session: the grace period, or
+ * optional MFA whose factors the app no longer accepts (D17).
+ */
+export const mfaEnrollmentSuggestionOf = (payload: unknown): ScuteMfaEnrollmentSuggestion => {
+  const answer = (payload ?? {}) as Record<string, any>;
+  return {
+    mfa_grace_days_remaining: typeof answer.mfa_grace_days_remaining === "number" ? answer.mfa_grace_days_remaining : undefined,
+    available_methods: Array.isArray(answer.available_methods) ? answer.available_methods : [],
+    mfa_factor_not_allowed: answer.mfa_factor_not_allowed === true,
+  };
+};
 
 /** A sign-in's setup-only pass, as a header (D18). */
 const setupTokenHeader = (setupToken: string) => ({ [SCUTE_SETUP_TOKEN_HEADER]: setupToken });

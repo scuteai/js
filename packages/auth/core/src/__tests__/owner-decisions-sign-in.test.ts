@@ -1,6 +1,8 @@
 /**
  * Sign-in and MFA owner decisions on the client: a second factor set up
- * with a sign-in's setup-only pass (D17, D18), an email or phone confirmed
+ * with a sign-in's setup-only pass when MFA is required (D18), the nudge
+ * when optional MFA no longer accepts the person's factor (D17), an email
+ * or phone confirmed
  * first (D15), the waiting device's own steps (D2), a challenge link that
  * signs nobody in (D16), and refreshes refused for the network or ended
  * for being idle (D11, D14).
@@ -165,6 +167,29 @@ describe("D18: setting up a second factor with the setup pass", () => {
     expect((error as BaseHttpError).json?.error_code).toBe(code);
     expect(localStorage.getItem(KEYS.access)).toBeNull();
     expect(rec.names()).not.toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
+  });
+});
+
+describe("D17: optional MFA whose factor the app no longer accepts", () => {
+  it("signs in and suggests another factor, with no grace days", async () => {
+    const { client, rec } = await setup();
+    const pair = tokenPair();
+
+    const { error } = await client.signInWithTokenPayload({
+      ...pair,
+      mfa_enrollment_suggested: true,
+      mfa_factor_not_allowed: true,
+      available_methods: ["totp"],
+    } as any);
+
+    expect(error).toBeNull();
+    expect(client.pendingMfaEnrollmentSuggestion).toStrictEqual({
+      mfa_grace_days_remaining: undefined,
+      available_methods: ["totp"],
+      mfa_factor_not_allowed: true,
+    });
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED, AUTH_CHANGE_EVENTS.SIGNED_IN]);
+    expect(localStorage.getItem(KEYS.access)).toBe(pair.access);
   });
 });
 

@@ -257,6 +257,24 @@ describe("browser", () => {
       expect(client._pendingMfaEnrollmentSuggestion).toEqual({
         mfa_grace_days_remaining: 3,
         available_methods: ["totp"],
+        mfa_factor_not_allowed: false,
+      });
+    });
+
+    it("says when the app no longer accepts the person's factor (D17), with no grace days", async () => {
+      const { client } = await create();
+      upstream.on("POST", "/auth/sign-in", () => new Response(null, { status: 500 }));
+      await client.signInWithTokenPayload({
+        access: makeAccess(),
+        mfa_enrollment_suggested: true,
+        mfa_factor_not_allowed: true,
+        available_methods: ["totp", "sms"],
+      });
+      await settle();
+      expect(client._pendingMfaEnrollmentSuggestion).toEqual({
+        mfa_grace_days_remaining: undefined,
+        available_methods: ["totp", "sms"],
+        mfa_factor_not_allowed: true,
       });
     });
 

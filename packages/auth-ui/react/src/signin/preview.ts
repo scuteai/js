@@ -67,6 +67,7 @@ export function previewFlow(p: ScuteSignInPreview): ScuteAuthFlow {
       : null,
     completedChallenge: view === "challenge_completed" ? { intent: null, intentFields: null } : null,
     finishingOnOtherDevice: false,
+    mfaFactorNotAllowed: view === "mfa_enroll_suggest" && !!p.mfaFactorNotAllowed,
     emailSignIn: null,
 
     resendIn: 0,
@@ -81,6 +82,7 @@ export function previewFlow(p: ScuteSignInPreview): ScuteAuthFlow {
     resendMfaCode: noFailure,
     switchMfaMethod: noFailure,
     submitVerificationCode: neverAccepted,
+    setUpMfaNow: nothing,
     startMfaSetup: noFailure,
     submitMfaSetupCode: neverAccepted,
     restartMfaSetup: nothing,

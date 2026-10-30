@@ -2,6 +2,7 @@ import {
   AUTH_CHANGE_EVENTS,
   ScuteBrowserCookieStorage,
   UnknownSignInError,
+  mfaEnrollmentSuggestionOf,
   type ScuteTokenPayload,
   type AuthenticatedSession,
   ScuteClient,
@@ -47,10 +48,7 @@ export const createClientComponentClient = (
       ) {
         // Check for MFA enrollment suggestion (grace period) before sign-in
         if ((payload as any).mfa_enrollment_suggested) {
-          (this as any)._pendingMfaEnrollmentSuggestion = {
-            mfa_grace_days_remaining: (payload as any).mfa_grace_days_remaining,
-            available_methods: (payload as any).available_methods,
-          };
+          (this as any)._pendingMfaEnrollmentSuggestion = mfaEnrollmentSuggestionOf(payload);
           this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED);
         }
 

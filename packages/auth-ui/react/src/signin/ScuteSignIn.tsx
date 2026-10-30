@@ -281,6 +281,30 @@ function Step({ auth, copy, methods, ...email }: { auth: ScuteAuthFlow } & Pick<
         </>
       );
     case "mfa_enroll_suggest":
+      // Setting one up right here with the new session (D17).
+      if (auth.mfaSetup && !auth.mfaSetup.setupToken) {
+        return auth.mfaSetup.method && auth.mfaSetup.enrollmentId
+          ? <MfaSetupCode auth={auth} setup={auth.mfaSetup} />
+          : <MfaSetupChoose auth={auth} setup={auth.mfaSetup} />;
+      }
+      if (auth.mfaFactorNotAllowed) {
+        const canSetUp = auth.mfaAvailableMethods.some((m) => m === "totp" || m === "sms" || m === "email");
+        return (
+          <>
+            <Title>Set up another second step</Title>
+            <Lead>You&apos;re signed in. This app no longer accepts your second step. Set up another one.</Lead>
+            {canSetUp && (
+              <Button variant="primary" autoFocus={!preview} onClick={auth.setUpMfaNow} className="scute-signin__mt-28">
+                Set one up
+              </Button>
+            )}
+            <Button variant={canSetUp ? undefined : "primary"} autoFocus={!preview && !canSetUp} onClick={auth.skipMfaEnrollment}
+                    className={canSetUp ? "scute-signin__mt-12" : "scute-signin__mt-28"}>
+              Continue
+            </Button>
+          </>
+        );
+      }
       return (
         <>
           <Title>Set up two-step verification</Title>
@@ -769,7 +793,11 @@ function MfaSetupChoose({ auth, setup }: { auth: ScuteAuthFlow; setup: MfaSetup 
   return (
     <>
       <Title focus={false}>Set up two-step verification</Title>
-      <Lead>Your account needs a second step to sign in. Choose how you want to get your codes.</Lead>
+      <Lead>
+        {setup.setupToken
+          ? "Your account needs a second step to sign in. Choose how you want to get your codes."
+          : "Choose how you want to get your codes."}
+      </Lead>
       <div className="scute-signin__others-list scute-signin__mt-24" role="group" aria-label="Second step">
         {setup.methods.map((m) => (
           <Button
@@ -783,7 +811,7 @@ function MfaSetupChoose({ auth, setup }: { auth: ScuteAuthFlow; setup: MfaSetup 
         ))}
       </div>
       {error && <ErrorBox>{error}</ErrorBox>}
-      <Different auth={auth} />
+      {setup.setupToken ? <Different auth={auth} /> : <TextButton onClick={auth.skipMfaEnrollment} disabled={busy}>Not now</TextButton>}
     </>
   );
 }

@@ -1,6 +1,8 @@
 /**
  * ScuteSignIn and useScuteAuthFlow on the sign-in and MFA owner decisions:
- * setting up a second factor with the sign-in's setup pass (D17, D18),
+ * setting up a second factor with the sign-in's setup pass when MFA is
+ * required (D18), the nudge when optional MFA no longer accepts the
+ * person's factor (D17),
  * confirming an email or phone first (D15), the waiting page while the
  * other device finishes (D2), a challenge link that signs nobody in (D16),
  * a sign-in method the app turned off (D13, D20) and an idle sign-out (D14).
@@ -178,6 +180,58 @@ describe("D18: setting up a second factor while signing in", () => {
     renderSignIn(client);
     await screen.findByRole("heading", { name: "You can't finish signing in here" });
     expect(screen.getByText(/Contact the app's support team/)).toBeTruthy();
+  });
+});
+
+describe("D17: optional MFA whose factor the app no longer accepts", () => {
+  async function atNudge(client: FakeClient, methods = ["totp", "sms"]) {
+    // As the client does: the suggestion comes before SIGNED_IN, which
+    // follows once the session is stored and the user loaded.
+    client.pendingMfaEnrollmentSuggestion = { available_methods: methods, mfa_factor_not_allowed: true };
+    renderSignIn(client);
+    await screen.findByRole("heading", { name: "Sign in" });
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED));
+    act(() => client.emitSignedIn());
+    await screen.findByRole("heading", { name: "Set up another second step" });
+  }
+
+  it("says the app no longer accepts the second step, with no days, and Continue goes on", async () => {
+    const client = setupClient();
+    await atNudge(client);
+    expect(screen.getByText(/This app no longer accepts your second step\. Set up another one\./)).toBeTruthy();
+    expect(screen.queryByText(/day/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "You're in" });
+  });
+
+  it("sets one up right there with the session", async () => {
+    const client = setupClient({
+      enrollMfa: vi.fn(async () => ({
+        data: { enrollment: { id: "enr_9", method: "totp" }, provisioning_uri: "otpauth://totp/x", secret: "KEY9" },
+        error: null,
+      })),
+      verifyMfaEnrollment: vi.fn(async () => ({ data: { enrollment: { id: "enr_9", verified: true } }, error: null })),
+    });
+    await atNudge(client);
+    fireEvent.click(screen.getByRole("button", { name: "Set one up" }));
+    expect(screen.getByText("Choose how you want to get your codes.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Email" })).toBeNull();
+
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Authenticator app" })));
+    expect(client.enrollMfa).toHaveBeenCalledWith({ method: "totp" });
+    expect(client.enrollMfaWithSetupToken).not.toHaveBeenCalled();
+    expect(screen.getByText("KEY9")).toBeTruthy();
+
+    await paste("Authenticator app", "123456");
+    expect(client.verifyMfaEnrollment).toHaveBeenCalledWith("enr_9", "123456");
+    await screen.findByRole("heading", { name: "You're in" });
+  });
+
+  it("keeps the grace period copy for a grace period", () => {
+    render(<ScuteSignIn preview={{ view: "mfa_enroll_suggest", mfaGraceDaysRemaining: 3 }} />);
+    expect(screen.getByText(/soon need a second step to sign in \(in 3 days\)/)).toBeTruthy();
+    render(<ScuteSignIn preview={{ view: "mfa_enroll_suggest", mfaFactorNotAllowed: true }} />);
+    expect(screen.getByRole("heading", { name: "Set up another second step" })).toBeTruthy();
   });
 });
 
