@@ -45,6 +45,10 @@ export function previewFlow(p: ScuteSignInPreview): ScuteAuthFlow {
     mfaGraceDaysRemaining: p.mfaGraceDaysRemaining,
     mfaResent: false,
     mfaSwitching: false,
+    deviceTrustOffered: typeof p.deviceTrustDays === "number",
+    deviceTrustDays: p.deviceTrustDays ?? null,
+    trustDevice: false,
+    setTrustDevice: nothing,
 
     verification: view === "verification_required"
       ? { token: "preview", method: p.verificationMethod ?? "email_otp", expires_at: "" }

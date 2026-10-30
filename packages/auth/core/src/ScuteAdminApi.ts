@@ -7,6 +7,7 @@ import type {
   ScuteAppData,
   ScuteIdentifier,
   ScuteImpersonateParams,
+  ScuteImpersonationHandoff,
   ScuteImpersonationRecord,
   ScuteImpersonationTokens,
   ScutePaginationMeta,
@@ -486,6 +487,22 @@ class ScuteAdminApi extends ScuteBaseHttp {
     return this.post<ScuteImpersonationTokens>(
       `${this._appsPath}/users/${encodeURIComponent(userId)}/impersonate`,
       { ...rest, actor_user_id: actorUserId },
+      this._authorizationHeader
+    );
+  }
+
+  /**
+   * Start a session as this user and hand it to your app instead of taking
+   * the token: answers a one-time link into the app (`handoff.url`, your
+   * sign-in page with `?sct_imp=<code>`). The SDK on that page swaps the code
+   * for the session and shows your impersonation banner. The code works once,
+   * for a couple of minutes; no token is ever put in a URL.
+   */
+  async createImpersonationHandoff(userId: UniqueIdentifier, params: ScuteImpersonateParams) {
+    const { actorUserId, ...rest } = params;
+    return this.post<ScuteImpersonationHandoff>(
+      `${this._appsPath}/users/${encodeURIComponent(userId)}/impersonate`,
+      { ...rest, actor_user_id: actorUserId, handoff: true },
       this._authorizationHeader
     );
   }
