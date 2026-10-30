@@ -27,7 +27,10 @@ export async function otpSignIn(client: ScuteClient, identifier: string, via: "s
   if (sent.error) throw new Error(`${via} failed: ${describeError(sent.error)}`);
 
   const verified = ok(await client.verifyOtp(TEST_CODE, identifier), "verifyOtp");
-  if (verified.mfaRequired) {
+  if ("contactVerificationRequired" in verified) {
+    throw new Error(`verifyOtp asked to confirm the ${verified.field} first`);
+  }
+  if ("mfaRequired" in verified) {
     return {
       kind: "mfa",
       challengeToken: verified.mfaChallenge?.token,
