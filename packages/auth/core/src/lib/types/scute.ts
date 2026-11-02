@@ -304,6 +304,19 @@ export type ScuteVerificationRequiredResponse = {
 };
 
 /**
+ * What a magic link sign-in answers when attack protection wants a code
+ * first (on the device that opened the link, or the one polling its
+ * status): pass the code to verifySignInVerification. `verification` is
+ * null when the API couldn't make the challenge.
+ */
+export type ScuteSignInVerificationRequired = {
+  verificationRequired: true;
+  verification: ScuteSignInVerification | null;
+  reason?: string;
+  threats: string[];
+};
+
+/**
  * The app wants the person's email or phone confirmed before the sign-in
  * goes on (D15). With `challenge`, a code was sent to the one on file;
  * with `setup_token` (and no challenge), the person has none: ask for it

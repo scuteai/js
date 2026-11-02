@@ -96,6 +96,7 @@ import type {
   ScuteMfaRequiredResponse,
   ScuteSignInVerification,
   ScuteVerificationRequiredResponse,
+  ScuteSignInVerificationRequired,
   ScuteSsoDiscovery,
   ScuteContactVerificationRequiredResponse,
   ScuteChallengeLinkCompletedResponse,
@@ -782,7 +783,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { data: null, error: magicStatusError };
     }
 
-    return this.signInWithMagicLinkStatus(payload);
+    return this.signInWithMagicLinkStatus(payload, id);
   }
 
   /**
@@ -792,10 +793,35 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * a contact to confirm (`data.contactVerificationRequired`,
    * CONTACT_VERIFICATION_REQUIRED), or answers MagicLinkWindowClosedError
    * when the link was opened too long ago.
+   *
+   * Attack protection may want a code on this device first (202): the
+   * answer is `{ verificationRequired: true, verification }` with
+   * VERIFICATION_REQUIRED, and {@link verifySignInVerification} finishes it
+   * by asking status again for `magicLinkId`.
+   *
+   * @param magicLinkId The magic link status id the payload is for, kept
+   *   for the code step.
    */
   async signInWithMagicLinkStatus(
-    payload: ScuteTokenPayload | ScuteMfaRequiredResponse | ScuteContactVerificationRequiredResponse | { message?: string } | null
-  ): Promise<{ data: ScuteSignInStep | null; error: ScuteError | null }> {
+    payload:
+      | ScuteTokenPayload
+      | ScuteMfaRequiredResponse
+      | ScuteContactVerificationRequiredResponse
+      | ScuteVerificationRequiredResponse
+      | { message?: string }
+      | null,
+    magicLinkId?: UniqueIdentifier
+  ): Promise<{ data: ScuteSignInStep | ScuteSignInVerificationRequired | null; error: ScuteError | null }> {
+    if (isVerificationRequired(payload)) {
+      return {
+        data: this._verificationRequired(
+          payload,
+          magicLinkId !== undefined ? { magicLinkId } : null
+        ),
+        error: null,
+      };
+    }
+
     // The workspace has this device do its own steps too (D2 both_devices):
     // MFA, a factor to set up, or a contact to confirm.
     const step = this._signInStep(payload);
@@ -962,23 +988,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     // Attack protection wants a code first (202). Nothing is signed in: the
     // same link signs in once the code is verified
     // (verifySignInVerification).
-    if (
-      authPayload &&
-      "verification_required" in authPayload &&
-      authPayload.verification_required
-    ) {
-      const answer = authPayload as ScuteVerificationRequiredResponse;
-      this._pendingSignInVerification = answer.verification
-        ? { magicToken: token, verification: answer.verification }
-        : null;
-      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.VERIFICATION_REQUIRED);
+    if (isVerificationRequired(authPayload)) {
       return {
-        data: {
-          verificationRequired: true as const,
-          verification: answer.verification ?? null,
-          reason: answer.reason,
-          threats: answer.threats ?? [],
-        },
+        data: this._verificationRequired(authPayload, { magicToken: token }),
         error: null,
       };
     }
@@ -1103,11 +1115,35 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    */
   private _pendingMfaEnrollmentSuggestion: ScuteMfaEnrollmentSuggestion | null = null;
 
-  /** Attack protection's code step for a magic link sign-in, while pending. */
-  private _pendingSignInVerification: {
-    magicToken: string;
-    verification: ScuteSignInVerification;
-  } | null = null;
+  /**
+   * Attack protection's code step for a magic link sign-in, while pending:
+   * on the device that opened the link (its token), or on the device that
+   * asked for it and polls its status (the status id).
+   */
+  private _pendingSignInVerification: (
+    | { magicToken: string; magicLinkId?: undefined }
+    | { magicLinkId: UniqueIdentifier; magicToken?: undefined }
+  ) & { verification: ScuteSignInVerification } | null = null;
+
+  /**
+   * Attack protection wants a code before the sign-in goes on: keeps it
+   * for verifySignInVerification with what to check again once it passes,
+   * says so with VERIFICATION_REQUIRED, and answers what the caller shows.
+   */
+  private _verificationRequired(
+    answer: ScuteVerificationRequiredResponse,
+    source: { magicToken: string } | { magicLinkId: UniqueIdentifier } | null
+  ): ScuteSignInVerificationRequired {
+    this._pendingSignInVerification =
+      answer.verification && source ? { ...source, verification: answer.verification } : null;
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.VERIFICATION_REQUIRED);
+    return {
+      verificationRequired: true as const,
+      verification: answer.verification ?? null,
+      reason: answer.reason,
+      threats: answer.threats ?? [],
+    };
+  }
 
   /**
    * The code attack protection sent before a magic link sign-in goes on
@@ -1121,22 +1157,31 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
   /**
    * Finish attack protection's code step for a magic link sign-in: verify
    * the code against its challenge (no app key needed), then check the same
-   * link again, which now signs in (or asks for MFA, like
-   * {@link verifyMagicLinkToken}).
+   * link again.
+   *
+   * On the device that opened the link the link is checked again, which
+   * now signs in (or asks for MFA, like {@link verifyMagicLinkToken}). On
+   * the device that asked for the link, its status is asked again and the
+   * answer goes through {@link signInWithMagicLinkStatus}: signed in (`data`
+   * null), this device's own step, or MagicLinkWindowClosedError.
    *
    * @param code - The code that was sent
-   * @param pending - The challenge token and magic link token, when not the
-   *   pending ones from the last {@link verifyMagicLinkToken} call.
+   * @param pending The challenge token and the magic link token (or the
+   *   magic link status id), when not the pending ones from the last
+   *   {@link verifyMagicLinkToken} or {@link signInWithMagicLinkStatus} call.
    */
   async verifySignInVerification(
     code: string,
-    pending?: { challengeToken: string; magicToken: string }
+    pending?:
+      | { challengeToken: string; magicToken: string }
+      | { challengeToken: string; magicLinkId: UniqueIdentifier }
   ) {
+    const source = pending ?? this._pendingSignInVerification;
     const challengeToken =
       pending?.challengeToken ?? this._pendingSignInVerification?.verification.token;
-    const magicToken =
-      pending?.magicToken ?? this._pendingSignInVerification?.magicToken;
-    if (!challengeToken || !magicToken) {
+    const magicToken = source && "magicToken" in source ? source.magicToken : undefined;
+    const magicLinkId = source && "magicLinkId" in source ? source.magicLinkId : undefined;
+    if (!challengeToken || (!magicToken && (magicLinkId === undefined || magicLinkId === null))) {
       return { data: null, error: new InvalidMagicLinkError() };
     }
 
@@ -1149,6 +1194,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
 
     this._pendingSignInVerification = null;
+    if (!magicToken) {
+      return this.signInWithMagicLinkId(magicLinkId as UniqueIdentifier);
+    }
     return this.verifyMagicLinkToken(magicToken);
   }
 
@@ -2405,7 +2453,13 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param id Magic link status id
    */
   async getMagicLinkStatus(id: UniqueIdentifier) {
-    return this.post<ScuteTokenPayload>("/magic_links/status", {
+    return this.post<
+      | ScuteTokenPayload
+      | ScuteMfaRequiredResponse
+      | ScuteContactVerificationRequiredResponse
+      | ScuteVerificationRequiredResponse
+      | { message?: string }
+    >("/magic_links/status", {
       id,
     });
   }
@@ -2836,6 +2890,11 @@ export const mfaEnrollmentSuggestionOf = (payload: unknown): ScuteMfaEnrollmentS
 
 /** A sign-in's setup-only pass, as a header (D18). */
 const setupTokenHeader = (setupToken: string) => ({ [SCUTE_SETUP_TOKEN_HEADER]: setupToken });
+
+/** Whether an API answer is attack protection asking for a code first (202). */
+const isVerificationRequired = (payload: unknown): payload is ScuteVerificationRequiredResponse =>
+  !!payload && typeof payload === "object" &&
+  (payload as { verification_required?: unknown }).verification_required === true;
 
 /** Whether a sign-in answer is a step to take (MFA or a contact to confirm). */
 const isSignInStep = (data: object): data is ScuteSignInStep =>

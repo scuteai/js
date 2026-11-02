@@ -335,6 +335,105 @@ describe("D2: the device that asked for the link", () => {
   });
 });
 
+describe("R2: attack protection on the device that asked for the link", () => {
+  const VERIFY = `${AUTH_PREFIX}/challenges/sv_tok/verify`;
+  const VERIFICATION = { token: "sv_tok", method: "email_otp", expires_at: "2030-01-01T00:00:00Z" };
+  const REQUIRED = {
+    verification_required: true,
+    reason: "security_verification",
+    threats: ["new_device"],
+    verification: VERIFICATION,
+  };
+
+  it("answers the 202 from status as verificationRequired, not as a closed window", async () => {
+    const { client, rec } = await setup();
+    server.on("POST", STATUS, { status: 202, body: REQUIRED });
+
+    const { data, error } = await client.signInWithMagicLinkId("ml_1");
+
+    expect(error).toBeNull();
+    expect(data).toStrictEqual({
+      verificationRequired: true,
+      verification: VERIFICATION,
+      reason: "security_verification",
+      threats: ["new_device"],
+    });
+    expect(client.pendingSignInVerification).toEqual(VERIFICATION);
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.VERIFICATION_REQUIRED]);
+    expect(localStorage.getItem(KEYS.access)).toBeNull();
+  });
+
+  it("answers a status payload asking for a code the same way", async () => {
+    const { client } = await setup();
+    const { data, error } = await client.signInWithMagicLinkStatus(REQUIRED as any, "ml_1");
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ verificationRequired: true, verification: VERIFICATION });
+  });
+
+  it("verifies the code, asks status again and signs in", async () => {
+    const { client, rec } = await setup();
+    server.on("POST", STATUS, { status: 202, body: REQUIRED });
+    await client.signInWithMagicLinkId("ml_1");
+
+    server.on("POST", VERIFY, { body: { status: "completed" } });
+    server.on("POST", STATUS, { body: tokenPair() });
+
+    const { data, error } = await client.verifySignInVerification("123456");
+
+    const [verifyCall] = server.callsTo("POST", VERIFY);
+    expect(verifyCall.body).toEqual({ code: "123456" });
+    expect(verifyCall.headers.authorization).toBeUndefined();
+    const statuses = server.callsTo("POST", STATUS);
+    expect(statuses).toHaveLength(2);
+    expect(statuses[1].body).toEqual({ id: "ml_1" });
+    expect(server.callsTo("PATCH", AUTHENTICATE)).toHaveLength(0);
+    expect(error).toBeNull();
+    expect(data).toBeNull();
+    expect(client.pendingSignInVerification).toBeNull();
+    expect(localStorage.getItem(KEYS.access)).not.toBeNull();
+    expect(rec.names()).toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
+  });
+
+  it("takes the challenge token and the link id, and passes on this device's MFA step", async () => {
+    const { client, rec } = await setup();
+    server.on("POST", VERIFY, { body: { status: "completed" } });
+    server.on("POST", STATUS, {
+      body: { mfa_required: true, app_user_id: "au_1", mfa_challenge: MFA_CHALLENGE, available_methods: ["totp"] },
+    });
+
+    const { data, error } = await client.verifySignInVerification("123456", { challengeToken: "sv_tok", magicLinkId: "ml_9" });
+
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ mfaRequired: true, mfaChallenge: MFA_CHALLENGE });
+    expect(server.callsTo("POST", STATUS)[0].body).toEqual({ id: "ml_9" });
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.MFA_REQUIRED]);
+    expect(localStorage.getItem(KEYS.access)).toBeNull();
+  });
+
+  it("keeps the code step on a wrong code and doesn't ask status again", async () => {
+    const { client } = await setup();
+    server.on("POST", STATUS, { status: 202, body: REQUIRED });
+    await client.signInWithMagicLinkId("ml_1");
+    server.on("POST", VERIFY, { status: 422, body: { error: "Invalid code", remaining_attempts: 2 } });
+
+    const { data, error } = await client.verifySignInVerification("000000");
+
+    expect(data).toBeNull();
+    expect((error as BaseHttpError).code).toBe(422);
+    expect(server.callsTo("POST", STATUS)).toHaveLength(1);
+    expect(client.pendingSignInVerification).toEqual(VERIFICATION);
+  });
+
+  it("returns 403 security_block from status as the API error", async () => {
+    const { client } = await setup();
+    server.on("POST", STATUS, { status: 403, body: { error: "Blocked", error_code: "security_block" } });
+    const { data, error } = await client.signInWithMagicLinkId("ml_1");
+    expect(data).toBeNull();
+    expect((error as BaseHttpError).json?.error_code).toBe("security_block");
+    expect(client.pendingSignInVerification).toBeNull();
+  });
+});
+
 describe("D16: a challenge link that signs nobody in", () => {
   it("answers challengeCompleted with the intent, no session and no event", async () => {
     const { client, rec } = await setup();

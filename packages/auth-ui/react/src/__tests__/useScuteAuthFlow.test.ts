@@ -674,6 +674,177 @@ describe("magic link polling", () => {
     expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
   });
 
+  describe("attack protection on this device (R2)", () => {
+    const VERIFICATION = { token: "sv_tok", method: "email_otp", expires_at: "2030-01-01T00:00:00Z" };
+    const REQUIRED = {
+      verification_required: true,
+      reason: "security_verification",
+      threats: ["new_device"],
+      verification: VERIFICATION,
+    };
+
+    it("stops polling on the 202 and shows the code step", async () => {
+      const client = createFakeClient();
+      magicLinkSignIn(client, "ml_ap");
+      client.getMagicLinkStatus.mockResolvedValueOnce({ data: REQUIRED, error: null });
+      const { result } = await atMagicPending(client);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(client.signInWithMagicLinkStatus).toHaveBeenCalledWith(REQUIRED, "ml_ap");
+      expect(result.current.flow.view).toBe("verification_required");
+      expect(result.current.flow.verification).toEqual(VERIFICATION);
+      expect(result.current.flow.error).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
+      expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
+      expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+    });
+
+    it("finishes the code step through the link's status and signs in", async () => {
+      const client = createFakeClient();
+      magicLinkSignIn(client, "ml_ap");
+      client.getMagicLinkStatus.mockResolvedValueOnce({ data: REQUIRED, error: null });
+      // Like the real client: the code passes, status gives the session.
+      client.verifySignInVerification.mockImplementation(async () => {
+        await client.signInWithTokenPayload(AUTH_PAYLOAD);
+        return { data: null, error: null };
+      });
+      const { result } = await atMagicPending(client);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(result.current.flow.view).toBe("verification_required");
+
+      let ok = false;
+      await act(async () => {
+        ok = await result.current.flow.submitVerificationCode("123456");
+      });
+      expect(ok).toBe(true);
+      expect(client.verifySignInVerification).toHaveBeenCalledWith("123456", {
+        challengeToken: "sv_tok",
+        magicLinkId: "ml_ap",
+      });
+      expect(result.current.flow.view).toBe("authenticated");
+      // No passkey offer here: polling signs in directly, as without the code.
+      expect(client.addDevice).not.toHaveBeenCalled();
+    });
+
+    it("moves to this device's MFA step after the code", async () => {
+      const client = createFakeClient();
+      magicLinkSignIn(client, "ml_ap");
+      client.getMagicLinkStatus.mockResolvedValueOnce({ data: REQUIRED, error: null });
+      client.verifySignInVerification.mockImplementation(async () => {
+        client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
+        return {
+          data: { mfaRequired: true, mfaChallenge: { token: "chl_1", method: "totp" }, availableMethods: ["totp"] },
+          error: null,
+        };
+      });
+      const { result } = await atMagicPending(client);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      await act(async () => {
+        await result.current.flow.submitVerificationCode("123456");
+      });
+      expect(result.current.flow.view).toBe("mfa_verify");
+      expect(result.current.flow.mfaChallenge).toEqual({ token: "chl_1", method: "totp" });
+    });
+
+    it("keeps the code step on a wrong code", async () => {
+      const client = createFakeClient();
+      magicLinkSignIn(client, "ml_ap");
+      client.getMagicLinkStatus.mockResolvedValueOnce({ data: REQUIRED, error: null });
+      client.verifySignInVerification.mockResolvedValue({
+        data: null,
+        error: { message: "Invalid code", code: 422, json: { error: "Invalid code" } },
+      });
+      const { result } = await atMagicPending(client);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      let ok = true;
+      await act(async () => {
+        ok = await result.current.flow.submitVerificationCode("000000");
+      });
+      expect(ok).toBe(false);
+      expect(result.current.flow.view).toBe("verification_required");
+      expect(result.current.flow.error).toBe("Invalid code");
+    });
+
+    it("shows the timed out error when the window closed by the time the code passed", async () => {
+      const client = createFakeClient();
+      magicLinkSignIn(client, "ml_ap");
+      client.getMagicLinkStatus.mockResolvedValueOnce({ data: REQUIRED, error: null });
+      client.verifySignInVerification.mockResolvedValue({
+        data: null,
+        error: { code: "magic-link-window-closed", message: "closed" },
+      });
+      const { result } = await atMagicPending(client);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      await act(async () => {
+        await result.current.flow.submitVerificationCode("123456");
+      });
+      expect(result.current.flow.view).toBe("error");
+      expect(result.current.flow.error).toBe("The sign-in link timed out. Please try again.");
+    });
+
+    it("goes back to waiting when the other device is still finishing after the code", async () => {
+      const client = createFakeClient();
+      magicLinkSignIn(client, "ml_ap");
+      client.getMagicLinkStatus
+        .mockResolvedValueOnce({ data: REQUIRED, error: null })
+        .mockResolvedValueOnce({ data: AUTH_PAYLOAD, error: null });
+      client.verifySignInVerification.mockResolvedValue({
+        data: null,
+        error: { message: "", code: 409, json: { error: "Waiting", error_code: "sign_in_pending" } },
+      });
+      const { result } = await atMagicPending(client);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      let ok = false;
+      await act(async () => {
+        ok = await result.current.flow.submitVerificationCode("123456");
+      });
+      expect(ok).toBe(true);
+      expect(result.current.flow.view).toBe("magic_pending");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(2);
+      expect(result.current.flow.view).toBe("authenticated");
+    });
+
+    it.each(["security_block", "ip_blocked", "country_blocked", "user_banned", "user_suspended"])(
+      "stops polling on 403 %s and shows the error with its code",
+      async (code) => {
+        const client = createFakeClient();
+        magicLinkSignIn(client);
+        client.getMagicLinkStatus.mockResolvedValueOnce({
+          data: null,
+          error: { message: "", code: 403, json: { error: "Refused", error_code: code } },
+        });
+        const { result } = await atMagicPending(client);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2000);
+        });
+        expect(result.current.flow.view).toBe("error");
+        expect(result.current.flow.errorCode).toBe(code);
+        expect(result.current.flow.error).toBe("Refused");
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(20_000);
+        });
+        expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
+        expect(client.signInWithTokenPayload).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   it("does not poll on MAGIC_PENDING until a magic link id is known", async () => {
     const client = createFakeClient();
     const { result } = renderFlow(client);

@@ -26,9 +26,12 @@ export const RESEND_COOLDOWN_SECONDS = 30;
 export const APP_SETTINGS_UNAVAILABLE = "app_settings_unavailable";
 const APP_SETTINGS_MESSAGE = "We couldn't load this app's sign-in settings";
 
-/** Sign-in refusals the API names with an error code (403). */
-export type SignInRefusalCode = "user_banned" | "user_suspended" | "ip_blocked" | "country_blocked";
-const REFUSAL_CODES: readonly string[] = ["user_banned", "user_suspended", "ip_blocked", "country_blocked"];
+/**
+ * Sign-in refusals the API names with an error code (403). `security_block`
+ * is attack protection refusing this device for good.
+ */
+export type SignInRefusalCode = "user_banned" | "user_suspended" | "ip_blocked" | "country_blocked" | "security_block";
+const REFUSAL_CODES: readonly string[] = ["user_banned", "user_suspended", "ip_blocked", "country_blocked", "security_block"];
 
 /**
  * A second factor being set up: while signing in with the sign-in's setup
@@ -157,7 +160,10 @@ export type AuthFlowView =
  * - OTP verification
  * - Resend of the link or the code, with a cooldown (`resend`, `resendIn`)
  * - Attack protection's code step on a magic link ("verification_required",
- *   `submitVerificationCode`)
+ *   `submitVerificationCode`), on the device that opened it or the one
+ *   waiting for it
+ * - A refusal while waiting for the link (`security_block`, a blocked
+ *   network, a banned account): view "error" with `errorCode`, no more polling
  * - MFA: verify, resend, switch method (`submitMfaCode`, `resendMfaCode`,
  *   `switchMfaMethod`), enrollment required or suggested, and "Trust this
  *   device" where the app allows it (`deviceTrustOffered`, `trustDevice`)
@@ -246,6 +252,9 @@ export function useScuteAuthFlow() {
   // The magic link token, kept (the URL is scrubbed) for the code step that
   // attack protection may ask for: once verified, the same link signs in.
   const magicTokenRef = useRef<string | null>(null);
+  // The magic link status id when the code step is for this page, the one
+  // that asked for the link and polls it: once verified, its status signs in.
+  const statusVerificationIdRef = useRef<string | null>(null);
   const skipPasskeyOfferRef = useRef(false);
   const submittingCodeRef = useRef(false);
   const passkeysSupported = typeof scuteClient.isWebauthnSupported === "function"
@@ -373,6 +382,7 @@ export function useScuteAuthFlow() {
     setFinishingOnOtherDevice(false);
     setMfaFactorNotAllowed(false);
     magicTokenRef.current = null;
+    statusVerificationIdRef.current = null;
     // Signed out by the app's idle timeout (D14): say so on the email step.
     const idle = scuteClient.sessionEndReason === "session_idle";
     setError(idle ? IDLE_MESSAGE : null);
@@ -384,9 +394,11 @@ export function useScuteAuthFlow() {
   // A first factor passed (a magic link, its verification code, or an email
   // code): MFA, attack protection's code step, a passkey offer or straight
   // in. A passkey is offered only when the app has them on (fail closed,
-  // SEC-40) and this browser can make one.
-  const afterFirstFactor = useCallback(async (data: any, opts: { skipPasskeyOffer?: boolean } = {}) => {
+  // SEC-40) and this browser can make one. `magicLinkId` when the answer
+  // came from polling the link's status on this page.
+  const afterFirstFactor = useCallback(async (data: any, opts: { skipPasskeyOffer?: boolean; magicLinkId?: string } = {}) => {
     if (data && "verificationRequired" in data && data.verificationRequired) {
+      statusVerificationIdRef.current = opts.magicLinkId ?? null;
       if (!data.verification) {
         setError("We couldn't send the verification code. Start again from your email.");
         setErrorCode("verification_unavailable");
@@ -595,10 +607,12 @@ export function useScuteAuthFlow() {
       if (result && !result.error && result.data) {
         stopped = true;
         // Signed in (SIGNED_IN moves the flow on), a step needed here too
-        // (MFA, a factor to set up, a contact to confirm), or opened too
-        // long ago.
-        const finished = await scuteClient.signInWithMagicLinkStatus(result.data);
-        if (handleStep(finished.data)) {
+        // (MFA, a factor to set up, a contact to confirm, attack
+        // protection's code), or opened too long ago.
+        const finished: { data: any; error: any } = await scuteClient.signInWithMagicLinkStatus(result.data, magicLinkId);
+        if (finished.data?.verificationRequired) {
+          await afterFirstFactor(finished.data, { magicLinkId });
+        } else if (handleStep(finished.data)) {
           // The step's view is showing.
         } else if ((finished.error as any)?.code === "magic-link-window-closed") {
           setError(MAGIC_LINK_TIMEOUT_MESSAGE);
@@ -613,6 +627,16 @@ export function useScuteAuthFlow() {
         stopped = true;
         setError(messageOf(result.error) || "Finish signing in on the device where you opened the link.");
         setErrorCode("mfa_required");
+        setView("error");
+        return;
+      }
+      // Refused for good on this device (attack protection's
+      // security_block, a blocked network, a banned account): say why, and
+      // stop waiting.
+      const refusal = result?.error ? errorCodeOf(result.error) : null;
+      if (refusal && REFUSAL_CODES.includes(refusal)) {
+        stopped = true;
+        fail(result!.error, "We couldn't sign you in");
         setView("error");
         return;
       }
@@ -631,7 +655,7 @@ export function useScuteAuthFlow() {
       stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [view, magicLinkId, scuteClient, handleStep]);
+  }, [view, magicLinkId, scuteClient, handleStep, afterFirstFactor, fail]);
 
   // ── 5. Track authenticated state ──
   useEffect(() => {
@@ -756,23 +780,50 @@ export function useScuteAuthFlow() {
 
   /**
    * Attack protection's code step: verify the code it sent, then the same
-   * magic link signs in (or asks for MFA, or offers a passkey).
+   * magic link signs in (or asks for MFA, or offers a passkey). On the page
+   * that asked for the link, its status is asked again instead: signed in,
+   * this device's own step, or still waiting for the other device.
    */
   const submitVerificationCode = useCallback(async (code: string): Promise<boolean> => {
-    if (!verification || !magicTokenRef.current || submittingCodeRef.current) return false;
+    const linkId = statusVerificationIdRef.current;
+    if (!verification || (!linkId && !magicTokenRef.current) || submittingCodeRef.current) return false;
     submittingCodeRef.current = true;
     setSubmitting(true);
     clearError();
     try {
-      const { data, error: verifyError } = await scuteClient.verifySignInVerification(code, {
-        challengeToken: verification.token,
-        magicToken: magicTokenRef.current,
-      });
+      const { data, error: verifyError } = await scuteClient.verifySignInVerification(
+        code,
+        linkId
+          ? { challengeToken: verification.token, magicLinkId: linkId }
+          : { challengeToken: verification.token, magicToken: magicTokenRef.current! }
+      );
+      if (verifyError && linkId) {
+        // The code passed; the link's status says what is next.
+        const errorCode = errorCodeOf(verifyError);
+        if (errorCode === "sign_in_pending") {
+          setView("magic_pending");
+          return true;
+        }
+        if ((verifyError as any)?.code === "magic-link-window-closed") {
+          setError(MAGIC_LINK_TIMEOUT_MESSAGE);
+          setErrorCode(null);
+          setView("error");
+          return true;
+        }
+        if (errorCode && REFUSAL_CODES.includes(errorCode)) {
+          fail(verifyError, "We couldn't sign you in");
+          setView("error");
+          return true;
+        }
+      }
       if (verifyError) {
         fail(verifyError, "That code didn't work");
         return false;
       }
-      await afterFirstFactor(data, { skipPasskeyOffer: skipPasskeyOfferRef.current });
+      await afterFirstFactor(
+        data,
+        linkId ? { magicLinkId: linkId } : { skipPasskeyOffer: skipPasskeyOfferRef.current }
+      );
       return true;
     } catch (err: any) {
       fail(err, "That code didn't work");
@@ -1165,6 +1216,7 @@ export function useScuteAuthFlow() {
     setFinishingOnOtherDevice(false);
     setMfaFactorNotAllowed(false);
     magicTokenRef.current = null;
+    statusVerificationIdRef.current = null;
     setMfaResent(false);
     if (!settingsFailed) {
       setView("login");
