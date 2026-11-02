@@ -106,8 +106,21 @@ export function createFakeClient(overrides: Record<string, unknown> = {}) {
     }),
     signInOrUp: vi.fn(async () => ({ data: null, error: null })),
     getMagicLinkStatus: vi.fn(async () => ({ data: null, error: { message: "pending" } })),
-    // Like the real client: MFA, the closed window, or a sign-in.
+    // Like the real client: attack protection's code step, MFA, the closed
+    // window, or a sign-in.
     signInWithMagicLinkStatus: vi.fn(async (data: any) => {
+      if (data?.verification_required === true) {
+        client.emit(AUTH_CHANGE_EVENTS.VERIFICATION_REQUIRED);
+        return {
+          data: {
+            verificationRequired: true,
+            verification: data.verification ?? null,
+            reason: data.reason,
+            threats: data.threats ?? [],
+          },
+          error: null,
+        };
+      }
       if (data?.mfa_required) {
         client.pendingMfaChallenge = data;
         client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED);

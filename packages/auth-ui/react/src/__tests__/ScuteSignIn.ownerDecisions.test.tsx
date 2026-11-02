@@ -368,6 +368,55 @@ describe("D2: the page waiting for the link", () => {
   });
 });
 
+describe("R2: attack protection on the page waiting for the link", () => {
+  const VERIFICATION = { token: "sv_tok", method: "email_otp", expires_at: "2030-01-01T00:00:00Z" };
+
+  async function waitForLink(client: FakeClient) {
+    vi.useFakeTimers();
+    client.signInOrUp.mockImplementation(async () => {
+      client.emit(AUTH_CHANGE_EVENTS.MAGIC_PENDING);
+      return { data: { magic_link: { id: "ml_1" } }, error: null };
+    });
+    renderSignIn(client);
+    await flush();
+    await act(async () => {
+      const input = screen.getByLabelText("Email");
+      fireEvent.change(input, { target: { value: "ada@example.com" } });
+      fireEvent.submit(input.closest("form")!);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+  }
+
+  it("asks for the code here, then signs in", async () => {
+    const client = setupClient();
+    client.getMagicLinkStatus.mockResolvedValueOnce({
+      data: { verification_required: true, reason: "security_verification", threats: ["new_device"], verification: VERIFICATION },
+      error: null,
+    });
+    client.verifySignInVerification.mockImplementation(async () => {
+      client.emitSignedIn();
+      return { data: null, error: null };
+    });
+    await waitForLink(client);
+
+    expect(screen.getByRole("heading", { name: "Confirm it's you" })).toBeTruthy();
+    expect(screen.getByText(/we sent a 6-digit code to your email/)).toBeTruthy();
+    await paste("Verification code", "123456");
+    expect(client.verifySignInVerification).toHaveBeenCalledWith("123456", { challengeToken: "sv_tok", magicLinkId: "ml_1" });
+    expect(screen.getByRole("heading", { name: "You're in" })).toBeTruthy();
+  });
+
+  it("says the sign-in was stopped on security_block", async () => {
+    const client = setupClient();
+    client.getMagicLinkStatus.mockResolvedValueOnce({ data: null, error: apiError(403, "security_block", "Blocked") });
+    await waitForLink(client);
+    expect(screen.getByRole("heading", { name: "We stopped this sign-in" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to sign in" })).toBeTruthy();
+  });
+});
+
 describe("D16: a challenge link that signs nobody in", () => {
   it("says Verified instead of signing in", async () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
