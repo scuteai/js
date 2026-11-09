@@ -251,14 +251,12 @@ describe("HTTP error mapping", () => {
     expect(error!.cause).toBeInstanceOf(SyntaxError);
   });
 
-  // Known limitation, tracked separately: get/post/put/patch always parse
-  // JSON, so a 204 No Content success comes back as an error with no code.
-  it("a 204 No Content on post is reported as an error", async () => {
+  // A 204 No Content success is a success with no data, not a parse error.
+  it("a 204 No Content on post is a success with null data", async () => {
     server.on("POST", "/v1/auth/app_x/thing", { status: 204 });
     const { data, error } = await http.doPost("/thing", {});
     expect(data).toBeNull();
-    expect(error).toBeInstanceOf(BaseHttpError);
-    expect(error!.code).toBeUndefined();
+    expect(error).toBeNull();
   });
 
   it("a network failure is retried 3 times, then becomes a BaseHttpError with no code or message", async () => {
@@ -331,15 +329,45 @@ describe("requests that carry a refresh token", () => {
     expect(server.callsTo("POST", REFRESH_PATH)).toHaveLength(1);
   });
 
-  it("other POSTs keep the retry policy", async () => {
-    vi.useFakeTimers();
-    server.on("POST", "/v1/auth/app_x/thing", { status: 503, body: {} });
+});
 
-    const pending = http.doPost("/thing", {}, { "X-Authorization": "a1" });
+describe("only idempotent requests are retried", () => {
+  it.each([
+    ["POST", (h: TestHttp) => h.doPost("/thing", {}, { "X-Authorization": "a1" })],
+    ["PUT", (h: TestHttp) => h.doPut("/thing", {})],
+    ["PATCH", (h: TestHttp) => h.doPatch("/thing", {})],
+  ] as const)("a %s is sent once after a 503 or a network failure", async (method, send) => {
+    vi.useFakeTimers();
+    server.on(method, "/v1/auth/app_x/thing", { status: 503, body: {} });
+
+    const pending = send(http);
+    await vi.advanceTimersByTimeAsync(3000);
+    const { error } = await pending;
+
+    expect(error).toBeInstanceOf(BaseHttpError);
+    expect(server.callsTo(method, "/v1/auth/app_x/thing")).toHaveLength(1);
+  });
+
+  it("a POST that fails at the network is sent once", async () => {
+    vi.useFakeTimers();
+    server.on("POST", "/v1/auth/app_x/thing", new TypeError("fetch failed"));
+
+    const pending = http.doPost("/thing", {});
     await vi.advanceTimersByTimeAsync(3000);
     await pending;
 
-    expect(server.callsTo("POST", "/v1/auth/app_x/thing")).toHaveLength(4);
+    expect(server.callsTo("POST", "/v1/auth/app_x/thing")).toHaveLength(1);
+  });
+
+  it("a GET is retried up to 3 times after a 503", async () => {
+    vi.useFakeTimers();
+    server.on("GET", "/v1/auth/app_x/thing", { status: 503, body: {} });
+
+    const pending = http.doGet("/thing");
+    await vi.advanceTimersByTimeAsync(3000);
+    await pending;
+
+    expect(server.callsTo("GET", "/v1/auth/app_x/thing")).toHaveLength(4);
   });
 });
 
