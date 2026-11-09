@@ -93,6 +93,7 @@ describe("cookies written on sign in (server side / node)", () => {
       value: access,
       options: {
         path: "/",
+        secure: true,
         expires: new Date(accessExp * 1000),
         sameSite: "lax",
         httpOnly: false,
@@ -103,6 +104,7 @@ describe("cookies written on sign in (server side / node)", () => {
       value: refresh,
       options: {
         path: "/",
+        secure: true,
         expires: new Date(refreshExp * 1000),
         sameSite: "lax",
         httpOnly: true,
@@ -118,9 +120,9 @@ describe("cookies written on sign in (server side / node)", () => {
     ).toBeLessThan(5000);
   });
 
-  // Known limitation, tracked separately: ScuteSession never sets `secure`
-  // or `domain`; those come only from the adapter's defaultCookieOptions.
-  it("never sets secure or domain itself", async () => {
+  // Cookies are Secure by default (outside a browser there is no page to
+  // be plain-http localhost); `domain` still comes only from the adapter.
+  it("writes Secure cookies by default and never sets domain itself", async () => {
     const storage = new RecordingCookieStorage();
     const client = newClient(storage);
     await client.signInWithTokenPayload({
@@ -129,9 +131,15 @@ describe("cookies written on sign in (server side / node)", () => {
     } as any);
 
     for (const write of storage.writes) {
-      expect(write.options.secure).toBeUndefined();
+      expect(write.options.secure).toBe(true);
       expect(write.options.domain).toBeUndefined();
     }
+  });
+
+  it("an adapter constructed with secure: false writes cookies without Secure", async () => {
+    const storage = new RecordingCookieStorage({ secure: false });
+    await newClient(storage).signInWithTokenPayload({ access: accessToken(), refresh: refreshToken() } as any);
+    for (const write of storage.writes) expect(write.options.secure).toBe(false);
   });
 
   it("merges adapter defaults into every write, with per-call attributes winning", async () => {
@@ -210,12 +218,14 @@ describe("cookie removal", () => {
     ]);
     expect(storage.deletes[0].options).toStrictEqual({
       path: "/",
+      secure: true,
       httpOnly: false,
       sameSite: "lax",
       maxAge: 0,
     });
     expect(storage.deletes[2].options).toStrictEqual({
       path: "/",
+      secure: true,
       httpOnly: true,
       sameSite: "lax",
       maxAge: 0,
@@ -281,7 +291,7 @@ describe("legacy key migration on read", () => {
       {
         name: KEYS.access,
         value: legacy,
-        options: { path: "/", sameSite: "lax", httpOnly: false },
+        options: { path: "/", secure: true, sameSite: "lax", httpOnly: false },
       },
     ]);
     expect(storage.jar.get(KEYS.legacyAccess)).toBe(legacy);
@@ -390,28 +400,31 @@ describe("ScuteBrowserCookieStorage (js-cookie) document.cookie output", () => {
       path: "/",
     });
     expect(writes).toEqual([
-      `${KEYS.access}=a.b.c; path=/; expires=${expires.toUTCString()}; sameSite=lax`,
+      `${KEYS.access}=a.b.c; path=/; secure; expires=${expires.toUTCString()}; sameSite=lax`,
     ]);
     expect(await storage.getItem(KEYS.access)).toBe("a.b.c");
   });
 
-  it("has no Secure flag unless the adapter was constructed with secure: true", async () => {
+  it("is Secure by default; secure: false or a plain-http localhost page turn it off", async () => {
     await new ScuteBrowserCookieStorage().setItem("k", "v");
-    await new ScuteBrowserCookieStorage({ secure: true }).setItem("k2", "v");
-    expect(writes[0]).not.toMatch(/secure/i);
-    expect(writes[1]).toBe("k2=v; path=/; secure");
+    await new ScuteBrowserCookieStorage({ secure: false }).setItem("k2", "v");
+    vi.stubGlobal("window", { location: { protocol: "http:", hostname: "localhost" } });
+    await new ScuteBrowserCookieStorage().setItem("k3", "v");
+    vi.stubGlobal("window", { location: { protocol: "http:", hostname: "app.test" } });
+    await new ScuteBrowserCookieStorage().setItem("k4", "v");
+    expect(writes).toEqual(["k=v; path=/; secure", "k2=v; path=/", "k3=v; path=/", "k4=v; path=/; secure"]);
   });
 
   it("serializes httpOnly: true as a bare flag, which document.cookie cannot honour", async () => {
     await new ScuteBrowserCookieStorage().setItem("k", "v", { httpOnly: true });
-    expect(writes[0]).toBe("k=v; path=/; httpOnly");
+    expect(writes[0]).toBe("k=v; path=/; secure; httpOnly");
   });
 
   it("removeItem writes an already expired cookie with the same path", async () => {
     const storage = new ScuteBrowserCookieStorage();
     await storage.setItem("k", "v");
     await storage.removeItem("k", { sameSite: "lax" });
-    expect(writes[1]).toMatch(/^k=; path=\/; sameSite=lax; expires=/);
+    expect(writes[1]).toMatch(/^k=; path=\/; secure; sameSite=lax; expires=/);
     expect(await storage.getItem("k")).toBeNull();
   });
 });
