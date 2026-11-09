@@ -24,6 +24,12 @@ const AUTO_REFRESH_TICK_DURATION = 30 * 1000;
 // in seconds
 const EXPIRY_MARGIN = 10;
 
+/** The access token expires within `marginSeconds` (or has no valid expiry). */
+const expiresWithinMargin = (session: Session, marginSeconds = EXPIRY_MARGIN) => {
+  const at = session.accessExpiresAt?.getTime?.();
+  return typeof at !== "number" || Number.isNaN(at) || at < Date.now() + marginSeconds * 1000;
+};
+
 /** ticks before the current session expires */
 const AUTO_REFRESH_TICK_THRESHOLD = 3;
 
@@ -265,7 +271,10 @@ export abstract class ScuteSession {
 
             session = unAuthenticatedState();
           } else {
-            if (refreshedSession.access) {
+            if (!refreshedSession.access) {
+              // The refresh ended the session (no refresh token to use).
+              session = unAuthenticatedState();
+            } else {
               this.debug("#_getSession", "refreshed");
               session = {
                 access: refreshedSession.access,
@@ -284,7 +293,9 @@ export abstract class ScuteSession {
             "expiring session"
           );
 
-          await this._expireSession();
+          // The expired token is gone from storage and is not checked or
+          // reported as a live session either.
+          session = await this._expireSession();
         }
       }
     }
@@ -578,11 +589,25 @@ export abstract class ScuteSession {
    * @see {@link ScuteClient.getAuthToken}
    */
   protected async _getAuthToken(session: Session) {
-    if (!session.access) {
+    if (!session.access || expiresWithinMargin(session, 0)) {
       return { data: null, error: new InvalidAuthTokenError() };
     }
 
     return { data: { access: session.access }, error: null };
+  }
+
+  /**
+   * The stored access token, refreshed first (like getSession) when it
+   * expires within the margin. Never returns an expired token.
+   * @internal
+   */
+  protected async _currentAuthToken() {
+    let session = await this.initialSessionState();
+    if (session.access && expiresWithinMargin(session)) {
+      const { data } = await this._getSession();
+      session = data.session ?? unAuthenticatedState();
+    }
+    return this._getAuthToken(session);
   }
 
   /**
@@ -712,11 +737,11 @@ export abstract class ScuteSession {
 
         if (refreshError) {
           return { data: null, error: refreshError };
-        } else {
-          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
         }
 
+        // Persist first, so listeners of TOKEN_REFRESHED read the new tokens.
         session = await this.setSession(tokenPayload);
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, session);
       }
     } else {
       if (!session.refresh && this.refreshProxyCallback) {
@@ -739,13 +764,17 @@ export abstract class ScuteSession {
 
         if (refreshError) {
           return { data: null, error: refreshError };
-        } else {
-          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
-          session = await this.setSession(tokenPayload);
         }
+
+        session = await this.setSession(tokenPayload);
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, session);
       } else {
+        // Nothing to refresh with: the session ends here, and listeners
+        // hear about it.
+        const ended = unAuthenticatedState();
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_OUT, ended);
         await this._signOut(session.access);
-        session = unAuthenticatedState();
+        session = ended;
       }
     }
 

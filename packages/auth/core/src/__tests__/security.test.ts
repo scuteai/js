@@ -411,9 +411,9 @@ describe("CSRF and credentials", () => {
 });
 
 describe("fail-open server flags", () => {
-  // Known limitation, tracked separately: in a browser, autoRefreshToken is
-  // replaced by `appData.auto_refresh !== false` once app data loads.
-  it("a missing auto_refresh field overrides autoRefreshToken: false and refreshes", async () => {
+  // The app's auto_refresh can only turn auto refresh off: a client's own
+  // autoRefreshToken: false holds whatever the app data says.
+  it("a missing auto_refresh field does not override autoRefreshToken: false", async () => {
     const appData = appDataFixture();
     delete (appData as any).auto_refresh;
     server.on("GET", `/v1/apps/${APP_ID}`, { body: appData });
@@ -424,7 +424,18 @@ describe("fail-open server flags", () => {
     localStorage.setItem(KEYS.refresh, refreshToken());
 
     await browserClient({ autoRefreshToken: false }).getSession();
-    expect(server.callsTo("POST", REFRESH)).toHaveLength(1);
+    expect(server.callsTo("POST", REFRESH)).toHaveLength(0);
+  });
+
+  it("auto_refresh: true from the server does not override autoRefreshToken: false", async () => {
+    server.on("GET", `/v1/apps/${APP_ID}`, { body: appDataFixture({ auto_refresh: true }) });
+    const { localStorage } = installBrowser();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    localStorage.setItem(KEYS.access, accessToken({ expiresIn: 5 }));
+    localStorage.setItem(KEYS.refresh, refreshToken());
+
+    await browserClient({ autoRefreshToken: false }).getSession();
+    expect(server.callsTo("POST", REFRESH)).toHaveLength(0);
   });
 
   it("auto_refresh: false from the server overrides autoRefreshToken: true and expires instead", async () => {

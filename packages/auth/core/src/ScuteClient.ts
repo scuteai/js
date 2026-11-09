@@ -322,7 +322,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
 
     this.debug("#_initialize", "start");
-    this.initializeDeferred = new Deferred();
+    const deferred = (this.initializeDeferred = new Deferred());
 
     try {
       const { error: appDataError } = await this._initializeAppData();
@@ -333,20 +333,27 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
             this._setupSessionBroadcast();
           }
 
-          this.config.autoRefreshToken = this.appData.auto_refresh !== false;
+          // The app can turn auto refresh off, never on against the
+          // client's own autoRefreshToken: false.
+          this.config.autoRefreshToken =
+            this.config.autoRefreshToken !== false && this.appData.auto_refresh !== false;
 
           await this.registerVisibilityChange();
           await this.registerRefetchInterval();
         }
       }
 
-      this.initializeDeferred.resolve({ error: appDataError });
+      deferred.resolve({ error: appDataError });
+      // A failed app data load (a transient API error) is not memoized: the
+      // next call tries again instead of failing until the client is recreated.
+      if (appDataError && this.initializeDeferred === deferred) this.initializeDeferred = null;
     } catch {
-      this.initializeDeferred.reject();
+      deferred.reject();
+      if (this.initializeDeferred === deferred) this.initializeDeferred = null;
     }
 
     this.debug("#_initialize", "end");
-    return this.initializeDeferred.promise;
+    return deferred.promise;
   }
 
   protected debug(...args: any[]) {
@@ -2063,9 +2070,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * Get the access token from the current session.
    */
   async getAuthToken() {
-    const session = await this.initialSessionState();
-
-    return this._getAuthToken(session);
+    return this._currentAuthToken();
   }
 
   /**

@@ -29,7 +29,8 @@ export const getLocalStorage = (): Storage | null => {
 };
 
 export const isMaybePhoneNumber = (phone: string) => {
-  const phoneRegex = /^\+?[\d\s()-]*$/;
+  // At least one digit: punctuation or whitespace alone is not a number.
+  const phoneRegex = /^\+?[\d()-]*\d[\d()-]*$/;
   return phone && phoneRegex.test(phone.replace(/\s+/g, ""));
 };
 
@@ -106,10 +107,14 @@ export const impersonationContext = (claims?: { imp?: unknown; act?: unknown } |
 export const needsReverification = (error: unknown): boolean =>
   (error as { json?: { error_code?: string } } | null)?.json?.error_code === "verification_required";
 
+/** A JWT `exp`: a finite, positive number of seconds. */
+const isNumericExp = (exp: unknown): exp is number =>
+  typeof exp === "number" && Number.isFinite(exp) && exp > 0;
+
 export const decodeAccessToken = (accessToken: string) => {
   try {
     const payload = jwtDecode<_ScuteAccessPayload>(accessToken);
-    if (!payload.exp || !payload.uuid) {
+    if (!isNumericExp(payload.exp) || !payload.uuid) {
       return null;
     }
 
@@ -125,7 +130,7 @@ export const decodeAccessToken = (accessToken: string) => {
 export const decodeRefreshToken = (refreshToken: string) => {
   try {
     const payload = jwtDecode<_ScuteAccessPayload>(refreshToken);
-    if (!payload.exp) {
+    if (!isNumericExp(payload.exp)) {
       return null;
     }
 
