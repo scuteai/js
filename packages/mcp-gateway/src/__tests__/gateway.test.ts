@@ -1,6 +1,10 @@
 import { webcrypto } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { createServer, request as httpRequest, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createGateway, type GatewayConfig } from "../gateway";
+import { nodeListener } from "../node";
+import { toolHash } from "../pins";
 import { formatSse, parseSse } from "../sse";
 
 const subtle = (webcrypto as unknown as Crypto).subtle;
@@ -35,7 +39,19 @@ const OWN = ["scute_verify_person", "scute_submit_code", "scute_check_verificati
 
 type Seen = { url: string; method: string; headers: Headers; body: any };
 
-async function setup(options: { sse?: boolean; decide?: (body: any) => any; exchange?: any; quarantined?: string[]; config?: Partial<GatewayConfig> } = {}) {
+type SetupOptions = {
+  sse?: boolean;
+  decide?: (body: any) => any;
+  exchange?: any;
+  quarantined?: string[];
+  config?: Partial<GatewayConfig>;
+  /** Replace Scute's answer to tools/observe. */
+  observe?: () => Response;
+  /** Replace the upstream's answer; return undefined for the default. */
+  upstream?: (rpc: any) => Response | undefined;
+};
+
+async function setup(options: SetupOptions = {}) {
   const { publicKey, privateKey } = await keyPair();
   const jwk = await subtle.exportKey("jwk", publicKey);
   const seen: Seen[] = [];
@@ -75,10 +91,12 @@ async function setup(options: { sse?: boolean; decide?: (body: any) => any; exch
         : reply({ token: "ch_1", status: "pending", remaining_attempts: 2, error: "Invalid code", say: "That code didn't work." }, 422);
     }
     if (url === `${API}/v1/apps/app1/oauth/resources`) return reply({ resources: [{ id: "r1", url: RESOURCE }] });
-    if (url === `${API}/v1/apps/app1/oauth/resources/r1/tools/observe`) return reply({ quarantined: options.quarantined ?? [] });
+    if (url === `${API}/v1/apps/app1/oauth/resources/r1/tools/observe`) return options.observe?.() ?? reply({ quarantined: options.quarantined ?? [] });
 
     if (url === UPSTREAM) {
       const rpc = body as { id: number; method: string; params?: any };
+      const custom = options.upstream?.(rpc);
+      if (custom) return custom;
       const result = rpc.method === "tools/list" ? { tools: TOOLS }
         : rpc.method === "tools/call" ? { content: [{ type: "text", text: `ran ${rpc.params.name}` }] }
         : { ok: true };
@@ -99,6 +117,14 @@ async function setup(options: { sse?: boolean; decide?: (body: any) => any; exch
 }
 
 const upstreamCalls = (seen: Seen[]) => seen.filter((s) => s.url === UPSTREAM);
+const upstreamToolCalls = (seen: Seen[]) => upstreamCalls(seen).filter((s) => s.body?.method === "tools/call");
+const observeCalls = (seen: Seen[]) => seen.filter((s) => s.url.endsWith("/tools/observe"));
+/** Headers serialize to {} with JSON.stringify, so spell them out before searching a request for a token. */
+const serialize = (s: Seen) => {
+  const headers: Record<string, string> = {};
+  s.headers.forEach((v, k) => { headers[k] = v; });
+  return { ...s, headers };
+};
 
 describe("MCP gateway", () => {
   it("serves protected resource metadata that points at the app's OAuth server", async () => {
@@ -121,7 +147,14 @@ describe("MCP gateway", () => {
       await token({ exp: Math.floor(Date.now() / 1000) - 120 }),
       await token({ iss: "https://evil.test/v1/oauth/app1" }),
       await token({}, { typ: "JWT" }),
+      await token({}, { alg: "none" }),
+      await token({}, { alg: "HS256" }),
+      await token({}, { kid: undefined }),
+      await token({}, { kid: "unknown" }),
+      await token({ sub: undefined }),
       await sign(otherKey, {}),
+      `${(await token()).split(".").slice(0, 2).join(".")}.`, // empty signature
+      `${(await token()).split(".").slice(0, 2).join(".")}.!!not*base64`, // malformed signature: 401, not a gateway error
     ]) {
       const res = await call(t, { method: "tools/list" });
       expect(res.status).toBe(401);
@@ -149,9 +182,9 @@ describe("MCP gateway", () => {
     const res = await call(t, { method: "tools/call", params: { name: "read_invoice", arguments: { id: 7 } } }, { traceparent: "00-abc-def-01" });
 
     expect((await res.json()).result.content[0].text).toBe("ran read_invoice");
-    const [up] = upstreamCalls(seen);
+    const [up] = upstreamToolCalls(seen);
     expect(up.headers.get("authorization")).toBe("Bearer upstream-secret");
-    expect(JSON.stringify(up)).not.toContain(t);
+    expect(JSON.stringify(serialize(up))).not.toContain(t);
     expect(up.body.params._meta).toEqual({ traceparent: "00-abc-def-01" });
   });
 
@@ -159,9 +192,9 @@ describe("MCP gateway", () => {
     const { call, token, seen } = await setup({ config: { upstream: { url: UPSTREAM } } });
     const t = await token();
     await call(t, { method: "tools/call", params: { name: "read_invoice", arguments: {} } });
-    const [up] = upstreamCalls(seen);
+    const [up] = upstreamToolCalls(seen);
     expect(up.headers.get("authorization")).toBeNull();
-    expect(JSON.stringify(up)).not.toContain(t);
+    expect(JSON.stringify(serialize(up))).not.toContain(t);
   });
 
   it("answers a denied call itself, with words for the model", async () => {
@@ -172,7 +205,7 @@ describe("MCP gateway", () => {
     const body = await res.json();
     expect(body.result.isError).toBe(true);
     expect(body.result.content[0].text).toContain("Not allowed: Claude can't delete customers.");
-    expect(upstreamCalls(seen)).toHaveLength(0);
+    expect(upstreamToolCalls(seen)).toHaveLength(0);
   });
 
   it("asks the client for more scope when the task doesn't cover the tool", async () => {
@@ -212,13 +245,11 @@ describe("MCP gateway", () => {
   });
 
   it("streams a tool call's events as they come (the upstream may ask the client something first)", async () => {
-    const { gateway, token } = await setup();
     let release!: () => void;
     const released = new Promise<void>((r) => { release = r; });
     const enc = new TextEncoder();
-    const upstreamFetch = gateway.config.fetch!;
-    (gateway as unknown as { fetchImpl: typeof fetch }).fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) !== UPSTREAM) return upstreamFetch(input, init);
+    const { gateway, token } = await setup({ upstream: (rpc) => {
+      if (rpc.method !== "tools/call") return undefined;
       const body = new ReadableStream<Uint8Array>({
         async start(controller) {
           controller.enqueue(enc.encode(formatSse([{ event: "message", data: JSON.stringify({ jsonrpc: "2.0", id: 99, method: "sampling/createMessage", params: {} }) }])));
@@ -228,7 +259,7 @@ describe("MCP gateway", () => {
         },
       });
       return new Response(body, { headers: { "content-type": "text/event-stream" } });
-    }) as typeof fetch;
+    } });
 
     const res = await gateway.handle(new Request(RESOURCE, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${await token()}` },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "read_invoice", arguments: {} } }) }));
@@ -300,5 +331,157 @@ describe("MCP gateway", () => {
     const { call, token } = await setup({ exchange: { error: "invalid_request", error_description: "No agent is linked to this client" } });
     const body = await (await call(await token(), { method: "tools/call", params: { name: "read_invoice", arguments: {} } })).json();
     expect(body.result.content[0].text).toContain("No agent is linked");
+  });
+});
+
+describe("MCP gateway: pinning and failure handling", () => {
+  it("refuses a held tool even when the client never listed tools", async () => {
+    const { call, token, seen } = await setup({ quarantined: ["export_everything"] });
+    const t = await token();
+    const held = await (await call(t, { method: "tools/call", params: { name: "export_everything", arguments: {} } })).json();
+
+    expect(held.result.isError).toBe(true);
+    expect(held.result.content[0].text).toContain("held for review");
+    // The gateway listed the upstream's tools itself, with its own credentials, and never ran the held tool.
+    const ups = upstreamCalls(seen);
+    expect(ups.map((u) => u.body.method)).toEqual(["tools/list"]);
+    expect(ups[0].headers.get("authorization")).toBe("Bearer upstream-secret");
+    expect(JSON.stringify(serialize(ups[0]))).not.toContain(t);
+    // ...and reported every tool's pin hash.
+    const [observe] = observeCalls(seen);
+    expect(observe.body.tools).toEqual(await Promise.all(TOOLS.map(async (tool) => ({ name: tool.name, hash: await toolHash(tool) }))));
+
+    // A pinned tool runs, and the tools aren't listed again.
+    const ok = await (await call(t, { method: "tools/call", params: { name: "read_invoice", arguments: {} } })).json();
+    expect(ok.result.content[0].text).toBe("ran read_invoice");
+    expect(upstreamCalls(seen).map((u) => u.body.method)).toEqual(["tools/list", "tools/call"]);
+  });
+
+  it("learns the quarantine from an SSE tools/list too", async () => {
+    const { call, token, seen } = await setup({ sse: true, quarantined: ["export_everything"] });
+    const res = await call(await token(), { method: "tools/call", params: { name: "export_everything", arguments: {} } });
+    expect((await res.json()).result.content[0].text).toContain("held for review");
+    expect(upstreamCalls(seen).map((u) => u.body.method)).toEqual(["tools/list"]);
+  });
+
+  it("pauses tool calls while Scute can't confirm the pins", async () => {
+    const { call, token, seen } = await setup({ observe: () => new Response("down", { status: 500 }) });
+    const body = await (await call(await token(), { method: "tools/call", params: { name: "read_invoice", arguments: {} } })).json();
+
+    expect(body.result.isError).toBe(true);
+    expect(body.result.content[0].text).toContain("couldn't confirm");
+    expect(upstreamCalls(seen).map((u) => u.body.method)).toEqual(["tools/list"]);
+  });
+
+  it("still lists tools when tools/observe is down (listing fails open; calls are what's guarded)", async () => {
+    const { call, token } = await setup({ observe: () => new Response("down", { status: 500 }) });
+    const res = await call(await token(), { method: "tools/list" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).result.tools.map((x: { name: string }) => x.name)).toContain("read_invoice");
+  });
+
+  it("answers with an error, not the upstream's unchecked tool list, when checking it fails", async () => {
+    const { call, token } = await setup({ observe: () => new Response("<html>oops</html>", { status: 200, headers: { "content-type": "application/json" } }) });
+    const res = await call(await token(), { method: "tools/list" });
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body).toMatchObject({ jsonrpc: "2.0", id: 1, error: { code: -32603 } });
+    expect(JSON.stringify(body)).not.toContain("export_everything");
+  });
+
+  it("sends an error event, not the upstream's unchecked answer, when checking an SSE answer fails", async () => {
+    const { call, token } = await setup({ sse: true, observe: () => new Response("<html>oops</html>", { status: 200, headers: { "content-type": "application/json" } }) });
+    const text = await (await call(await token(), { method: "tools/list" })).text();
+    const [event] = parseSse(text);
+    expect(JSON.parse(event.data)).toMatchObject({ jsonrpc: "2.0", id: 1, error: { code: -32603 } });
+    expect(text).not.toContain("export_everything");
+  });
+
+  it("passes a body that isn't JSON-RPC on unchanged", async () => {
+    const { call, token } = await setup({ config: { pinning: false },
+      upstream: (rpc) => (rpc.method === "tools/call" ? new Response("plain words", { headers: { "content-type": "application/json" } }) : undefined) });
+    const res = await call(await token(), { method: "tools/call", params: { name: "read_invoice", arguments: {} } });
+    expect(await res.text()).toBe("plain words");
+  });
+
+  it("reads SSE events separated by lone carriage returns", async () => {
+    const { call, token } = await setup({ quarantined: ["export_everything"],
+      upstream: (rpc) => rpc.method === "tools/list"
+        ? new Response(`event: message\rdata: ${JSON.stringify({ jsonrpc: "2.0", id: rpc.id, result: { tools: TOOLS } })}\r\r`, { headers: { "content-type": "text/event-stream" } })
+        : undefined });
+    const [event] = parseSse(await (await call(await token(), { method: "tools/list" })).text());
+    expect(JSON.parse(event.data).result.tools.map((x: { name: string }) => x.name)).not.toContain("export_everything");
+  });
+
+  describe("task sessions", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("starts a new task once the cached task token has expired", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const { call, token, seen } = await setup({ exchange: { access_token: "sct_task", agent: "claude", expires_in: 60, scope: "mcp" } });
+      const t = await token(); // valid for 10 minutes
+      const run = () => call(t, { method: "tools/call", params: { name: "read_invoice", arguments: {} } });
+      const exchanges = () => seen.filter((s) => s.url === `${ISSUER}/token`).length;
+
+      await run();
+      await run();
+      expect(exchanges()).toBe(1);
+      vi.setSystemTime(Date.now() + 61_000);
+      await run();
+      expect(exchanges()).toBe(2);
+    });
+  });
+});
+
+describe("nodeListener", () => {
+  let server: Server | undefined;
+  afterEach(async () => {
+    await new Promise<void>((r) => (server ? server.close(() => r()) : r()));
+    server = undefined;
+  });
+
+  async function serve(handler: (req: Request) => Promise<Response>, options?: { trustProxy?: boolean }) {
+    server = createServer(nodeListener(handler, options));
+    await new Promise<void>((r) => server!.listen(0, "127.0.0.1", () => r()));
+    const { port } = server.address() as AddressInfo;
+    return (headers: Record<string, string> = {}) =>
+      new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const req = httpRequest({ host: "127.0.0.1", port, path: "/mcp", method: "GET", headers }, (res) => {
+          let body = "";
+          res.on("data", (c) => (body += c));
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+        });
+        req.on("error", reject);
+        req.end();
+      });
+  }
+
+  it("behind a trusted proxy, gives the handler the forwarded host in both the URL and the Host header", async () => {
+    let seen: { url: string; host: string | null } | undefined;
+    const get = await serve(async (req) => {
+      seen = { url: req.url, host: req.headers.get("host") };
+      return new Response("ok");
+    }, { trustProxy: true });
+    await get({ "x-forwarded-host": "mcp.test, internal.lb", "x-forwarded-proto": "https" });
+    expect(seen).toEqual({ url: "https://mcp.test/mcp", host: "mcp.test" });
+  });
+
+  it("ignores forwarded headers without trustProxy", async () => {
+    let seen: { url: string; host: string | null } | undefined;
+    const get = await serve(async (req) => {
+      seen = { url: req.url, host: req.headers.get("host") };
+      return new Response("ok");
+    });
+    await get({ "x-forwarded-host": "mcp.test", "x-forwarded-proto": "https" });
+    expect(seen?.url.startsWith("http://127.0.0.1:")).toBe(true);
+    expect(seen?.host).toMatch(/^127\.0\.0\.1:\d+$/);
+  });
+
+  it("doesn't echo internal error text", async () => {
+    const get = await serve(async () => { throw new Error("db password is hunter2"); });
+    const res = await get();
+    expect(res.status).toBe(500);
+    expect(res.body).not.toContain("hunter2");
+    expect(JSON.parse(res.body)).toMatchObject({ error: "gateway_error" });
   });
 });
