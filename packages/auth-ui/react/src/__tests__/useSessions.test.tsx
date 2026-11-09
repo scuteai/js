@@ -136,15 +136,38 @@ describe("revoke", () => {
     expect(res.error.message).toBe("Failed to revoke session");
   });
 
-  it("revokes the current device's session like any other, without signing out locally", async () => {
+  it("signs out locally after revoking the current device's session", async () => {
     const { client, result } = await loaded();
     client.revokeSession.mockResolvedValue({ data: {}, error: null });
     expect(result.current.isCurrent(11)).toBe(true);
+    let res: any;
+    await act(async () => {
+      res = await result.current.revoke(11);
+    });
+    expect(client.revokeSession).toHaveBeenCalledWith(11);
+    expect(res).toEqual({ ok: true, data: {} });
+    // This device's tokens are dead on the server: the stored session is
+    // cleared too, and the list is not fetched again with them.
+    expect(client.signOut).toHaveBeenCalledTimes(1);
+    expect(client.listUserSessions).toHaveBeenCalledTimes(1);
+    expect(result.current.sessions).toEqual([]);
+  });
+
+  it("does not sign out after revoking another device's session", async () => {
+    const { client, result } = await loaded();
+    client.revokeSession.mockResolvedValue({ data: {}, error: null });
+    await act(async () => {
+      await result.current.revoke(12);
+    });
+    expect(client.signOut).not.toHaveBeenCalled();
+  });
+
+  it("does not sign out when revoking the current session fails", async () => {
+    const { client, result } = await loaded();
+    client.revokeSession.mockResolvedValue({ data: null, error: { message: "nope" } });
     await act(async () => {
       await result.current.revoke(11);
     });
-    expect(client.revokeSession).toHaveBeenCalledWith(11);
-    // Known limitation, tracked separately: revoking this device's session does not sign out locally.
     expect(client.signOut).not.toHaveBeenCalled();
   });
 });

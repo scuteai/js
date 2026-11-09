@@ -196,7 +196,15 @@ export function useScuteAuthFlow() {
   const scuteClient = useScuteClient();
   const { isAuthenticated, isLoading, user, signOut } = useAuth();
 
-  const [view, setView] = useState<AuthFlowView>("loading");
+  const [view, setViewState] = useState<AuthFlowView>("loading");
+  // The current view for the auth event listener, which subscribes once
+  // (re-subscribing replays INITIAL_SESSION and refetches the session). Set
+  // with the state so an event right after a view change sees the new view.
+  const viewRef = useRef<AuthFlowView>("loading");
+  const setView = useCallback((next: AuthFlowView) => {
+    viewRef.current = next;
+    setViewState(next);
+  }, []);
   const [identifier, setIdentifier] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -422,10 +430,21 @@ export function useScuteAuthFlow() {
     const canAddPasskey = typeof scuteClient.isWebauthnSupported === "function" && !!scuteClient.isWebauthnSupported();
     if (!opts.skipPasskeyOffer && passkeysEnabled && canAddPasskey) {
       await offerPasskey(data.authPayload);
-    } else {
-      await scuteClient.signInWithTokenPayload(data.authPayload);
+      return;
     }
-  }, [scuteClient, offerPasskey, handleStep]);
+    // The last step: exchange the payload for a session (SIGNED_IN moves the
+    // flow on). A refusal here must not leave the flow waiting.
+    let result: { error?: any } | undefined;
+    try {
+      result = await scuteClient.signInWithTokenPayload(data.authPayload);
+    } catch (err: any) {
+      result = { error: err ?? {} };
+    }
+    if (result?.error) {
+      fail(result.error, "We couldn't sign you in");
+      setView("error");
+    }
+  }, [scuteClient, offerPasskey, handleStep, fail]);
 
   // ── 1. Initialize SDK + detect magic link in URL ──
   useEffect(() => {
@@ -453,12 +472,14 @@ export function useScuteAuthFlow() {
       const magicToken = scuteClient.getMagicLinkToken();
       if (magicToken) {
         setView("magic_verifying");
-      } else if (!isAuthenticated && settingsError) {
+      } else if (!isAuthenticatedRef.current && settingsError) {
         // Every sign-in needs them: say so now, not after the email.
         setError(settingsError.message || APP_SETTINGS_MESSAGE);
         setErrorCode(APP_SETTINGS_UNAVAILABLE);
         setView("error");
-      } else if (!isAuthenticated) {
+      } else if (!isAuthenticatedRef.current) {
+        // Read from the ref: a SIGNED_IN that landed while _initialize() ran
+        // has already moved the flow on.
         setView("login");
       }
     })();
@@ -472,6 +493,7 @@ export function useScuteAuthFlow() {
         // picks the next view. An expiry while this flow had no session is a
         // stale session from an earlier visit and must not drop a sign-in in
         // progress; a sign-out always resets.
+        const view = viewRef.current;
         if (view === "loading" || view === "magic_verifying") return;
         if (event === AUTH_CHANGE_EVENTS.SESSION_EXPIRED && !isAuthenticatedRef.current) return;
         resetAfterSignOut();
@@ -483,7 +505,7 @@ export function useScuteAuthFlow() {
       }
       // The passkey offer and the MFA nudge come with a session already: the
       // person moves on from them.
-      if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && !KEEP_WHEN_SIGNED_IN.includes(view)) {
+      if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && !KEEP_WHEN_SIGNED_IN.includes(viewRef.current)) {
         setView("authenticated");
       }
       if (event === AUTH_CHANGE_EVENTS.MAGIC_PENDING || event === AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING) {
@@ -528,7 +550,7 @@ export function useScuteAuthFlow() {
       }
     });
     return () => unsubscribe();
-  }, [scuteClient, view, resetAfterSignOut, startSetupFrom, handleContactStep, applySuggestion]);
+  }, [scuteClient, setView, resetAfterSignOut, startSetupFrom, handleContactStep, applySuggestion]);
 
   // ── 3. Process magic link from URL ──
   useEffect(() => {
@@ -609,7 +631,12 @@ export function useScuteAuthFlow() {
         // Signed in (SIGNED_IN moves the flow on), a step needed here too
         // (MFA, a factor to set up, a contact to confirm, attack
         // protection's code), or opened too long ago.
-        const finished: { data: any; error: any } = await scuteClient.signInWithMagicLinkStatus(result.data, magicLinkId);
+        let finished: { data: any; error: any };
+        try {
+          finished = await scuteClient.signInWithMagicLinkStatus(result.data, magicLinkId);
+        } catch (err: any) {
+          finished = { data: null, error: err ?? {} };
+        }
         if (finished.data?.verificationRequired) {
           await afterFirstFactor(finished.data, { magicLinkId });
         } else if (handleStep(finished.data)) {
@@ -617,6 +644,10 @@ export function useScuteAuthFlow() {
         } else if ((finished.error as any)?.code === "magic-link-window-closed") {
           setError(MAGIC_LINK_TIMEOUT_MESSAGE);
           setErrorCode(null);
+          setView("error");
+        } else if (finished.error) {
+          // The final token exchange was refused: say so, don't keep waiting.
+          fail(finished.error, "We couldn't sign you in");
           setView("error");
         }
         return;
@@ -759,9 +790,8 @@ export function useScuteAuthFlow() {
       const result = await scuteClient.verifyOtp(code, identifier);
       if (result?.error) { setError(messageOf(result.error)); setErrorCode(errorCodeOf(result.error)); return false; }
       if (result?.data && "mfaRequired" in result.data && result.data.mfaRequired) {
-        setMfaChallenge(result.data.mfaChallenge);
-        setMfaAvailableMethods(result.data.availableMethods || []);
-        if ((result.data as any).mfaEnrollmentRequired) startSetupFrom((result.data as any).setupToken, result.data.availableMethods);
+        // Same fields as every other path, the grace period included (REF-16).
+        handleMfaResponse(result.data);
         // View change handled by event listener
         return true;
       }
@@ -776,7 +806,7 @@ export function useScuteAuthFlow() {
       fail(err, "Invalid code");
       return false;
     }
-  }, [identifier, scuteClient, afterFirstFactor, fail, clearError, handleStep, startSetupFrom]);
+  }, [identifier, scuteClient, afterFirstFactor, fail, clearError, handleStep, handleMfaResponse]);
 
   /**
    * Attack protection's code step: verify the code it sent, then the same
@@ -1040,6 +1070,9 @@ export function useScuteAuthFlow() {
         if (!setupExpired(verifyError)) fail(verifyError, "That code didn't work");
         return false;
       }
+      // Set up: drop the authenticator key and the pass before moving on, so
+      // the secret is not kept in state. A next step brings its own.
+      setMfaSetup(null);
       handleStep(data);
       return true;
     } catch (err: any) {

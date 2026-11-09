@@ -198,7 +198,7 @@ export function useSecureAccount(): UseSecureAccountResult {
   // tracks this from session events, so we don't have to infer it from
   // whether `/mfa/methods` returned data (which conflates network errors
   // with sign-in state).
-  const { isAuthenticated: authedFromContext, isLoading: authLoading } = useAuth();
+  const { isAuthenticated: authedFromContext, isLoading: authLoading, user } = useAuth();
 
   const [appData, setAppData] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<any[]>([]);
@@ -226,10 +226,13 @@ export function useSecureAccount(): UseSecureAccountResult {
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // The first load failure, thrown or returned as { error }.
+    let loadError: SecureAccountError | null = null;
     try {
       // App config — always available; powers the row visibility logic.
       const cfg = await client.getAppData();
       if (cfg?.data && mountedRef.current) setAppData(cfg.data);
+      if (cfg?.error) loadError = toError("config_load_failed", cfg.error);
 
       // MFA methods — only attempt while signed in. If the auth context is
       // still loading we'll re-run when it settles via the effect below.
@@ -239,15 +242,21 @@ export function useSecureAccount(): UseSecureAccountResult {
         if (list?.data) {
           setEnrollments(list.data.methods ?? []);
           setBackupCodesAvailable(list.data.backup_codes_available ?? 0);
+        } else if (list?.error) {
+          // The rows keep the last known state; `error` says it is stale.
+          loadError ??= toError("config_load_failed", list.error);
         }
       } else {
         setEnrollments([]);
         setBackupCodesAvailable(0);
       }
     } catch (e) {
-      if (mountedRef.current) setError(toError("config_load_failed", e));
+      loadError ??= toError("config_load_failed", e);
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current) {
+        if (loadError) setError(loadError);
+        setLoading(false);
+      }
     }
   }, [client, authedFromContext]);
 
@@ -277,11 +286,10 @@ export function useSecureAccount(): UseSecureAccountResult {
       }
 
       if (key === "passkey") {
-        // Passkey enrollment is signalled by the existence of any credential
-        // on the AppUser. Newer SDKs expose this via getCurrentUser, but the
-        // most reliable signal we have here is whether the session payload
-        // surfaced credentials. Best-effort.
-        const enrolled = !!(appData as any)?._currentUserHasPasskey;
+        // The current user's `webauthn_enabled` (GET /current_user): true
+        // when the account has any passkey credential. The client refetches
+        // the user after a passkey is added (WEBAUTHN_REGISTER_SUCCESS).
+        const enrolled = authedFromContext && user?.webauthn_enabled === true;
         return {
           key,
           ...METHOD_META[key],
@@ -307,7 +315,7 @@ export function useSecureAccount(): UseSecureAccountResult {
         enrollmentId: match?.id,
       };
     }).filter(Boolean) as SecureMethod[];
-  }, [appData, enrollments, backupCodesAvailable]);
+  }, [appData, enrollments, backupCodesAvailable, authedFromContext, user]);
 
   // --- Actions ----------------------------------------------------------
 
