@@ -248,11 +248,11 @@ describe("verifyMagicLinkToken", () => {
     const pair = tokenPair();
     server.on("PATCH", AUTHENTICATE, { body: pair });
 
-    const { data, error } = await client.verifyMagicLink(
+    const result = await client.verifyMagicLink(
       `https://app.test/cb?sct_magic=${magicLinkToken()}&sct_sk=true`
     );
-    expect(error).toBeNull();
-    expect(data).toMatchObject({ signedIn: true });
+    expect(result.error).toBeNull();
+    expect((result as { data?: unknown }).data).toMatchObject({ signedIn: true });
     expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN]);
     expect(localStorage.getItem(KEYS.access)).toBe(pair.access);
   });

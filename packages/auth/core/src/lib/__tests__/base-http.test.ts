@@ -333,10 +333,10 @@ describe("requests that carry a refresh token", () => {
 
 describe("only idempotent requests are retried", () => {
   it.each([
-    ["POST", (h: TestHttp) => h.doPost("/thing", {}, { "X-Authorization": "a1" })],
-    ["PUT", (h: TestHttp) => h.doPut("/thing", {})],
-    ["PATCH", (h: TestHttp) => h.doPatch("/thing", {})],
-  ] as const)("a %s is sent once after a 503 or a network failure", async (method, send) => {
+    ["POST", (h: TestHttp): Promise<{ error: unknown }> => h.doPost("/thing", {}, { "X-Authorization": "a1" })],
+    ["PUT", (h: TestHttp): Promise<{ error: unknown }> => h.doPut("/thing", {})],
+    ["PATCH", (h: TestHttp): Promise<{ error: unknown }> => h.doPatch("/thing", {})],
+  ] as const)("a %s is sent once after a 503", async (method, send) => {
     vi.useFakeTimers();
     server.on(method, "/v1/auth/app_x/thing", { status: 503, body: {} });
 
