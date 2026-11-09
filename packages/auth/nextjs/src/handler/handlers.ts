@@ -4,7 +4,7 @@ import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { splitCookiesString } from "set-cookie-parser";
 
-import internalHandler from "./internalHandler";
+import internalHandler, { badRequest, isHandlerRoute } from "./internalHandler";
 import { createPagesEdgeRuntimeClient } from "../pagesEdgeRuntimeClient";
 import { createPagesServerClient } from "../pagesServerClient";
 import { createRouteHandlerClient } from "../routeHandlerClient";
@@ -23,6 +23,7 @@ async function ScuteRouteHandler(
 ) {
   const url = req.nextUrl;
   const method = req.method;
+  if (!isHandlerRoute(url, method)) return badRequest();
   const query = Object.fromEntries(url.searchParams);
   const body = await getBody(req);
 
@@ -66,15 +67,16 @@ async function ScuteNodeApiHandler(
   const cookies = req.cookies as Record<string, string>;
   const headers = new Headers(req.headers as Record<string, string>);
 
-  const scute = createPagesServerClient({ req, res }, config);
-  const response = await internalHandler(scute, {
-    url,
-    method,
-    query,
-    body,
-    cookies,
-    headers,
-  });
+  const response = isHandlerRoute(url, method)
+    ? await internalHandler(createPagesServerClient({ req, res }, config), {
+        url,
+        method,
+        query,
+        body,
+        cookies,
+        headers,
+      })
+    : badRequest();
 
   res.statusCode = response.status;
   res.statusMessage = response.statusText;
@@ -109,6 +111,7 @@ async function ScuteEdgeApiHandler(
 ) {
   const url = req.nextUrl;
   const method = req.method;
+  if (!isHandlerRoute(url, method)) return badRequest();
   const query = Object.fromEntries(url.searchParams);
   const body = await getBody(req);
   const cookies = Object.fromEntries(

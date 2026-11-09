@@ -7,7 +7,7 @@ import type {
   NextApiResponse,
 } from "next";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
-import { clientIpFor } from "./utils";
+import { clientIpFor, writtenCookie } from "./utils";
 
 class ScuteNextServerStorage extends ScuteCookieStorage {
   constructor(
@@ -20,15 +20,13 @@ class ScuteNextServerStorage extends ScuteCookieStorage {
   }
 
   protected getCookie(name: string): string | null {
-    const setCookie = splitCookiesString(
-      this.context.res.getHeader("set-cookie")?.toString() ?? ""
-    )
-      .map((c) => parseCookies(c)[name])
-      .find((c) => !!c);
+    // the last write for this name wins; an empty value is a deletion
+    const written = writtenCookie(this.context.res.getHeader("set-cookie"), name);
+    if (written !== undefined) {
+      return written;
+    }
 
-    const value = setCookie ?? this.context.req.cookies[name] ?? null;
-
-    return value;
+    return this.context.req.cookies[name] ?? null;
   }
 
   protected setCookie(

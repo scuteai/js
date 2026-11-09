@@ -82,13 +82,10 @@ const internalHandler = async (
     }
 
     const presented = getBearerToken(headers);
+    const { data: appData } = presented ? await scute.getAppData() : { data: null };
 
-    // Start from a clean slate: session cookies already present for this
-    // app (namespaced or legacy) must never stand in for the presented token.
-    await scute["removeSession"]();
-
-    const { data: appData } = await scute.getAppData();
-
+    // Validate before touching the session: a refused sign-in leaves the
+    // session already in these cookies as it was.
     if (
       !presented ||
       !appData ||
@@ -98,6 +95,10 @@ const internalHandler = async (
         status: 401,
       });
     }
+
+    // Start from a clean slate: session cookies already present for this
+    // app (namespaced or legacy) must never stand in for the presented token.
+    await scute["removeSession"]();
 
     // Exchange exactly the presented token; sets the refresh token http-only.
     const { data: tokens, error } = await scute.admin.refreshWithAccess(
@@ -157,6 +158,26 @@ const internalHandler = async (
       return response;
     }
 
+    const session = await scute["initialSessionState"]();
+    if (!session.refresh) {
+      // No refresh cookie. Minting a session from the JS-readable access
+      // cookie alone is held to the same rule as sign-in: only an access
+      // token issued in the last 30 seconds may be exchanged. No session at
+      // all is a plain 401.
+      const { data: appData } = session.access
+        ? await scute.getAppData()
+        : { data: null };
+      if (
+        !session.access ||
+        !appData ||
+        !isFreshAccessToken(session.access, appData.access_expiration)
+      ) {
+        return new Response(null, {
+          status: 401,
+        });
+      }
+    }
+
     const { data, error } = await scute.refreshSession();
 
     const refusal = networkRefusalOf(error);
@@ -172,7 +193,16 @@ const internalHandler = async (
       });
     }
 
-    if (error) {
+    if (error && !isRefreshRejected(error)) {
+      // A 5xx or a dropped connection says nothing about the session. Keep
+      // the cookies so the next refresh can succeed: 502 for an upstream
+      // error status, 503 when upstream could not be reached.
+      return new Response(null, {
+        status: hasHttpStatus(error) ? 502 : 503,
+      });
+    }
+
+    if (error || !data?.access) {
       // A backend-rejected refresh means the stored refresh token is dead:
       // a stale `sc-refresh-token__<appId>` cookie force-migrated from a
       // pre-0.7 legacy slot, a revoked/cleaned-up session, or a flushed token
@@ -204,10 +234,27 @@ const internalHandler = async (
       }
     );
   } else {
-    return new Response("Bad Request", {
-      status: 400,
-    });
+    return badRequest();
   }
+};
+
+const hasHttpStatus = (error: unknown) =>
+  typeof (error as { code?: unknown } | null)?.code === "number";
+
+/**
+ * Upstream refused the refresh token itself (a 4xx other than a timeout or
+ * rate limit), so the session is dead. 5xx and network errors are transient.
+ */
+const isRefreshRejected = (error: unknown) => {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === "invalid-auth-token") return true;
+  return (
+    typeof code === "number" &&
+    code >= 400 &&
+    code < 500 &&
+    code !== 408 &&
+    code !== 429
+  );
 };
 
 /** A refresh refused for the network it came from (D11), not the session. */
@@ -228,5 +275,21 @@ const isCsrfRequest = (url: URL, method: string) =>
 
 const isRefreshRequest = (url: URL, method: string) =>
   method === "POST" && url.pathname.endsWith(getHandlerPath(REFRESH_HANDLER));
+
+/**
+ * True when `url` + `method` name one of the handler's endpoints. Callers
+ * check this before constructing a ScuteClient, so an unknown path costs no
+ * upstream call (the client's constructor fetches the app data).
+ */
+export const isHandlerRoute = (url: URL, method: string) =>
+  isSignInRequest(url, method) ||
+  isSignOutRequest(url, method) ||
+  isCsrfRequest(url, method) ||
+  isRefreshRequest(url, method);
+
+export const badRequest = () =>
+  new Response("Bad Request", {
+    status: 400,
+  });
 
 export default internalHandler;

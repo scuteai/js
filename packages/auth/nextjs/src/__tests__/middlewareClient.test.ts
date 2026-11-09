@@ -74,9 +74,9 @@ describe("createMiddlewareClient storage", () => {
     expect(await storage.getItem("a")).toBe("1");
   });
 
-  it("returns undefined (not null) for a missing cookie", async () => {
+  it("returns null for a missing cookie, like the other adapters", async () => {
     const { storage } = create();
-    expect(await storage.getItem("missing")).toBeUndefined();
+    expect(await storage.getItem("missing")).toBeNull();
   });
 
   it("prefers a value already written to the response Set-Cookie over the request", async () => {
@@ -124,23 +124,22 @@ describe("createMiddlewareClient storage", () => {
     expect(downstreamCookies(res)).toEqual({ a: "1", k: "v" });
   });
 
-  // Known limitation, tracked separately: reads return the first non-empty
-  // Set-Cookie match, so a second write in the same run is not read back.
-  it("a second write for the same name is not visible to reads (first match wins)", async () => {
+  // Reads take the last Set-Cookie written for the name (as the edge
+  // adapter does), so a second write in the same run is read back.
+  it("a second write for the same name is visible to reads (last write wins)", async () => {
     const { storage, res } = create();
     await storage.setItem("k", "v1");
     await storage.setItem("k", "v2");
     expect(res.headers.getSetCookie()).toEqual(["k=v1; Path=/", "k=v2; Path=/"]);
-    expect(await storage.getItem("k")).toBe("v1");
+    expect(await storage.getItem("k")).toBe("v2");
   });
 
-  // Known limitation, tracked separately: after a deletion, reads fall back
-  // to the request cookie for the rest of the middleware run.
-  it("a deleted cookie is still read back from the request", async () => {
+  // A deletion written in this run wins over the request cookie.
+  it("a deleted cookie is not read back from the request", async () => {
     const { storage, res } = create({ k: "stale" });
     await storage.removeItem("k");
     expect(res.headers.getSetCookie()).toEqual(["k=; Max-Age=0; Path=/"]);
-    expect(await storage.getItem("k")).toBe("stale");
+    expect(await storage.getItem("k")).toBeNull();
   });
 
   it("does nothing (and does not throw) when res has no headers", async () => {

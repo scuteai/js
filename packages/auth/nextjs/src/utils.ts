@@ -1,6 +1,27 @@
 import type { NextApiRequest } from "next";
 import type { TLSSocket } from "tls";
 import { normalizeClientIp } from "@scute/js-core";
+import { parse as parseCookies } from "cookie";
+import { splitCookiesString } from "set-cookie-parser";
+
+/**
+ * What this response's Set-Cookie headers last wrote for `name`: the value,
+ * null for a deletion (empty value), or undefined when nothing was written.
+ * The last write wins, so a deleted cookie is never read back.
+ */
+export function writtenCookie(
+  setCookieHeader: string | string[] | number | null | undefined,
+  name: string
+): string | null | undefined {
+  const all = Array.isArray(setCookieHeader)
+    ? setCookieHeader.flatMap((h) => splitCookiesString(h))
+    : splitCookiesString(setCookieHeader == null ? "" : String(setCookieHeader));
+  let written: string | undefined;
+  for (const c of all) {
+    written = (parseCookies(c.split(";")[0])[name] as string | undefined) ?? written;
+  }
+  return written === undefined ? undefined : written || null;
+}
 
 export async function getBody(
   req: Request

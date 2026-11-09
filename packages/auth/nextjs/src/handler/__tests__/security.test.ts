@@ -249,7 +249,8 @@ describe("refresh token confidentiality", () => {
         body: JSON.stringify({ refresh: makeRefresh({ tag: "smuggled" }) }),
       })
     );
-    expect(r.text).toBe('{"access":null}');
+    expect(r.res.status).toBe(401);
+    expect(r.text).toBe("");
     expect(upstream.callsTo("/tokens/refresh")).toEqual([]);
   });
 
@@ -358,6 +359,8 @@ describe("upstream error handling does not leak", () => {
     const at = makeAccess({ tag: "leak" });
     const c = Object.fromEntries(Object.entries(cookies).map(([k]) => [k, rt]));
     const h = Object.fromEntries(Object.entries(headers).map(([k]) => [k, `Bearer ${at}`]));
+    // A refused token is a 401; a transient upstream 5xx on refresh keeps the
+    // session and answers 502 (sign-in still refuses with 401).
     for (const status of [400, 401, 403, 500]) {
       upstream.on(method, upstreamPath, () => {
         const r = json({ error: "nope", stack: "at Secret.internal (secret.rb:1)", token: rt, access: at }, status);
@@ -365,7 +368,7 @@ describe("upstream error handling does not leak", () => {
         return r;
       });
       const r = await call(withCsrf({ path, cookies: c, headers: h }));
-      expect(r.res.status).toBe(401);
+      expect(r.res.status).toBe(status === 500 && path === "/auth/refresh" ? 502 : 401);
       expect(r.text).toBe("");
       expect(r.res.headers.get("x-upstream-secret")).toBeNull();
       const everything = [r.text, ...r.respHeaders.map(([k, v]) => `${k}: ${v}`)].join("\n");
@@ -542,11 +545,30 @@ describe("no SSRF-style proxying", () => {
     expect(rotate.headers.get("authorization")).toBe(`Bearer ${SECRET}`);
   });
 
-  // Known limitation, tracked separately: every request, including unknown
-  // paths, constructs a ScuteClient whose constructor GETs /v1/apps/:id.
-  it("each unauthenticated request triggers one upstream app-data GET", async () => {
-    for (let i = 0; i < 5; i++) await call({ path: `/auth/junk-${i}`, method: "GET" });
-    expect(upstream.calls).toHaveLength(5);
-    for (const c of upstream.calls) expect(c.headers.get("authorization")).toBe(`Bearer ${SECRET}`);
+  // Unknown paths are refused before a ScuteClient is constructed, so they
+  // cost no upstream call (the constructor GETs /v1/apps/:id with the secret).
+  it("unknown paths make no upstream call at all", async () => {
+    for (let i = 0; i < 5; i++) {
+      const r = await call({ path: `/auth/junk-${i}`, method: "GET" });
+      expect(r.res.status).toBe(400);
+    }
+    await call({ path: "/auth/csrf", method: "POST" });
+    expect(upstream.calls).toHaveLength(0);
+  });
+
+  it("unknown paths make no upstream call on the Pages (Node and Edge) handlers either", async () => {
+    const res = new ServerResponse(new IncomingMessage(new Socket()));
+    (res as any).write = () => true;
+    (res as any).end = () => res;
+    await (ScuteHandler as any)(
+      { method: "GET", url: "/api/auth/junk", headers: { host: "localhost" }, cookies: {}, query: {} },
+      res,
+      clientConfig()
+    );
+    expect(res.statusCode).toBe(400);
+    const edge = await (ScuteHandler as any)(makeNextRequest("/api/auth/junk"), clientConfig());
+    expect(edge.status).toBe(400);
+    await settle();
+    expect(upstream.calls).toHaveLength(0);
   });
 });
