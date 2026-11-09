@@ -1,7 +1,7 @@
 import type ScuteAdminApi from "./ScuteAdminApi";
 import type { AuthzDecision, AuthzResource } from "./ScuteAuthzApi";
 import type { UniqueIdentifier } from "./lib/types/general";
-import { decideLocally, decodeSnapshotToken, type AuthzPolicy, type LocalDecision } from "./lib/localAuthz";
+import { decideLocally, type AuthzPolicy, type LocalDecision } from "./lib/localAuthz";
 
 export type ScuteLocalAuthzOptions = {
   /** Re-fetch the snapshot after this long (default 30s). */
@@ -10,6 +10,12 @@ export type ScuteLocalAuthzOptions = {
   rolesTtlMs?: number;
   /** Deny on missing attributes like the server, instead of asking it. */
   strict?: boolean;
+  /**
+   * Stop deciding locally when the last verified snapshot is older than
+   * this (default 5 × refreshMs, at least 60s); checks go to the API until a
+   * fresh snapshot verifies. A snapshot past its `exp` is never used.
+   */
+  maxStaleMs?: number;
 };
 
 /**
@@ -24,6 +30,7 @@ export class ScuteLocalAuthz {
   private policy: AuthzPolicy | null = null;
   private version: number | null = null;
   private fetchedAt = 0;
+  private expiresAt = 0;
   private inflight: Promise<void> | null = null;
   private readonly roles = new Map<string, { roles: string[]; at: number }>();
 
@@ -34,16 +41,21 @@ export class ScuteLocalAuthz {
     return this.version;
   }
 
+  /**
+   * Fetch the snapshot and verify it (RS256 signature against the app's
+   * JWKS, audience, expiry). Rejects, keeping the previous policy, when the
+   * snapshot can't be fetched or doesn't verify.
+   */
   async refresh(): Promise<void> {
     if (this.inflight) return this.inflight;
     this.inflight = (async () => {
       try {
-        const { data, error } = await this.admin.authzSnapshot();
-        if (error || !data) throw error ?? new Error("No snapshot");
-        const claims = decodeSnapshotToken(data.token);
+        const { data: claims, error } = await this.admin.verifiedAuthzSnapshot();
+        if (error || !claims) throw error ?? new Error("No snapshot");
         if (claims.version !== this.version) this.roles.clear();
         this.policy = claims.policy;
         this.version = claims.version;
+        this.expiresAt = typeof claims.exp === "number" ? claims.exp * 1000 : 0;
         this.fetchedAt = Date.now();
       } finally {
         this.inflight = null;
@@ -52,10 +64,28 @@ export class ScuteLocalAuthz {
     return this.inflight;
   }
 
-  private async ensurePolicy() {
-    const stale = Date.now() - this.fetchedAt > (this.options.refreshMs ?? 30_000);
-    if (!this.policy) return this.refresh();
-    if (stale) void this.refresh().catch(() => {}); // keep answering from the last good snapshot
+  private get refreshMs() {
+    return this.options.refreshMs ?? 30_000;
+  }
+
+  /** The verified policy, or null when there is none or it is too old to trust. */
+  private usablePolicy(): AuthzPolicy | null {
+    if (!this.policy) return null;
+    const now = Date.now();
+    const maxStale = this.options.maxStaleMs ?? Math.max(5 * this.refreshMs, 60_000);
+    if (now >= this.expiresAt || now - this.fetchedAt > maxStale) return null;
+    return this.policy;
+  }
+
+  private async ensurePolicy(): Promise<AuthzPolicy | null> {
+    if (!this.usablePolicy()) {
+      // Nothing trustworthy to answer from: wait for a verified snapshot,
+      // and ask the API if none comes.
+      await this.refresh().catch(() => {});
+      return this.usablePolicy();
+    }
+    if (Date.now() - this.fetchedAt >= this.refreshMs) void this.refresh().catch(() => {});
+    return this.usablePolicy();
   }
 
   private async rolesFor(userId: UniqueIdentifier): Promise<string[] | null> {
@@ -76,10 +106,10 @@ export class ScuteLocalAuthz {
     /** The user's attributes for conditions. */
     user?: Record<string, unknown>;
   }): Promise<LocalDecision | AuthzDecision | null> {
-    await this.ensurePolicy();
-    const roles = await this.rolesFor(params.userId);
-    if (this.policy && roles) {
-      const local = decideLocally(this.policy, {
+    const policy = await this.ensurePolicy();
+    const roles = policy ? await this.rolesFor(params.userId) : null;
+    if (policy && roles) {
+      const local = decideLocally(policy, {
         roles,
         user: params.user,
         action: params.action,
