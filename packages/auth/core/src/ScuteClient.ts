@@ -1710,6 +1710,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       await this.webauthnInitializeRegister(accessToken);
 
     if (initializeError) return { data: null, error: initializeError };
+    if (!data?.options) {
+      // An answer without registration options can't start a ceremony.
+      const error = new TechnicalError();
+      this._reportClientError(error, "webauthn-register-options");
+      return { data: null, error };
+    }
 
     return this.webauthnFinalizeRegister(
       {
