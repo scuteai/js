@@ -32,8 +32,11 @@ export function fakeScute(
     const secret = auth === "Bearer sk_test";
     const task = auth?.startsWith("Bearer sct_");
 
+    // Like the API: app endpoints take the secret key, agent endpoints a task token.
+    if (path.startsWith("/v1/apps/") && !secret) return json({ error: "Unauthorized" }, 401);
+    if (path.startsWith("/v1/auth/app1/agent/") && !task) return json({ error: "Task token missing" }, 401);
+
     if (method === "POST" && path === "/v1/apps/app1/authz/agents/support-bot/tasks") {
-      if (!secret) return json({ error: "Unauthorized" }, 401);
       tasks += 1;
       return json(
         {
@@ -50,18 +53,15 @@ export function fakeScute(
     }
     if (method === "POST" && /\/tasks\/[^/]+\/(complete|revoke)$/.test(path)) return json({ status: "done" });
     if (method === "GET" && path === "/v1/auth/app1/agent/properties/stripe") {
-      if (!task) return json({ error: "Task token missing" }, 401);
       return json({ name: "stripe", value: "sk_live_123" });
     }
     if (method === "GET" && path === "/v1/auth/app1/agent/properties/locked") {
       return json({ error: "support-bot isn't allowed to use locked.", error_code: "agent_not_listed" }, 403);
     }
     if (method === "POST" && path === "/v1/auth/app1/agent/properties/mandates/sign") {
-      if (!task) return json({ error: "Task token missing" }, 401);
       return json(body.claims ? { jws: "h.b.s", alg: "ES256", kid: "prop_1" } : { signature: "c2ln", alg: "ES256", kid: "prop_1" });
     }
     if (method === "GET" && path === "/v1/auth/app1/agent/whoami") {
-      if (!task) return json({ error: "Task token missing" }, 401);
       return json({
         agent: "support-bot",
         task: "task1",
@@ -78,19 +78,18 @@ export function fakeScute(
       });
     }
     if (method === "POST" && path === "/v1/auth/app1/agent/check") {
-      if (!task) return json({ error: "Task token missing" }, 401);
       const d = options.decide?.(body, seen) ?? { decision: "allow" };
       const decision = d.decision ?? "allow";
       return json({ allowed: decision === "allow", reason: decision === "allow" ? "role_grant" : "no", ...d });
     }
     if (method === "POST" && path === "/v1/auth/app1/agent/sessions") return json({ id: "sess1", task_id: "task1", verified: false }, 201);
+    if (method === "POST" && path === "/v1/auth/app1/agent/sessions/sess1/end") return json({ id: "sess1", task_id: "task1", verified: false });
     if (method === "POST" && path === "/v1/auth/app1/agent/sessions/sess1/verified") {
       return body.challenge === "ch_ok"
         ? json({ id: "sess1", verified: true })
         : json({ error: "That challenge doesn't verify this person", error_code: "challenge_invalid" }, 422);
     }
     if (method === "POST" && path === "/v1/auth/app1/agent/verifications") {
-      if (!task) return json({ error: "Task token missing" }, 401);
       return json({ token: "ch_ok", status: "pending", method: body.method, expires_at: "", say: "I've emailed a code to a***@example.com. What's the code?" }, 201);
     }
     if (method === "GET" && path === "/v1/auth/app1/agent/verifications/ch_ok") {
@@ -105,11 +104,9 @@ export function fakeScute(
       return json({ token: "ch_ok", status: "pending", method: "email_otp", remaining_attempts: 2, error: "Invalid code", say: "That code didn't work. Want to try again?" }, 422);
     }
     if (method === "POST" && path === "/v1/auth/app1/agent/approvals") {
-      if (!task) return json({ error: "Task token missing" }, 401);
       return json({ id: "req1", status: state.requestStatus, say: "I've asked for approval. I'll let you know when there's an answer." }, 201);
     }
     if (method === "POST" && path === "/v1/auth/app1/agent/plans") {
-      if (!task) return json({ error: "Task token missing" }, 401);
       const steps = (body.steps ?? []).map((s: any) => ({ permission: `${s.resource?.type ?? ""}:${s.action}`, needs: "approval", details: s.details }));
       return json({ id: "plan1", status: "pending", say: "I've asked for approval.", steps }, 201);
     }
