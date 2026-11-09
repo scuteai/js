@@ -342,6 +342,11 @@ describe("server-provided URLs and URL building", () => {
     expect(await client.discoverSSO("a@acme.com")).toBeNull();
   });
 
+  it("discoverSSO answers null on the uniform miss (no enumeration signal)", async () => {
+    server.on("GET", "/v1/auth/saml/discover", { status: 404, body: { error: "not found" } });
+    expect(await nodeClient().discoverSSO("a@unknown.com")).toBeNull();
+  });
+
   it("an https login URL is passed through unchanged", async () => {
     const loginUrl = `${BASE_URL}${AUTH_PREFIX}/saml/login`;
     ssoRequired(loginUrl);

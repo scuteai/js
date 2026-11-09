@@ -12,46 +12,25 @@
  */
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { createServer } from "./harness";
+import { createServer, FakeBroadcastChannel, installBrowser } from "./harness";
 
-// Polyfill enough of the browser surface to make `isBrowser()` return true
-// and let `new BroadcastChannel(name)` work. We do this BEFORE importing
-// the SDK so the module sees the polyfilled globals at evaluation time.
-// `vi.resetModules()` clears the static per-appId instance map between
-// tests by forcing a fresh module load.
+// The shared browser stub (vi.stubGlobal, undone in afterEach) makes
+// `isBrowser()` true and records BroadcastChannels. `vi.resetModules()`
+// clears the static per-appId instance map between tests by forcing a
+// fresh module load, so the SDK is imported inside each test.
 beforeEach(() => {
   vi.resetModules();
   // Stubbed fetch keeps the suite offline (the app data request gets a 404).
   createServer({ appData: null });
-  (globalThis as any).window = globalThis;
-  (globalThis as any).document = { createElement: () => ({}) };
-  (globalThis as any).localStorage = new Map<string, string>();
-  // Minimal BroadcastChannel stub — records the channel name it was
-  // constructed with so we can assert per-app scoping.
-  class FakeBroadcastChannel {
-    name: string;
-    static instances: string[] = [];
-    constructor(name: string) {
-      this.name = name;
-      FakeBroadcastChannel.instances.push(name);
-    }
-    addEventListener() {}
-    removeEventListener() {}
-    postMessage() {}
-    close() {}
-  }
-  (globalThis as any).BroadcastChannel = FakeBroadcastChannel;
-  (FakeBroadcastChannel as any).instances = [];
+  installBrowser();
 });
 
 afterEach(() => {
-  delete (globalThis as any).window;
-  delete (globalThis as any).document;
-  delete (globalThis as any).localStorage;
-  delete (globalThis as any).BroadcastChannel;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+
+const channelNames = () => FakeBroadcastChannel.instances.map((c) => c.name);
 
 describe("ScuteClient multi-instance warning", () => {
   it("does not warn for different appIds in the same context", async () => {
@@ -92,22 +71,20 @@ describe("ScuteClient multi-instance warning", () => {
 
 describe("ScuteClient BroadcastChannel scoping", () => {
   it("opens a channel named sct_broadcast__<appId> per client", async () => {
-    const FakeBC = (globalThis as any).BroadcastChannel;
     const { createClient } = await import("../ScuteClient");
 
     createClient({ appId: "app_alpha", preferences: { fingerprinting: false } });
-    expect(FakeBC.instances).toContain("sct_broadcast__app_alpha");
+    expect(channelNames()).toContain("sct_broadcast__app_alpha");
   });
 
   it("two clients with different appIds get different channels (no cross-talk)", async () => {
-    const FakeBC = (globalThis as any).BroadcastChannel;
     const { createClient } = await import("../ScuteClient");
 
     createClient({ appId: "app_A", preferences: { fingerprinting: false } });
     createClient({ appId: "app_B", preferences: { fingerprinting: false } });
 
-    expect(FakeBC.instances).toContain("sct_broadcast__app_A");
-    expect(FakeBC.instances).toContain("sct_broadcast__app_B");
-    expect(new Set(FakeBC.instances).size).toBe(FakeBC.instances.length);
+    expect(channelNames()).toContain("sct_broadcast__app_A");
+    expect(channelNames()).toContain("sct_broadcast__app_B");
+    expect(new Set(channelNames()).size).toBe(channelNames().length);
   });
 });

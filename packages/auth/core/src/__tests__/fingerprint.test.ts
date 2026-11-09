@@ -20,43 +20,52 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// Fake timers throughout: the waits are FINGERPRINT_WAIT_MS (2s) timers in
+// the client, advanced explicitly, never real sleeps or wall-clock bounds.
+const FINGERPRINT_WAIT_MS = 2000;
+
+const setup = (method: string, path: string) => {
+  vi.useFakeTimers();
+  installBrowser({ href: "https://app.test/" });
+  const server = createServer({});
+  server.on(method, `${AUTH_PREFIX}${path}`, { body: {} });
+  const client = createClient({ appId: APP_ID, baseUrl: BASE_URL, preferences: { ...quietPreferences, fingerprinting: true } });
+  return { server, client: client as any };
+};
+
 describe("X-Fingerprint", () => {
   it("a request sent while the fingerprint loads waits for it and carries it", async () => {
-    installBrowser({ href: "https://app.test/" });
-    const server = createServer({});
-    server.on("PATCH", `${AUTH_PREFIX}/magic_links/authenticate`, { status: 404, body: { error: "x" } });
-    const client = createClient({ appId: APP_ID, baseUrl: BASE_URL, preferences: { ...quietPreferences, fingerprinting: true } });
+    const { server, client } = setup("PATCH", "/magic_links/authenticate");
 
-    const request = (client as any).patch("/magic_links/authenticate", { token: "t" });
-    await new Promise((r) => setTimeout(r, 50));
+    const request = client.patch("/magic_links/authenticate", { token: "t" });
+    await vi.advanceTimersByTimeAsync(FINGERPRINT_WAIT_MS - 1);
     expect(server.callsTo("PATCH", `${AUTH_PREFIX}/magic_links/authenticate`)).toHaveLength(0);
 
     resolveVisitor("visitor-1");
+    await vi.advanceTimersByTimeAsync(0);
     await request;
     const [call] = server.callsTo("PATCH", `${AUTH_PREFIX}/magic_links/authenticate`);
     expect(call.headers["x-fingerprint"]).toBe("visitor-1");
   });
 
-  it("does not hold a request for long when the fingerprint never loads", async () => {
-    installBrowser({ href: "https://app.test/" });
-    const server = createServer({});
-    server.on("POST", `${AUTH_PREFIX}/thing`, { body: {} });
-    const client = createClient({ appId: APP_ID, baseUrl: BASE_URL, preferences: { ...quietPreferences, fingerprinting: true } });
+  it("holds a request at most FINGERPRINT_WAIT_MS when the fingerprint never loads", async () => {
+    const { server, client } = setup("POST", "/thing");
 
-    const started = Date.now();
-    await (client as any).post("/thing", {});
-    expect(Date.now() - started).toBeLessThan(3000);
+    const request = client.post("/thing", {});
+    await vi.advanceTimersByTimeAsync(FINGERPRINT_WAIT_MS - 1);
+    expect(server.callsTo("POST", `${AUTH_PREFIX}/thing`)).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await request;
     const [call] = server.callsTo("POST", `${AUTH_PREFIX}/thing`);
     expect(call.headers["x-fingerprint"]).toBeUndefined();
   });
 
   it("GET requests never wait", async () => {
-    installBrowser({ href: "https://app.test/" });
-    const server = createServer({});
-    server.on("GET", `${AUTH_PREFIX}/thing`, { body: {} });
-    const client = createClient({ appId: APP_ID, baseUrl: BASE_URL, preferences: { ...quietPreferences, fingerprinting: true } });
-    const started = Date.now();
-    await (client as any).get("/thing");
-    expect(Date.now() - started).toBeLessThan(500);
+    const { server, client } = setup("GET", "/thing");
+
+    // No timer is advanced: a GET that waited for the fingerprint would hang.
+    await client.get("/thing");
+    expect(server.callsTo("GET", `${AUTH_PREFIX}/thing`)).toHaveLength(1);
   });
 });
