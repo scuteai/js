@@ -107,6 +107,7 @@ export * from "./lib/types/session";
 export * from "./lib/types/config";
 export {
   AUTH_CHANGE_EVENTS,
+  SESSION_EVENTS,
   SCUTE_MAGIC_PARAM,
   SCUTE_SKIP_PARAM,
   SCUTE_ID_VERIFICATION_PARAM,

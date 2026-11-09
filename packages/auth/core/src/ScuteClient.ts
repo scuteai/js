@@ -16,6 +16,7 @@ import {
   AUTH_CHANGE_EVENTS,
   type InternalEvent,
   INTERNAL_EVENTS,
+  SESSION_EVENTS,
   SCUTE_MAGIC_PARAM,
   SCUTE_SKIP_PARAM,
   SCUTE_OAUTH_PKCE_PARAM,
@@ -520,16 +521,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       user: T extends AuthenticatedSession ? ScuteUserData : null
     ) => void
   ) {
-    const sessionEvents: AuthChangeEvent[] = [
-      AUTH_CHANGE_EVENTS.INITIAL_SESSION,
-      AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
-      AUTH_CHANGE_EVENTS.SESSION_REFETCH,
-      AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
-      AUTH_CHANGE_EVENTS.SIGNED_IN,
-      AUTH_CHANGE_EVENTS.SIGNED_OUT,
-      AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
-      AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
-    ];
+    const sessionEvents = SESSION_EVENTS;
 
     let unsubscribed = false;
 
@@ -1285,6 +1277,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param token - Challenge token
    */
   async cancelChallenge(token: string) {
+    const result = await this._cancelChallengeRequest(token);
+    // The sign-in's pending MFA challenge is over once it is cancelled.
+    if (!result.error && this._pendingMfaChallenge?.mfa_challenge?.token === token) {
+      this._pendingMfaChallenge = null;
+    }
+    return result;
+  }
+
+  /** @internal */
+  private async _cancelChallengeRequest(token: string) {
     return this.delete(`/challenges/${encodeURIComponent(token)}`);
   }
 
@@ -1295,8 +1297,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param method - New MFA method (e.g., "totp", "email_otp", "sms_otp", "backup_code")
    */
   async switchMfaMethod(currentToken: string, method: string) {
-    // Cancel existing challenge
-    await this.cancelChallenge(currentToken);
+    // Cancel existing challenge (the pending sign-in stays: a new challenge
+    // replaces it below)
+    await this._cancelChallengeRequest(currentToken);
 
     // Create new challenge with the different method
     const appUserId = this._pendingMfaChallenge?.app_user_id;

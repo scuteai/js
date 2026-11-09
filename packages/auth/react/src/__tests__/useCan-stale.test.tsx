@@ -24,6 +24,9 @@ describe("useCan", () => {
     await waitFor(() => expect(can).toHaveBeenCalledTimes(2));
 
     expect({ loading: result.current.loading, allowed: result.current.allowed }).toEqual({ loading: true, allowed: false });
-    pending.resolve({ data: { decision: "deny", allowed: false, reason: "no_role_grants_permission" }, error: null });
+    await act(async () => {
+      pending.resolve({ data: { decision: "deny", allowed: false, reason: "no_role_grants_permission" }, error: null });
+    });
+    expect({ loading: result.current.loading, allowed: result.current.allowed }).toEqual({ loading: false, allowed: false });
   });
 });

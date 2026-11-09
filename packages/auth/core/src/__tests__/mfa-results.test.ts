@@ -631,6 +631,28 @@ describe("MFA follow-up helpers", () => {
     expect(client.pendingMfaChallenge?.mfa_challenge).toEqual(next);
   });
 
+  it("cancelChallenge on the pending sign-in challenge clears it", async () => {
+    const { client } = await setup();
+    server.on("PATCH", AUTHENTICATE, { body: mfaPayload() });
+    await client.verifyMagicLinkToken(magicLinkToken());
+    server.on("DELETE", `${AUTH_PREFIX}/challenges/ch_tok`, { status: 200, body: {} });
+
+    expect((await client.cancelChallenge("ch_tok")).error).toBeNull();
+    expect(client.pendingMfaChallenge).toBeNull();
+  });
+
+  it("a failed cancelChallenge, or one for another challenge, keeps the pending one", async () => {
+    const { client } = await setup();
+    server.on("PATCH", AUTHENTICATE, { body: mfaPayload() });
+    await client.verifyMagicLinkToken(magicLinkToken());
+    server.on("DELETE", `${AUTH_PREFIX}/challenges/ch_tok`, { status: 500, body: {} });
+    server.on("DELETE", `${AUTH_PREFIX}/challenges/other`, { status: 200, body: {} });
+
+    expect((await client.cancelChallenge("ch_tok")).error).toBeTruthy();
+    await client.cancelChallenge("other");
+    expect(client.pendingMfaChallenge).not.toBeNull();
+  });
+
   it("switchMfaMethod without a pending challenge omits app_user_id", async () => {
     const { client } = await setup();
     server.on("DELETE", `${AUTH_PREFIX}/challenges/x`, { status: 200, body: {} });

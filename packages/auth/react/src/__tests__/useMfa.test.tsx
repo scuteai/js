@@ -362,6 +362,21 @@ describe("useMfaVerify", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("verify that leads to a further step is not verified yet and exposes the step", async () => {
+    const { client, result } = setup(() => useMfaVerify(), { pendingMfaChallenge: challenge });
+    // Real client shape: verifyMfaChallenge returns { data: nextStep } when
+    // the sign-in owes another step (e.g. a contact to confirm).
+    const step = { contactVerificationRequired: true, contact: { channel: "email" } };
+    client.verifyMfaChallenge.mockResolvedValue({ data: step, error: null });
+    await act(async () => {
+      await result.current.verify("246810");
+    });
+    expect(result.current.state).not.toBe("verified");
+    expect(result.current.state).toBe("idle");
+    expect(result.current.nextStep).toBe(step);
+    expect(result.current.error).toBeNull();
+  });
+
   it("verify failure stores the client error and returns the raw result", async () => {
     const { client, result } = setup(() => useMfaVerify(), { pendingMfaChallenge: challenge });
     const err = { message: "Invalid code", code: "invalid_code" };
@@ -534,6 +549,39 @@ describe("useMfaVerify", () => {
 });
 
 describe("useFactorList", () => {
+  // Loads for the signed-in user: render, then sign in.
+  function signedIn(overrides: Record<string, unknown> = {}) {
+    const out = setup(() => useFactorList(), overrides);
+    act(() => out.client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, authenticatedSession(), makeUser()));
+    return out;
+  }
+
+  it("asks nothing while signed out, and loads once signed in", async () => {
+    const { client, result } = setup(() => useFactorList());
+    expect(client.listMfaMethods).not.toHaveBeenCalled();
+    expect(result.current.factors).toEqual([]);
+    expect(result.current.loading).toBe(false);
+
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, authenticatedSession(), makeUser()));
+    await waitFor(() => expect(client.listMfaMethods).toHaveBeenCalledTimes(1));
+
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_IN, authenticatedSession("access.jwt.B"), makeUser({ id: "usr_2" })));
+    await waitFor(() => expect(client.listMfaMethods).toHaveBeenCalledTimes(2));
+  });
+
+  it("clears the list on sign-out", async () => {
+    const factorsFor = [{ ...totpEnrollment, verified: true }];
+    const { client, result } = signedIn({
+      listMfaMethods: vi.fn(async () => ({ data: { methods: factorsFor, backup_codes_available: 1, mfa_enabled: true }, error: null })),
+    });
+    await waitFor(() => expect(result.current.factors).toHaveLength(1));
+
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SIGNED_OUT, unauthenticatedSession(), null));
+    await waitFor(() => expect(result.current.factors).toEqual([]));
+    expect(result.current.mfaEnabled).toBe(false);
+    expect(client.listMfaMethods).toHaveBeenCalledTimes(1);
+  });
+
   const factors = [
     { ...totpEnrollment, verified: true, is_default: true },
     { ...totpEnrollment, id: "enr_sms_1", method: "sms", name: null, verified: true },
@@ -541,7 +589,7 @@ describe("useFactorList", () => {
 
   it("loads on mount and exposes factors, backup code count and mfaEnabled", async () => {
     const d = deferred<any>();
-    const { client, result } = setup(() => useFactorList(), {
+    const { client, result } = signedIn({
       listMfaMethods: vi.fn(() => d.promise),
     });
     expect(client.listMfaMethods).toHaveBeenCalledTimes(1);
@@ -560,7 +608,7 @@ describe("useFactorList", () => {
   });
 
   it("defaults missing fields to empty list, zero codes and disabled", async () => {
-    const { result } = setup(() => useFactorList(), {
+    const { result } = signedIn({
       listMfaMethods: vi.fn(async () => ({ data: {}, error: null })),
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -569,20 +617,24 @@ describe("useFactorList", () => {
     expect(result.current.mfaEnabled).toBe(false);
   });
 
-  it("surfaces the client error when signed out instead of an empty list", async () => {
-    // This is the shape listMfaMethods returns when getAuthToken fails.
+  it("signed out: an empty list and no error, without asking the client", async () => {
+    // As documented: signed out is an empty list, not an auth error.
     const authErr = { message: "Invalid auth token", code: 401 };
-    const { result } = setup(() => useFactorList(), {
+    const { client, result } = setup(() => useFactorList(), {
       listMfaMethods: vi.fn(async () => ({ data: null, error: authErr })),
     });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    // Known limitation, tracked separately: the JSDoc says signed-out returns an empty list with no error, but the auth error is surfaced.
-    expect(result.current.error).toBe(authErr);
+    let returned: any;
+    await act(async () => {
+      returned = await result.current.refresh();
+    });
+    expect(returned).toEqual({ data: null, error: null });
+    expect(client.listMfaMethods).not.toHaveBeenCalled();
+    expect(result.current.error).toBeNull();
     expect(result.current.factors).toEqual([]);
   });
 
   it("keeps previously loaded factors when a later refresh fails", async () => {
-    const { client, result } = setup(() => useFactorList(), {
+    const { client, result } = signedIn({
       listMfaMethods: vi.fn(async () => ({
         data: { methods: factors, backup_codes_available: 2, mfa_enabled: true },
         error: null,
@@ -601,7 +653,7 @@ describe("useFactorList", () => {
   });
 
   it("refresh with neither data nor error leaves error null", async () => {
-    const { client, result } = setup(() => useFactorList());
+    const { client, result } = signedIn();
     await waitFor(() => expect(result.current.loading).toBe(false));
     client.listMfaMethods.mockResolvedValueOnce({ data: null, error: null });
     let returned: any;
@@ -613,7 +665,7 @@ describe("useFactorList", () => {
   });
 
   it("remove calls removeMfaMethod(id) and refreshes on success", async () => {
-    const { client, result } = setup(() => useFactorList());
+    const { client, result } = signedIn();
     await waitFor(() => expect(result.current.loading).toBe(false));
     client.removeMfaMethod.mockResolvedValue({ data: {}, error: null });
     client.listMfaMethods.mockResolvedValueOnce({
@@ -636,7 +688,7 @@ describe("useFactorList", () => {
   });
 
   it("remove failure returns the error and skips the refresh", async () => {
-    const { client, result } = setup(() => useFactorList());
+    const { client, result } = signedIn();
     await waitFor(() => expect(result.current.loading).toBe(false));
     const err = { message: "Cannot remove last factor" };
     client.removeMfaMethod.mockResolvedValue({ data: null, error: err });
@@ -651,7 +703,7 @@ describe("useFactorList", () => {
   });
 
   it("setDefault calls setDefaultMfaMethod(id) and refreshes on success", async () => {
-    const { client, result } = setup(() => useFactorList());
+    const { client, result } = signedIn();
     await waitFor(() => expect(result.current.loading).toBe(false));
     client.setDefaultMfaMethod.mockResolvedValue({ data: {}, error: null });
     await act(async () => {
@@ -662,7 +714,7 @@ describe("useFactorList", () => {
   });
 
   it("setDefault failure returns the error and skips the refresh", async () => {
-    const { client, result } = setup(() => useFactorList());
+    const { client, result } = signedIn();
     await waitFor(() => expect(result.current.loading).toBe(false));
     const err = { message: "Not verified" };
     client.setDefaultMfaMethod.mockResolvedValue({ data: null, error: err });
@@ -676,7 +728,7 @@ describe("useFactorList", () => {
 
   it("a refresh that resolves after unmount returns an empty result", async () => {
     const d = deferred<any>();
-    const { result, unmount } = setup(() => useFactorList(), {
+    const { result, unmount } = signedIn({
       listMfaMethods: vi.fn(() => d.promise),
     });
     const pending = result.current.refresh();
