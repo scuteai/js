@@ -715,6 +715,34 @@ describe("sign out", () => {
       issued[0].access
     );
   });
+
+  it("when the pre-signout refresh fails transiently, still revokes with the stored token", async () => {
+    server.on("POST", REFRESH, { status: 500, body: {} });
+    const stale = accessToken({ expiresIn: 5 });
+    seedSession(storage, { access: stale, refresh: refreshToken() });
+    server.on("DELETE", CURRENT_USER, { status: 200, body: {} });
+
+    expect(await newClient().signOut()).toBe(true);
+    expect(server.callsTo("DELETE", CURRENT_USER)[0].headers["x-authorization"]).toBe(stale);
+    expect(storage.snapshot()).toEqual({});
+  });
+
+  it("reports false when the server could not be told (refresh and revoke both fail)", async () => {
+    server.on("POST", REFRESH, { status: 500, body: {} });
+    server.on("DELETE", CURRENT_USER, { status: 500, body: {} });
+    seedSession(storage, { access: accessToken({ expiresIn: 5 }), refresh: refreshToken() });
+
+    expect(await newClient().signOut()).toBe(false);
+    expect(storage.snapshot()).toEqual({});
+  });
+
+  it("a rejected refresh (401) needs no revoke: the session is already dead", async () => {
+    server.on("POST", REFRESH, { status: 401, body: {} });
+    seedSession(storage, { access: accessToken({ expiresIn: 5 }), refresh: refreshToken() });
+
+    expect(await newClient().signOut()).toBe(true);
+    expect(server.callsTo("DELETE", CURRENT_USER)).toHaveLength(0);
+  });
 });
 
 describe("onAuthStateChange", () => {

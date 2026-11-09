@@ -1849,15 +1849,22 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @returns true if the refresh token is revoked successfully.
    */
   async signOut(): Promise<boolean> {
-    const { data } = await this._getSession();
+    const stored = await this.initialSessionState();
+    const { data, error } = await this._getSession();
 
     this.emitAuthChangeEvent(
       AUTH_CHANGE_EVENTS.SIGNED_OUT,
       sessionUnAuthenticatedState()
     );
 
-    const session = data.session;
-    return this._signOut(session?.access);
+    // A transient failure of the pre-signout refresh (network, 5xx) leaves
+    // no confirmed session, but the stored one may still be live: revoke
+    // with it, so the result says whether the server really ended it.
+    let access = data.session?.access ?? null;
+    if (!access && error && stored.access && !this._isSessionRejected(error)) {
+      access = stored.access;
+    }
+    return this._signOut(access);
   }
 
   // ── Signing in as a user (support access, RB-49) ──

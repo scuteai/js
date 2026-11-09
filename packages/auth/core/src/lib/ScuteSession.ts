@@ -814,6 +814,15 @@ export abstract class ScuteSession {
   }
 
   /**
+   * Whether `error` means the server rejected the session (vs a transient
+   * failure).
+   * @internal
+   */
+  protected _isSessionRejected(error: unknown) {
+    return isSessionRejected(error);
+  }
+
+  /**
    * Handle refetch session (getCurrentUser) error
    * @internal
    */
