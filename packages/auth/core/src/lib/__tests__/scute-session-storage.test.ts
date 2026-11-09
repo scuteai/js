@@ -21,6 +21,10 @@ import { ScuteSession } from "../ScuteSession";
 import type { ScuteStorage } from "../ScuteStorage";
 import { scopedKey, legacyKey } from "../storage-keys";
 
+/** An unsigned JWT-shaped legacy token naming `aud` (the SDK never verifies). */
+const legacyToken = (aud?: string) =>
+  `e30.${Buffer.from(JSON.stringify({ uuid: "u", exp: 9e9, ...(aud ? { aud } : {}) })).toString("base64url")}.sig`;
+
 class TestStorage implements ScuteStorage {
   private map = new Map<string, string>();
   async getItem(key: string): Promise<string | null> {
@@ -95,16 +99,31 @@ describe("ScuteSession storage namespacing", () => {
     expect(await sessionA.pubRead("access")).toBe("tok_A");
   });
 
-  it("legacy-read-through: namespaced miss falls back to legacy AND migrates forward", async () => {
-    storage.seed(legacyKey("access"), "legacy_token");
+  it("legacy-read-through: namespaced miss falls back to this app's legacy token AND migrates forward", async () => {
+    const token = legacyToken("app_A");
+    storage.seed(legacyKey("access"), token);
 
     const value = await sessionA.pubRead("access");
-    expect(value).toBe("legacy_token");
+    expect(value).toBe(token);
 
     // Forward-migrated into namespaced
-    expect(await storage.getItem(scopedKey("access", "app_A"))).toBe("legacy_token");
-    // Legacy left intact during v0.7 grace window (older tabs may still need it)
-    expect(await storage.getItem(legacyKey("access"))).toBe("legacy_token");
+    expect(await storage.getItem(scopedKey("access", "app_A"))).toBe(token);
+    // Legacy left intact during the grace window (older tabs may still need it)
+    expect(await storage.getItem(legacyKey("access"))).toBe(token);
+  });
+
+  it("a legacy token that names no app, or another app, is not read or migrated", async () => {
+    for (const token of [legacyToken(), legacyToken("app_B"), "legacy_token"]) {
+      storage.seed(legacyKey("access"), token);
+      expect(await sessionA.pubRead("access")).toBeNull();
+      expect(await storage.getItem(scopedKey("access", "app_A"))).toBeNull();
+    }
+  });
+
+  it("non-token kinds (remembered identifier) still migrate", async () => {
+    storage.seed(legacyKey("lastLogin"), "ada@example.com");
+    expect(await sessionA.pubRead("lastLogin")).toBe("ada@example.com");
+    expect(await storage.getItem(scopedKey("lastLogin", "app_A"))).toBe("ada@example.com");
   });
 
   it("when both slots are populated, namespaced wins (no clobber by legacy)", async () => {
@@ -115,14 +134,24 @@ describe("ScuteSession storage namespacing", () => {
     expect(value).toBe("new_token");
   });
 
-  it("sign-out clears BOTH namespaced and legacy for the same kind", async () => {
-    storage.seed(legacyKey("access"), "legacy_token");
+  it("sign-out clears BOTH namespaced and this app's legacy token for the same kind", async () => {
+    storage.seed(legacyKey("access"), legacyToken("app_A"));
     await sessionA.pubWrite("access", "new_token");
 
     await sessionA.pubRemove("access");
 
     expect(await storage.getItem(scopedKey("access", "app_A"))).toBeNull();
     expect(await storage.getItem(legacyKey("access"))).toBeNull();
+  });
+
+  it("sign-out on app A leaves a legacy token it can't attribute to itself", async () => {
+    const shared = legacyToken();
+    storage.seed(legacyKey("access"), shared);
+    await sessionA.pubWrite("access", "new_token");
+
+    await sessionA.pubRemove("access");
+
+    expect(await storage.getItem(legacyKey("access"))).toBe(shared);
   });
 
   it("sign-out on app A does not touch app B's namespaced keys", async () => {
@@ -137,14 +166,14 @@ describe("ScuteSession storage namespacing", () => {
     expect(await sessionB.pubRead("access")).toBe("tok_B");
   });
 
-  it("read on app B does not migrate the legacy key into app A's slot", async () => {
+  it("read on app B does not migrate an unattributable legacy token into any app's slot", async () => {
     storage.seed(legacyKey("access"), "shared_legacy");
     const sessionB = new HarnessSession("app_B", storage);
 
     await sessionB.pubRead("access");
 
-    // The legacy value got copied into app_B's namespaced slot, NOT app_A's.
-    expect(await storage.getItem(scopedKey("access", "app_B"))).toBe("shared_legacy");
+    // Whichever app reads first must not take a token it can't attribute.
+    expect(await storage.getItem(scopedKey("access", "app_B"))).toBeNull();
     expect(await storage.getItem(scopedKey("access", "app_A"))).toBeNull();
   });
 

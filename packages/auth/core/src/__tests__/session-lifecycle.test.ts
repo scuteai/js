@@ -275,7 +275,8 @@ describe("refresh: failures", () => {
 
     expect(server.callsTo("POST", REFRESH)).toHaveLength(1);
     expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(0);
-    expect(storage.snapshot()).toEqual({});
+    // The unattributable legacy slot may be another app's: left alone.
+    expect(storage.snapshot()).toEqual({ [KEYS.legacyAccess]: "legacy_access" });
     expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SESSION_EXPIRED]);
     expect(rec.events[0].session).toEqual({
       access: null,
@@ -682,7 +683,8 @@ describe("sign out", () => {
   it("emits SIGNED_OUT, wipes namespaced and legacy tokens and DELETEs /current_user with the access token", async () => {
     const access = accessToken();
     seedSession(storage, { access, refresh: refreshToken() });
-    storage.seed(KEYS.legacyRefresh, "legacy_refresh");
+    // A legacy token that names this app is this app's to clear.
+    storage.seed(KEYS.legacyRefresh, refreshToken({ aud: APP_ID }));
     server.on("DELETE", CURRENT_USER, { status: 200, body: {} });
     const client = newClient();
     const rec = recordEvents(client);

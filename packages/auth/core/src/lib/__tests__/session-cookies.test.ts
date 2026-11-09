@@ -192,12 +192,12 @@ describe("cookies written on sign in (browser)", () => {
 });
 
 describe("cookie removal", () => {
-  it("sign out deletes namespaced and legacy access/refresh cookies with maxAge 0", async () => {
+  it("sign out deletes namespaced and this app's legacy access/refresh cookies with maxAge 0", async () => {
     const storage = new RecordingCookieStorage();
     storage.jar.set(KEYS.access, accessToken());
     storage.jar.set(KEYS.refresh, refreshToken());
-    storage.jar.set(KEYS.legacyAccess, "legacy_a");
-    storage.jar.set(KEYS.legacyRefresh, "legacy_r");
+    storage.jar.set(KEYS.legacyAccess, accessToken({ aud: APP_ID }));
+    storage.jar.set(KEYS.legacyRefresh, refreshToken({ app_id: APP_ID }));
     server.on("DELETE", `${AUTH_PREFIX}/current_user`, { status: 200, body: {} });
 
     await newClient(storage).signOut();
@@ -221,6 +221,21 @@ describe("cookie removal", () => {
       maxAge: 0,
     });
     expect(storage.jar.size).toBe(0);
+  });
+
+  it("sign out leaves legacy cookies that don't name this app (another app's session)", async () => {
+    const storage = new RecordingCookieStorage();
+    const otherAccess = accessToken({ aud: "app_other" });
+    storage.jar.set(KEYS.access, accessToken());
+    storage.jar.set(KEYS.legacyAccess, otherAccess);
+    storage.jar.set(KEYS.legacyRefresh, "legacy_r");
+    server.on("DELETE", `${AUTH_PREFIX}/current_user`, { status: 200, body: {} });
+
+    await newClient(storage).signOut();
+
+    expect(storage.jar.get(KEYS.legacyAccess)).toBe(otherAccess);
+    expect(storage.jar.get(KEYS.legacyRefresh)).toBe("legacy_r");
+    expect(storage.jar.has(KEYS.access)).toBe(false);
   });
 
   it("sign out keeps the last-login and credential cookies", async () => {
@@ -253,9 +268,9 @@ describe("cookie removal", () => {
 });
 
 describe("legacy key migration on read", () => {
-  it("copies a legacy access cookie into the namespaced slot without an expiry", async () => {
+  it("copies a legacy access cookie that names this app into the namespaced slot without an expiry", async () => {
     const storage = new RecordingCookieStorage();
-    const legacy = accessToken();
+    const legacy = accessToken({ aud: APP_ID });
     storage.jar.set(KEYS.legacyAccess, legacy);
 
     const { data } = await newClient(storage).getAuthToken();
@@ -272,9 +287,21 @@ describe("legacy key migration on read", () => {
     expect(storage.jar.get(KEYS.legacyAccess)).toBe(legacy);
   });
 
+  it("never takes a legacy access cookie that doesn't name this app", async () => {
+    for (const legacy of [accessToken(), accessToken({ aud: "app_other" }), "not-a-jwt"]) {
+      const storage = new RecordingCookieStorage();
+      storage.jar.set(KEYS.legacyAccess, legacy);
+
+      const { data } = await newClient(storage).getAuthToken();
+      expect(data).toBeNull();
+      expect(storage.writeFor(KEYS.access)).toEqual([]);
+      expect(storage.jar.get(KEYS.legacyAccess)).toBe(legacy);
+    }
+  });
+
   it("a failing migration write does not break the read", async () => {
     const storage = new RecordingCookieStorage();
-    const legacy = accessToken();
+    const legacy = accessToken({ aud: APP_ID });
     storage.jar.set(KEYS.legacyAccess, legacy);
     storage.failWrites = true;
 
