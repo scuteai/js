@@ -302,9 +302,9 @@ describe("URL builders and redirects", () => {
     expect(client.getMagicLinkToken(new URL("https://app.test/?x=1"))).toBeNull();
   });
 
-  it("getMagicLinkToken defaults to window.location.href and throws without a window", () => {
+  it("getMagicLinkToken defaults to window.location.href, and is null without a window", () => {
     const client = newClient();
-    expect(() => client.getMagicLinkToken()).toThrow(ReferenceError);
+    expect(client.getMagicLinkToken()).toBeNull();
     installBrowser({ href: "https://app.test/cb?sct_magic=from_window" });
     expect(client.getMagicLinkToken()).toBe("from_window");
   });

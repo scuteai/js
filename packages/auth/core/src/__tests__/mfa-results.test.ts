@@ -227,29 +227,41 @@ describe("verifyMagicLinkToken", () => {
     expect((error as BaseHttpError).code).toBe(404);
   });
 
-  // Known limitation, tracked separately: on the sct_sk path the sign-in
-  // result is ignored, so a failed sign in still returns success.
-  it("reports success on the sct_sk path even when the sign in itself failed", async () => {
+  // On the sct_sk path the sign-in result is checked: a failed sign in is
+  // returned as the error, never as success.
+  it("returns the sign-in error on the sct_sk path when the sign in itself failed", async () => {
     const { client, rec } = await setup({ href: "https://app.test/cb?sct_sk=true" });
     server.on("PATCH", AUTHENTICATE, { body: tokenPair() });
     server.on("GET", CURRENT_USER, { status: 500, body: {} });
 
     const { data, error } = await client.verifyMagicLinkToken(magicLinkToken());
-    expect(error).toBeNull();
-    expect(data).toHaveProperty("authPayload");
+    expect(error).toBeInstanceOf(UnknownSignInError);
+    expect(data).toBeNull();
     expect(localStorage.getItem(KEYS.access)).toBeNull();
     expect(rec.names()).not.toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
   });
 
-  // Known limitation, tracked separately: verifyMagicLink(url) reads the
-  // token from `url` but sct_sk/sct_oauth from window.location.
-  it("verifyMagicLink(url) reads sct_sk from window.location, not from the given url", async () => {
+  // verifyMagicLink(url) reads the token and sct_sk/sct_oauth from the
+  // same url.
+  it("verifyMagicLink(url) reads sct_sk from the given url, not window.location", async () => {
     const { client, rec } = await setup({ href: "https://app.test/elsewhere" });
-    server.on("PATCH", AUTHENTICATE, { body: tokenPair() });
+    const pair = tokenPair();
+    server.on("PATCH", AUTHENTICATE, { body: pair });
 
-    await client.verifyMagicLink(
+    const { data, error } = await client.verifyMagicLink(
       `https://app.test/cb?sct_magic=${magicLinkToken()}&sct_sk=true`
     );
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ signedIn: true });
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN]);
+    expect(localStorage.getItem(KEYS.access)).toBe(pair.access);
+  });
+
+  it("verifyMagicLink(url) without sct_sk in the url does not sign in, whatever window.location says", async () => {
+    const { client, rec } = await setup({ href: "https://app.test/cb?sct_sk=true" });
+    server.on("PATCH", AUTHENTICATE, { body: tokenPair() });
+
+    await client.verifyMagicLink(`https://app.test/cb?sct_magic=${magicLinkToken()}`);
     expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.MAGIC_VERIFIED]);
     expect(localStorage.getItem(KEYS.access)).toBeNull();
   });
@@ -288,15 +300,26 @@ describe("signInWithMagicLinkToken", () => {
     expect(result.error).toBeInstanceOf(InvalidMagicLinkError);
   });
 
-  // Known limitation, tracked separately: with sct_sk=true in the URL,
-  // signInWithMagicLinkToken signs in twice (two SIGNED_IN events).
-  it("signs in twice when the URL carries sct_sk=true", async () => {
+  // With sct_sk=true in the URL verification already signs in, so
+  // signInWithMagicLinkToken signs in exactly once.
+  it("signs in once when the URL carries sct_sk=true", async () => {
     const { client, rec } = await setup({ href: "https://app.test/cb?sct_sk=true" });
     server.on("PATCH", AUTHENTICATE, { body: tokenPair() });
 
-    await client.signInWithMagicLinkToken(magicLinkToken());
-    expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(2);
-    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN, AUTH_CHANGE_EVENTS.SIGNED_IN]);
+    expect(await client.signInWithMagicLinkToken(magicLinkToken())).toStrictEqual({ error: null });
+    expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(1);
+    expect(rec.names()).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN]);
+  });
+
+  it("returns the sign-in error once when the sct_sk sign in fails", async () => {
+    const { client, rec } = await setup({ href: "https://app.test/cb?sct_sk=true" });
+    server.on("PATCH", AUTHENTICATE, { body: tokenPair() });
+    server.on("GET", CURRENT_USER, { status: 500, body: {} });
+
+    const result = await client.signInWithMagicLinkToken(magicLinkToken());
+    expect(result.error).toBeInstanceOf(UnknownSignInError);
+    expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(1);
+    expect(rec.names()).not.toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
   });
 
   it("signInWithMagicLink(url) without a token returns InvalidMagicLinkError", async () => {

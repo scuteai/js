@@ -594,10 +594,17 @@ describe("side effects of client-side error handling", () => {
     expect(storage.map.get(KEYS.refresh)).toBe(tokens.refresh);
   });
 
-  // Known limitation, tracked separately: verifyMagicLinkToken reads
-  // window.location for sct_sk, so it throws outside a browser.
-  it("verifyMagicLinkToken throws outside a browser", async () => {
+  // Outside a browser there is no window.location to read sct_sk from:
+  // verification works and nothing is signed in unless the url says so.
+  it("verifyMagicLinkToken works outside a browser", async () => {
     const client = nodeClient();
-    await expect(client.verifyMagicLinkToken(magicLinkToken())).rejects.toThrow(ReferenceError);
+    server.on("PATCH", `${AUTH_PREFIX}/magic_links/authenticate`, {
+      body: { access: accessToken(), refresh: refreshToken(), access_expires_at: "x", refresh_expires_at: "y" },
+    });
+    const { data, error } = await client.verifyMagicLinkToken(magicLinkToken());
+    expect(error).toBeNull();
+    expect(data).toHaveProperty("authPayload");
+    expect(data).not.toHaveProperty("signedIn");
+    expect(client.getMagicLinkToken()).toBeNull();
   });
 });
