@@ -496,9 +496,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     );
 
     this.channel.onmessage = (msg) => {
-      if (msg.data.type === INTERNAL_EVENTS.AUTH_STATE_CHANGED) {
+      if (msg.data?.type === INTERNAL_EVENTS.AUTH_STATE_CHANGED) {
+        // Only the event name is trusted from another tab. The session and
+        // user are read again here (storage + server check), never taken
+        // from the message.
         this.emitter.emit(INTERNAL_EVENTS.AUTH_STATE_CHANGED, {
-          ...msg.data.payload,
+          event: msg.data.payload?.event,
           // prevent infinite loop
           _broadcasted: true,
         });
@@ -2865,9 +2868,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     session?: Session | null,
     user?: ScuteUserData | null
   ) {
+    // The refresh token never leaves the session layer: listeners and the
+    // cross-tab channel get the session without it.
+    const shared = session && "refresh" in session && session.refresh
+      ? ({ ...session, refresh: undefined } as Session)
+      : session;
     this.emitter.emit(INTERNAL_EVENTS.AUTH_STATE_CHANGED, {
       event,
-      session,
+      session: shared,
       user,
     });
   }

@@ -238,10 +238,10 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     expect(report.credentials).toBe("include");
   });
 
-  // Known limitation, tracked separately: SIGNED_IN events carry the full
-  // session, refresh token included, and are posted on the per-app channel.
-  it("SIGNED_IN hands the refresh token to listeners and broadcasts it to other tabs", async () => {
-    installBrowser();
+  // SIGNED_IN events carry the session without its refresh token, to
+  // listeners and on the per-app channel.
+  it("SIGNED_IN never hands the refresh token to listeners or other tabs", async () => {
+    const { localStorage } = installBrowser();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const client = browserClient();
     await ready(client);
@@ -255,15 +255,18 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     await vi.waitFor(() => expect(cb).toHaveBeenCalledTimes(2));
 
     expect(cb.mock.calls[1][0]).toBe(AUTH_CHANGE_EVENTS.SIGNED_IN);
-    expect(cb.mock.calls[1][1].refresh).toBe(refresh);
+    expect(cb.mock.calls[1][1].refresh).toBeUndefined();
+    expect(JSON.stringify(cb.mock.calls[1])).not.toContain(refresh);
     const posted = channel.posted.find((m) => m.payload.event === AUTH_CHANGE_EVENTS.SIGNED_IN);
-    expect(posted.payload.session.refresh).toBe(refresh);
+    expect(JSON.stringify(posted)).not.toContain(refresh);
     expect(posted.payload.user).toEqual(userFixture());
+    // still stored for the session layer itself
+    expect(localStorage.getItem(KEYS.refresh)).toBe(refresh);
   });
 
-  // Known limitation, tracked separately: an inbound channel message with a
-  // session and user is passed to callbacks as-is, without a server check.
-  it("an inbound cross-tab SIGNED_IN with session and user reaches callbacks without a server check", async () => {
+  // An inbound channel message only says which event happened: the session
+  // and user are read again (storage + server check), never taken from it.
+  it("an inbound cross-tab SIGNED_IN never passes the message's session or user to callbacks", async () => {
     installBrowser();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const client = browserClient();
@@ -282,8 +285,10 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     });
     await vi.waitFor(() => expect(cb).toHaveBeenCalledTimes(2));
 
-    expect(cb.mock.calls[1]).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN, remoteSession, remoteUser]);
-    expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(userCalls);
+    expect(cb.mock.calls[1][0]).toBe(AUTH_CHANGE_EVENTS.SIGNED_IN);
+    expect(cb.mock.calls[1][1]).not.toMatchObject({ access: "remote_access" });
+    expect(cb.mock.calls[1][2]).not.toEqual(remoteUser);
+    expect(cb.mock.calls[1][1].status).toBe("unauthenticated"); // nothing stored in this tab
   });
 
   // By design: the core never removes sct_magic /
