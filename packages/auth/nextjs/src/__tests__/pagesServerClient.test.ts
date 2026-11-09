@@ -8,6 +8,8 @@ import {
   createUpstream,
   lastCookie,
   makeAccess,
+  makeLegacyRefresh,
+  makeLegacyAccess,
   makeRefresh,
   settle,
   type Upstream,
@@ -92,7 +94,12 @@ describe("createPagesServerClient storage", () => {
   });
 
   it("removeSession leaves exactly one deletion per cookie name", async () => {
-    const { client, res } = create({ [ACCESS_KEY]: makeAccess(), [REFRESH_KEY]: makeRefresh() });
+    const { client, res } = create({
+      [ACCESS_KEY]: makeAccess(),
+      [REFRESH_KEY]: makeRefresh(),
+      "sc-access-token": makeLegacyAccess(),
+      "sc-refresh-token": makeLegacyRefresh(),
+    });
     await client.removeSession();
     await client.removeSession();
     const names = setCookiesOf(res).map((c) => c.split("=")[0]);

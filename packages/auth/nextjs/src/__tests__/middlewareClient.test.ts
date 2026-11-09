@@ -7,6 +7,8 @@ import {
   createUpstream,
   lastCookie,
   makeAccess,
+  makeLegacyRefresh,
+  makeLegacyAccess,
   makeNextRequest,
   makeRefresh,
   parseCookies,
@@ -205,7 +207,13 @@ describe("createMiddlewareClient refresh in middleware", () => {
 
   it("refresh failure expires the session: namespaced + legacy deletions appended", async () => {
     upstream.on("POST", "/v1/auth/app-123/tokens/refresh", () => new Response("{}", { status: 401 }));
-    const { client, res } = create({ [ACCESS_KEY]: makeAccess({ expIn: -60 }), [REFRESH_KEY]: makeRefresh() });
+    const { client, res } = create({
+      [ACCESS_KEY]: makeAccess({ expIn: -60 }),
+      [REFRESH_KEY]: makeRefresh(),
+      // legacy cookies whose tokens name this app are this app's to clear
+      "sc-access-token": makeLegacyAccess(),
+      "sc-refresh-token": makeLegacyRefresh(),
+    });
     const { data } = await client.getSession();
     expect(data.user).toBeNull();
     const names = parseCookies(res.headers.getSetCookie())

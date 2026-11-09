@@ -23,6 +23,8 @@ import {
   json,
   lastCookie,
   makeAccess,
+  makeLegacyAccess,
+  makeLegacyRefresh,
   makeJwt,
   makeRefresh,
   makeRouteContext,
@@ -298,9 +300,10 @@ describe("POST /auth/sign-in", () => {
     expect(refresh.path).toBe("/");
     expect(refresh.expires).toBeInstanceOf(Date);
 
-    // only namespaced names get a value; legacy ones are only ever cleared
+    // only namespaced names get a value; legacy ones are never written
+    // (none were present, so none is cleared either)
     for (const name of [LEGACY_ACCESS_KEY, LEGACY_REFRESH_KEY]) {
-      expect(isDeletion(lastCookie(setCookies, name))).toBe(true);
+      expect(lastCookie(setCookies, name)?.value ?? "").toBe("");
     }
   });
 
@@ -353,7 +356,7 @@ describe("POST /auth/sign-in", () => {
     expect(res.status).toBe(401);
     expect(body).toBe("");
     expect(isDeletion(lastCookie(setCookies, ACCESS_KEY))).toBe(true);
-    expect(isDeletion(lastCookie(setCookies, LEGACY_ACCESS_KEY))).toBe(true);
+    expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
   });
 
   // SIGN_IN_MAX_DELAY_MS: only an access token issued in the last 30s may
@@ -444,12 +447,12 @@ describe("POST /auth/sign-in", () => {
     expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
   });
 
-  it("ignores legacy unsuffixed session cookies during sign-in and clears them", async () => {
+  it("ignores this app's legacy unsuffixed session cookies during sign-in and clears them", async () => {
     upstream.on("POST", `/v1/auth/${APP_ID}/tokens/refresh`, () => json({ error: "revoked" }, 401));
     const { res, setCookies } = await run({
       path: "/auth/sign-in",
       headers: { Authorization: `Bearer ${makeAccess()}` },
-      cookies: { [LEGACY_ACCESS_KEY]: makeAccess({ tag: "legacy" }), [LEGACY_REFRESH_KEY]: makeRefresh({ tag: "legacy" }) },
+      cookies: { [LEGACY_ACCESS_KEY]: makeLegacyAccess(), [LEGACY_REFRESH_KEY]: makeLegacyRefresh() },
       csrf: true,
     });
     expect(res.status).toBe(200);
@@ -559,7 +562,12 @@ describe("POST /auth/refresh", () => {
     );
     const { res, body, setCookies } = await run({
       path: "/auth/refresh",
-      cookies: { [REFRESH_KEY]: dead, [ACCESS_KEY]: makeAccess({ expIn: -10 }) },
+      cookies: {
+        [REFRESH_KEY]: dead,
+        [ACCESS_KEY]: makeAccess({ expIn: -10 }),
+        [LEGACY_ACCESS_KEY]: makeLegacyAccess(),
+        [LEGACY_REFRESH_KEY]: makeLegacyRefresh(),
+      },
       csrf: true,
     });
     expect(res.status).toBe(401);
@@ -659,7 +667,12 @@ describe("POST /auth/sign-out", () => {
     const access = makeAccess({ tag: "live" });
     const { res, body, setCookies, responseSetCookies } = await run({
       path: "/auth/sign-out",
-      cookies: { [ACCESS_KEY]: access, [REFRESH_KEY]: makeRefresh() },
+      cookies: {
+        [ACCESS_KEY]: access,
+        [REFRESH_KEY]: makeRefresh(),
+        [LEGACY_ACCESS_KEY]: makeLegacyAccess(),
+        [LEGACY_REFRESH_KEY]: makeLegacyRefresh(),
+      },
       csrf: true,
     });
     expect(res.status).toBe(200);

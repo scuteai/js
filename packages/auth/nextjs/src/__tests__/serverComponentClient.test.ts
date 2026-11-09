@@ -8,6 +8,7 @@ import {
   createUpstream,
   json,
   makeAccess,
+  makeLegacyAccess,
   makeRefresh,
   makeSealedCookies,
   settle,
@@ -56,7 +57,7 @@ describe("createServerComponentClient storage", () => {
   });
 
   it("legacy fallback still reads (migration write is a no-op)", async () => {
-    const legacy = makeAccess();
+    const legacy = makeLegacyAccess();
     const client = create({ [LEGACY_ACCESS_KEY]: legacy });
     expect((await client.initialSessionState()).access).toBe(legacy);
     expect(await client.scuteStorage.getItem(ACCESS_KEY)).toBeNull();
@@ -80,13 +81,14 @@ describe("createServerComponentClient refresh policy", () => {
 
   // CURRENT BEHAVIOR: server components never refresh. With an expired
   // access token and a valid refresh token the session is reported as
-  // expired for this render (the middleware / client must refresh).
+  // expired for this render (the middleware / client must refresh); the
+  // expired token is not sent upstream either.
   it("getSession() with an expired access token does not refresh and ends unauthenticated", async () => {
     upstream.on("GET", `/v1/auth/${APP_ID}/current_user`, () => json({ error: "expired" }, 401));
     const expired = makeAccess({ expIn: -60 });
     const { data, error } = await create({ [ACCESS_KEY]: expired, [REFRESH_KEY]: makeRefresh() }).getSession();
     expect(upstream.callsTo("/tokens/")).toEqual([]);
-    expect(upstream.callsTo("/current_user", "GET")[0].headers.get("x-authorization")).toBe(expired);
+    expect(upstream.callsTo("/current_user", "GET")).toEqual([]);
     expect(error).not.toBeNull();
     expect(data.session.status).toBe("unauthenticated");
     expect(data.user).toBeNull();
