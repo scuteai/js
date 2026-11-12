@@ -44,7 +44,7 @@
 <p>When a tool call needs verification, the model is told to use <code>scute_verify_person</code> and then try again. If your server has a tool with one of these names, the gateway&#39;s version replaces it. Turn them all off with <code>humanTools: false</code>.</p>
 <p>Signing in isn&#39;t a tool: the MCP client signs the person in when it connects (OAuth), and asks for more access when a tool needs it (<code>insufficient_scope</code>).</p>
 <a id="md:notes" class="tsd-anchor"></a><h2><a href="#md:notes">Notes</a></h2><ul>
-<li>Tool pinning checks the definitions it has seen in <code>tools/list</code>. Keep pinning on (<code>pinning: true</code>, the default) and review held tools in Scute.</li>
+<li>Tool pinning checks the definitions it has seen in <code>tools/list</code>. When a client calls a tool before any <code>tools/list</code> has been reported, the gateway lists the upstream&#39;s tools itself first; while Scute can&#39;t confirm the pins, tool calls are refused. Keep pinning on (<code>pinning: true</code>, the default) and review held tools in Scute.</li>
 <li>JSON-RPC batches that contain <code>tools/*</code> requests are refused; send them one at a time (MCP 2025-06-18 dropped batching).</li>
 </ul>
 </section></div>
