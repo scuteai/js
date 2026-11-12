@@ -8,7 +8,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const decision = (d: string) => ({ decision: d, allowed: d !== "deny", reason: "role_grant", permission: "document:edit" });
+// Matches the API: `allowed` is true only for a plain "allow".
+const decision = (d: string) => ({ decision: d, allowed: d === "allow", reason: "role_grant", permission: "document:edit" });
 
 function setup<T>(hook: () => T, authz: Record<string, unknown>) {
   const client = createFakeClient({ authz });
@@ -58,23 +59,34 @@ describe("useCan", () => {
     expect(result.current.allowed).toBe(false);
   });
 
-  it("keeps the newest answer when checks overlap", async () => {
+  it("keeps the newest answer when checks for the same inputs overlap", async () => {
+    // Same user, same action: only the request counter can tell the late
+    // first answer from the newer one (the inputs key is identical).
     const first = deferred<any>();
-    const can = vi
-      .fn()
-      .mockImplementationOnce(() => first.promise)
-      .mockImplementation(async () => ({ data: decision("deny"), error: null }));
-    const { client, result, rerender } = setup(() => useCan("edit"), { can });
+    const can = vi.fn(async () => ({ data: decision("allow"), error: null }));
+    const { client, result } = setup(() => useCan("edit"), { can });
 
     signIn(client);
-    await waitFor(() => expect(can).toHaveBeenCalledTimes(1));
-    signIn(client, "usr_2");
-    await waitFor(() => expect(can).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    first.resolve({ data: decision("allow"), error: null });
-    rerender();
+    await waitFor(() => expect(result.current.allowed).toBe(true));
 
-    await waitFor(() => expect(result.current.decision?.decision).toBe("deny"));
+    can.mockImplementationOnce(() => first.promise).mockImplementationOnce(async () => ({ data: decision("deny"), error: null }));
+    let slow!: Promise<void>;
+    act(() => {
+      slow = result.current.refetch();
+    });
+    await act(async () => {
+      await result.current.refetch();
+    });
+    expect(result.current.decision?.decision).toBe("deny");
+
+    await act(async () => {
+      first.resolve({ data: decision("allow"), error: null });
+      await slow;
+    });
+
+    expect(can).toHaveBeenCalledTimes(3);
+    expect(result.current.decision?.decision).toBe("deny");
+    expect(result.current.allowed).toBe(false);
   });
 
   it("surfaces errors", async () => {

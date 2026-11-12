@@ -19,6 +19,8 @@ import {
   createUpstream,
   json,
   makeAccess,
+  makeLegacyRefresh,
+  makeLegacyAccess,
   makeRefresh,
   settle,
   type Upstream,
@@ -179,10 +181,11 @@ describe("browser", () => {
     expect(s.access).toBe(access);
   });
 
-  // CURRENT BEHAVIOR (REF-41 target): legacy unsuffixed cookie is read and
-  // copied into the namespaced name as a session cookie (no expires).
-  it("falls back to the legacy access cookie and migrates it via document.cookie (on load)", async () => {
-    const legacy = makeAccess({ tag: "legacy" });
+  // CURRENT BEHAVIOR (REF-41 target): a legacy unsuffixed cookie whose
+  // token names this app is read and copied into the namespaced name as a
+  // session cookie (no expires).
+  it("falls back to this app's legacy access cookie and migrates it via document.cookie (on load)", async () => {
+    const legacy = makeLegacyAccess();
     const { client, writes, jar } = await create({}, { [LEGACY_ACCESS_KEY]: legacy });
     // the initial-session read on load already performed the migration
     expect(writes).toEqual([`${ACCESS_KEY}=${legacy}; path=/; sameSite=lax`]);
@@ -230,7 +233,11 @@ describe("browser", () => {
     });
 
     it("on a failed sign-in handler: clears the session and returns UnknownSignInError", async () => {
-      const { client, writes } = await create({}, { [ACCESS_KEY]: makeAccess() });
+      const { client, writes } = await create({}, {
+        [ACCESS_KEY]: makeAccess(),
+        [LEGACY_ACCESS_KEY]: makeLegacyAccess(),
+        [LEGACY_REFRESH_KEY]: makeLegacyRefresh(),
+      });
       writes.length = 0;
       upstream.on("POST", "/auth/sign-in", () => new Response("CSRF error", { status: 401 }));
       const { UnknownSignInError } = await import("@scute/js-core");

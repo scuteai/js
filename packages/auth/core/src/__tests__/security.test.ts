@@ -238,10 +238,10 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     expect(report.credentials).toBe("include");
   });
 
-  // Known limitation, tracked separately: SIGNED_IN events carry the full
-  // session, refresh token included, and are posted on the per-app channel.
-  it("SIGNED_IN hands the refresh token to listeners and broadcasts it to other tabs", async () => {
-    installBrowser();
+  // SIGNED_IN events carry the session without its refresh token, to
+  // listeners and on the per-app channel.
+  it("SIGNED_IN never hands the refresh token to listeners or other tabs", async () => {
+    const { localStorage } = installBrowser();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const client = browserClient();
     await ready(client);
@@ -255,15 +255,18 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     await vi.waitFor(() => expect(cb).toHaveBeenCalledTimes(2));
 
     expect(cb.mock.calls[1][0]).toBe(AUTH_CHANGE_EVENTS.SIGNED_IN);
-    expect(cb.mock.calls[1][1].refresh).toBe(refresh);
+    expect(cb.mock.calls[1][1].refresh).toBeUndefined();
+    expect(JSON.stringify(cb.mock.calls[1])).not.toContain(refresh);
     const posted = channel.posted.find((m) => m.payload.event === AUTH_CHANGE_EVENTS.SIGNED_IN);
-    expect(posted.payload.session.refresh).toBe(refresh);
+    expect(JSON.stringify(posted)).not.toContain(refresh);
     expect(posted.payload.user).toEqual(userFixture());
+    // still stored for the session layer itself
+    expect(localStorage.getItem(KEYS.refresh)).toBe(refresh);
   });
 
-  // Known limitation, tracked separately: an inbound channel message with a
-  // session and user is passed to callbacks as-is, without a server check.
-  it("an inbound cross-tab SIGNED_IN with session and user reaches callbacks without a server check", async () => {
+  // An inbound channel message only says which event happened: the session
+  // and user are read again (storage + server check), never taken from it.
+  it("an inbound cross-tab SIGNED_IN never passes the message's session or user to callbacks", async () => {
     installBrowser();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const client = browserClient();
@@ -282,8 +285,10 @@ describe("token leakage: URLs, logs, error reports, events", () => {
     });
     await vi.waitFor(() => expect(cb).toHaveBeenCalledTimes(2));
 
-    expect(cb.mock.calls[1]).toEqual([AUTH_CHANGE_EVENTS.SIGNED_IN, remoteSession, remoteUser]);
-    expect(server.callsTo("GET", CURRENT_USER)).toHaveLength(userCalls);
+    expect(cb.mock.calls[1][0]).toBe(AUTH_CHANGE_EVENTS.SIGNED_IN);
+    expect(cb.mock.calls[1][1]).not.toMatchObject({ access: "remote_access" });
+    expect(cb.mock.calls[1][2]).not.toEqual(remoteUser);
+    expect(cb.mock.calls[1][1].status).toBe("unauthenticated"); // nothing stored in this tab
   });
 
   // By design: the core never removes sct_magic /
@@ -335,6 +340,11 @@ describe("server-provided URLs and URL building", () => {
     expect((error as SsoRequiredError).domain).toBe("acme.com");
 
     expect(await client.discoverSSO("a@acme.com")).toBeNull();
+  });
+
+  it("discoverSSO answers null on the uniform miss (no enumeration signal)", async () => {
+    server.on("GET", "/v1/auth/saml/discover", { status: 404, body: { error: "not found" } });
+    expect(await nodeClient().discoverSSO("a@unknown.com")).toBeNull();
   });
 
   it("an https login URL is passed through unchanged", async () => {
@@ -411,9 +421,9 @@ describe("CSRF and credentials", () => {
 });
 
 describe("fail-open server flags", () => {
-  // Known limitation, tracked separately: in a browser, autoRefreshToken is
-  // replaced by `appData.auto_refresh !== false` once app data loads.
-  it("a missing auto_refresh field overrides autoRefreshToken: false and refreshes", async () => {
+  // The app's auto_refresh can only turn auto refresh off: a client's own
+  // autoRefreshToken: false holds whatever the app data says.
+  it("a missing auto_refresh field does not override autoRefreshToken: false", async () => {
     const appData = appDataFixture();
     delete (appData as any).auto_refresh;
     server.on("GET", `/v1/apps/${APP_ID}`, { body: appData });
@@ -424,7 +434,18 @@ describe("fail-open server flags", () => {
     localStorage.setItem(KEYS.refresh, refreshToken());
 
     await browserClient({ autoRefreshToken: false }).getSession();
-    expect(server.callsTo("POST", REFRESH)).toHaveLength(1);
+    expect(server.callsTo("POST", REFRESH)).toHaveLength(0);
+  });
+
+  it("auto_refresh: true from the server does not override autoRefreshToken: false", async () => {
+    server.on("GET", `/v1/apps/${APP_ID}`, { body: appDataFixture({ auto_refresh: true }) });
+    const { localStorage } = installBrowser();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    localStorage.setItem(KEYS.access, accessToken({ expiresIn: 5 }));
+    localStorage.setItem(KEYS.refresh, refreshToken());
+
+    await browserClient({ autoRefreshToken: false }).getSession();
+    expect(server.callsTo("POST", REFRESH)).toHaveLength(0);
   });
 
   it("auto_refresh: false from the server overrides autoRefreshToken: true and expires instead", async () => {
@@ -594,10 +615,17 @@ describe("side effects of client-side error handling", () => {
     expect(storage.map.get(KEYS.refresh)).toBe(tokens.refresh);
   });
 
-  // Known limitation, tracked separately: verifyMagicLinkToken reads
-  // window.location for sct_sk, so it throws outside a browser.
-  it("verifyMagicLinkToken throws outside a browser", async () => {
+  // Outside a browser there is no window.location to read sct_sk from:
+  // verification works and nothing is signed in unless the url says so.
+  it("verifyMagicLinkToken works outside a browser", async () => {
     const client = nodeClient();
-    await expect(client.verifyMagicLinkToken(magicLinkToken())).rejects.toThrow(ReferenceError);
+    server.on("PATCH", `${AUTH_PREFIX}/magic_links/authenticate`, {
+      body: { access: accessToken(), refresh: refreshToken(), access_expires_at: "x", refresh_expires_at: "y" },
+    });
+    const { data, error } = await client.verifyMagicLinkToken(magicLinkToken());
+    expect(error).toBeNull();
+    expect(data).toHaveProperty("authPayload");
+    expect(data).not.toHaveProperty("signedIn");
+    expect(client.getMagicLinkToken()).toBeNull();
   });
 });

@@ -24,6 +24,21 @@ const carriesRefreshToken = (opts: { headers?: HeadersInit } | undefined) => {
   }
 };
 
+/**
+ * Only idempotent requests (GET, HEAD, DELETE) are retried. A POST, PUT or
+ * PATCH (sign-in codes, magic links, token exchanges) that failed
+ * ambiguously may already have been applied, so it is never sent again.
+ */
+const RETRYABLE_METHODS = ["GET", "HEAD", "DELETE"];
+const isRetryable = (opts: { method?: string; headers?: HeadersInit } | undefined) =>
+  RETRYABLE_METHODS.includes((opts?.method ?? "GET").toUpperCase()) && !carriesRefreshToken(opts);
+
+/** A JSON body, or null for a success without content (204/205). */
+const jsonOrNull = async <T>(response: Response): Promise<T> => {
+  if (response.status === 204 || response.status === 205) return null as T;
+  return (await response.json()) as T;
+};
+
 /** The page URL for an error report, without Scute's one-time sign-in tokens. */
 const reportLocation = () => {
   try {
@@ -72,7 +87,7 @@ export abstract class ScuteBaseHttp {
           onRetry: undefined,
           retryOnNetworkError: true,
           resolveWithLatestResponse: true,
-          skip: (_url, opts) => carriesRefreshToken(opts),
+          skip: (_url, opts) => !isRetryable(opts),
         }),
       ])
       .errorType("json");
@@ -94,7 +109,7 @@ export abstract class ScuteBaseHttp {
         .url(url)
         .headers(headers as any)
         .get()
-        .json<T>();
+        .res(jsonOrNull<T>);
 
       return { data: response, error: null };
     } catch (e) {
@@ -114,7 +129,7 @@ export abstract class ScuteBaseHttp {
         .url(url)
         .headers(headers as any)
         .post(data)
-        .json<T>();
+        .res(jsonOrNull<T>);
       return { data: response, error: null };
     } catch (e) {
       const error = this._getErrorObject(e as WretchError);
@@ -133,7 +148,7 @@ export abstract class ScuteBaseHttp {
         .url(url)
         .headers(headers as any)
         .put(data)
-        .json<T>();
+        .res(jsonOrNull<T>);
       return { data: response, error: null };
     } catch (e) {
       const error = this._getErrorObject(e as WretchError);
@@ -152,7 +167,7 @@ export abstract class ScuteBaseHttp {
         .url(url)
         .headers(headers as any)
         .patch(data)
-        .json<T>();
+        .res(jsonOrNull<T>);
       return { data: response, error: null };
     } catch (e) {
       const error = this._getErrorObject(e as WretchError);

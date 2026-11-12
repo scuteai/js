@@ -9,6 +9,7 @@ import {
   createUpstream,
   lastCookie,
   makeAccess,
+  makeLegacyAccess,
   makeRefresh,
   makeRouteContext,
   makeSealedCookies,
@@ -78,7 +79,7 @@ describe("createRouteHandlerClient storage", () => {
   });
 
   it("with a read-only (server component) cookies store: reads work, legacy migration errors are swallowed", async () => {
-    const legacy = makeAccess();
+    const legacy = makeLegacyAccess();
     const sealed = makeSealedCookies({ [LEGACY_ACCESS_KEY]: legacy });
     const client: any = createRouteHandlerClient({ cookies: () => sealed as any }, clientConfig());
     const s = await client.initialSessionState();

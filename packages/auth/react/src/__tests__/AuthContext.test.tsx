@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { act, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AUTH_CHANGE_EVENTS } from "@scute/js-core";
+import { AUTH_CHANGE_EVENTS, SESSION_EVENTS } from "@scute/js-core";
 import { AuthContextProvider, useAuth, useScuteClient } from "../AuthContext";
 import {
   authenticatedSession,
@@ -160,6 +160,20 @@ describe("AuthContextProvider state transitions on client events", () => {
     expect(result.current.auth.isAuthenticated).toBe(true);
     expect(result.current.auth.user).toBe(user);
     expect(result.current.auth.session).toBe(session);
+  });
+
+  it("treats exactly js-core's SESSION_EVENTS as session-carrying", () => {
+    // One list, owned by js-core (onAuthStateChange resolves the session for
+    // these): every one applies the session it carries.
+    for (const event of SESSION_EVENTS) {
+      const { client, result, unmount } = renderAuth();
+      const session = authenticatedSession(`access.jwt.${event}`);
+      act(() => client.emit(event, session, makeUser()));
+      expect(result.current.auth.session).toBe(session);
+      unmount();
+    }
+    expect(SESSION_EVENTS).toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
+    expect(SESSION_EVENTS).not.toContain(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
   });
 
   it("stays loading when an event without a session arrives before the initial session", () => {

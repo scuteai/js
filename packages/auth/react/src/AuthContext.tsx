@@ -10,6 +10,7 @@ import {
 import {
   AUTH_CHANGE_EVENTS,
   SCUTE_IMPERSONATION_HANDOFF_PARAM,
+  SESSION_EVENTS as CORE_SESSION_EVENTS,
   ScuteClient,
   type Session,
   type ScuteUserData,
@@ -37,21 +38,9 @@ export type AuthSession = {
     }
 );
 
-// Events that carry the real session state: ScuteClient.onAuthStateChange
-// resolves the session for these before calling listeners. Every other event
-// (OTP_PENDING, MAGIC_PENDING, MFA_REQUIRED, WEBAUTHN_VERIFY_START, ...) is
-// delivered with an unauthenticated placeholder and a null user, so it must
-// not overwrite the session.
-const SESSION_EVENTS: readonly string[] = [
-  AUTH_CHANGE_EVENTS.INITIAL_SESSION,
-  AUTH_CHANGE_EVENTS.SESSION_REFETCH,
-  AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
-  AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
-  AUTH_CHANGE_EVENTS.SIGNED_IN,
-  AUTH_CHANGE_EVENTS.SIGNED_OUT,
-  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
-  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
-];
+// Events that carry the real session state: the same list ScuteClient's
+// onAuthStateChange resolves the session for (SESSION_EVENTS from js-core).
+const SESSION_EVENTS: readonly string[] = CORE_SESSION_EVENTS;
 
 const AuthContext = createContext<AuthSession | undefined>(undefined);
 const ScuteClientContext = createContext<ScuteClient | undefined>(undefined);

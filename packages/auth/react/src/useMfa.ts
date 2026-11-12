@@ -165,6 +165,9 @@ export function useMfaVerify() {
   );
   const [state, setState] = useState<MfaVerifyState>("idle");
   const [error, setError] = useState<ScuteError>(null);
+  // The further step a verified code led to (a contact to confirm, a factor
+  // to set up), when the sign-in isn't finished yet.
+  const [nextStep, setNextStep] = useState<unknown>(null);
 
   useEffect(() => {
     setPendingChallenge(client.pendingMfaChallenge);
@@ -196,11 +199,21 @@ export function useMfaVerify() {
         return { data: null, error: e };
       }
       setError(null);
+      setNextStep(null);
       setState("verifying");
       const result = await client.verifyMfaChallenge(challengeToken, code);
       if (result.error) {
         setError(result.error as any);
         setState("error");
+        return result;
+      }
+      const step = (result as { data?: unknown }).data;
+      if (step) {
+        // The code was right but the sign-in owes another step: not
+        // verified (signed in) yet.
+        setNextStep(step);
+        setPendingChallenge(client.pendingMfaChallenge);
+        setState("idle");
         return result;
       }
       setState("verified");
@@ -254,6 +267,7 @@ export function useMfaVerify() {
       return result;
     }
     setPendingChallenge(null);
+    setNextStep(null);
     setState("idle");
     setError(null);
     return result;
@@ -264,6 +278,7 @@ export function useMfaVerify() {
     challengeToken,
     state,
     error,
+    nextStep,
     verify,
     switchMethod,
     resend,
@@ -281,6 +296,7 @@ export function useMfaVerify() {
  */
 export function useFactorList() {
   const client = useScuteClient();
+  const { isAuthenticated, user } = useAuth();
   const [factors, setFactors] = useState<MfaEnrollment[]>([]);
   const [backupCodesAvailable, setBackupCodesAvailable] = useState(0);
   const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -298,6 +314,15 @@ export function useFactorList() {
   }, []);
 
   const refresh = useCallback(async () => {
+    if (!isAuthenticated) {
+      // Signed out: nothing to list, and no request.
+      setFactors([]);
+      setBackupCodesAvailable(0);
+      setMfaEnabled(false);
+      setLoading(false);
+      setError(null);
+      return { data: null, error: null };
+    }
     setLoading(true);
     setError(null);
     const { data, error: err } = await client.listMfaMethods();
@@ -311,7 +336,9 @@ export function useFactorList() {
     setBackupCodesAvailable(data.backup_codes_available ?? 0);
     setMfaEnabled(!!data.mfa_enabled);
     return { data, error: null };
-  }, [client]);
+    // Reload when the signed-in user changes (sign in, sign out, switch).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, isAuthenticated, user?.id]);
 
   // options.challenge: see needsReverification() when this is refused.
   const remove = useCallback(

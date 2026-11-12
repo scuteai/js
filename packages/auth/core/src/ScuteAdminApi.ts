@@ -27,6 +27,9 @@ import type {
   AuthzPermissions,
 } from "./ScuteAuthzApi";
 import type { AuthzFilter } from "./lib/authzFilter";
+import { verifySnapshotToken, type SnapshotClaims } from "./lib/localAuthz";
+
+type SnapshotJwks = { keys: (JsonWebKey & { kid?: string })[] };
 import type {
   AuthzDecisionsPage,
   AuthzDecisionsParams,
@@ -732,6 +735,42 @@ class ScuteAdminApi extends ScuteBaseHttp {
       `${this._appsPath}/authz/snapshot`,
       this._authorizationHeader
     );
+  }
+
+  /** The app's public signing keys (GET /v1/auth/:app_id/jwks). */
+  async authzJwks() {
+    return this.get<SnapshotJwks>(`${this._authPath}/jwks`);
+  }
+
+  private _snapshotJwks: SnapshotJwks | null = null;
+
+  /**
+   * The policy snapshot with its signature, audience and expiry checked
+   * against the app's JWKS. Returns an error (and no claims) when any check
+   * fails, so callers never act on an unverified policy. The JWKS is cached
+   * and fetched again once when the key isn't found (key rotation).
+   */
+  async verifiedAuthzSnapshot(): Promise<{ data: SnapshotClaims; error: null } | { data: null; error: Error }> {
+    const { data, error } = await this.authzSnapshot();
+    if (error || !data?.token) return { data: null, error: error ?? new Error("No snapshot") };
+    const attempt = async (fresh: boolean) => {
+      if (fresh || !this._snapshotJwks) {
+        const jwks = await this.authzJwks();
+        if (jwks.error || !Array.isArray(jwks.data?.keys)) throw jwks.error ?? new Error("No JWKS");
+        this._snapshotJwks = jwks.data;
+      }
+      return verifySnapshotToken(data.token, this._snapshotJwks!, String(this.appId));
+    };
+    try {
+      try {
+        return { data: await attempt(false), error: null };
+      } catch (e) {
+        if (!this._snapshotJwks || !/No matching key|Bad signature/.test((e as Error)?.message ?? "")) throw e;
+        return { data: await attempt(true), error: null };
+      }
+    } catch (e) {
+      return { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+    }
   }
 
   // ── Policy suggestions and backtests (RB-45) ──

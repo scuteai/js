@@ -51,6 +51,8 @@ const newClient = () =>
 
 const impersonationTokens = (expiresIn = 1800) => ({
   access: accessToken({ uuid: "user_2", imp: true, act: actor, expiresIn }),
+  // The admin API never sends one; if it ever did, the client must not keep it.
+  refresh: refreshToken(),
   access_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
   session_id: "ses_1",
   user_id: "user_2",
@@ -122,6 +124,38 @@ describe("in the browser", () => {
     expect(JSON.parse(storage.map.get(IMPERSONATOR_KEY)!)).toEqual(own);
     expect(await client.getImpersonation()).toMatchObject({ actor });
     expect(rec.names()).toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
+  });
+
+  it("keeps the support person's tokens aside HttpOnly when running on a server", async () => {
+    seedSession(storage, { access: accessToken({ uuid: "user_9" }), refresh: refreshToken() });
+    const client = newClient();
+
+    await client.beginImpersonation(impersonationTokens());
+
+    const stash = storage.ops.find((o) => o.op === "set" && o.key === IMPERSONATOR_KEY);
+    expect(stash?.options).toMatchObject({ httpOnly: true });
+  });
+
+  it("brings the own session back when the session as the user is refused (401)", async () => {
+    const own = { access: accessToken({ uuid: "user_9" }), refresh: refreshToken() };
+    seedSession(storage, own);
+    const tokens = impersonationTokens();
+    server.on("GET", CURRENT_USER, (call) =>
+      call.headers["x-authorization"] === tokens.access
+        ? { status: 401, body: { error: "invalid token" } }
+        : { body: { user: userFixture({ id: "user_9" }) } }
+    );
+    const client = newClient();
+    const rec = recordEvents(client);
+
+    const { error } = await client.beginImpersonation(tokens);
+
+    expect(error).toBeTruthy();
+    expect(storage.map.get(KEYS.access)).toBe(own.access);
+    expect(storage.map.get(KEYS.refresh)).toBe(own.refresh);
+    expect(storage.map.has(IMPERSONATOR_KEY)).toBe(false);
+    expect(await client.getImpersonation()).toBeNull();
+    expect(rec.names()).not.toContain(AUTH_CHANGE_EVENTS.SIGNED_IN);
   });
 
   it("refuses tokens that aren't a session as the user", async () => {

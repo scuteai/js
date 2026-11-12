@@ -334,14 +334,14 @@ describe("getMeaningfulError (what the UI shows)", () => {
     });
   });
 
-  // Known limitation, tracked separately: an HTTP error without a JSON
-  // `error` field yields an undefined message.
-  it("an HTTP error without json.error yields an undefined message", () => {
+  // An HTTP error without a JSON `error` field (a bare 502, a network
+  // failure) gets the generic message, never undefined.
+  it("an HTTP error without json.error yields the generic message", () => {
     const noJson = new BaseHttpError({ message: "Bad Gateway", code: 502 });
-    expect(getMeaningfulError(noJson)).toEqual({ isFatal: true, message: undefined });
+    expect(getMeaningfulError(noJson)).toEqual({ isFatal: true, message: "Something went wrong." });
 
     const network = new BaseHttpError({ message: undefined as any, code: undefined as any });
-    expect(getMeaningfulError(network)).toEqual({ isFatal: true, message: undefined });
+    expect(getMeaningfulError(network)).toEqual({ isFatal: true, message: "Something went wrong." });
   });
 
   it("custom client errors are non-fatal with their own message", () => {

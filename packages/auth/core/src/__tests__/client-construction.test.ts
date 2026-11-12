@@ -302,9 +302,9 @@ describe("URL builders and redirects", () => {
     expect(client.getMagicLinkToken(new URL("https://app.test/?x=1"))).toBeNull();
   });
 
-  it("getMagicLinkToken defaults to window.location.href and throws without a window", () => {
+  it("getMagicLinkToken defaults to window.location.href, and is null without a window", () => {
     const client = newClient();
-    expect(() => client.getMagicLinkToken()).toThrow(ReferenceError);
+    expect(client.getMagicLinkToken()).toBeNull();
     installBrowser({ href: "https://app.test/cb?sct_magic=from_window" });
     expect(client.getMagicLinkToken()).toBe("from_window");
   });
@@ -411,16 +411,19 @@ describe("authenticated endpoint table", () => {
     expect(call.body).toBeUndefined();
   });
 
-  // Known limitation, tracked separately: a /devices/register response
-  // without `options` makes addDevice reject instead of returning { error }.
-  it("addDevice rejects when the register response has no options", async () => {
+  // A /devices/register response without `options` is returned as
+  // { error }, never a rejection.
+  it("addDevice returns an error when the register response has no options", async () => {
     // A page with the WebAuthn API, so the browser call is reached.
     installBrowser();
     Object.assign(window, { isSecureContext: true, PublicKeyCredential: function PublicKeyCredential() {} });
     (navigator as any).credentials = { create: vi.fn(), get: vi.fn() };
     seedSession(storage, { access: ACCESS });
     server.on("POST", `${AUTH_PREFIX}/devices/register`, { body: {} });
-    await expect(newClient().addDevice()).rejects.toThrow(/publicKey/);
+    const { data, error } = await newClient().addDevice();
+    expect(data).toBeNull();
+    expect(error).toBeInstanceOf(TechnicalError);
+    expect((navigator as any).credentials.create).not.toHaveBeenCalled();
   });
 
   it("addDevice returns PasskeysUnavailableError where the page has no passkey API", async () => {

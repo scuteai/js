@@ -1,9 +1,8 @@
 import { ScuteCookieStorage, type CookieAttributes } from "@scute/js-core";
 import type { NextRequest, NextResponse } from "next/server";
 import { parse as parseCookies, serialize as serializeCookie } from "cookie";
-import { splitCookiesString } from "set-cookie-parser";
 import { createScuteClient, type ScuteNextjsClientConfig } from "./shared";
-import { clientIpFor, nextRequestIp } from "./utils";
+import { clientIpFor, nextRequestIp, writtenCookie } from "./utils";
 
 class ScuteNextMiddlewareStorage extends ScuteCookieStorage {
   constructor(
@@ -14,18 +13,14 @@ class ScuteNextMiddlewareStorage extends ScuteCookieStorage {
   }
 
   protected getCookie(name: string): string | null {
-    const setCookie = splitCookiesString(
-      this.context.res.headers.get("set-cookie")?.toString() ?? ""
-    )
-      .map((c) => parseCookies(c)[name])
-      .find((c) => !!c);
-
-    if (setCookie) {
-      return setCookie;
+    // the last write for this name wins; an empty value is a deletion
+    const written = writtenCookie(this.context.res.headers.get("set-cookie"), name);
+    if (written !== undefined) {
+      return written;
     }
 
     const cookies = parseCookies(this.context.req.headers.get("cookie") ?? "");
-    return cookies[name];
+    return cookies[name] ?? null;
   }
   protected setCookie(
     name: string,

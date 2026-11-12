@@ -2,13 +2,12 @@
   "name": "scute-js",
   "private": true,
   "scripts": {
-    "build": "pnpm turbo\\ run build",
-    "dev": "pnpm turbo\\ run dev",
+    "build": "turbo run build --concurrency 30",
+    "dev": "turbo run dev --concurrency 30",
     "docs": "typedoc",
-    "lint": "pnpm turbo\\ run lint",
+    "lint": "turbo run lint --concurrency 30",
     "test:live": "turbo run build --filter=@scute/live-tests... && pnpm --filter @scute/live-tests test:live",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "turbo run": "turbo run --concurrency 30",
     "verdaccio-start": "pnpm verdaccio --config ./verdaccio.config.yaml",
     "test:e2e:settings": "turbo run build --filter=@scute/auth-ui-react... && pnpm --filter @scute/sdk-e2e test:settings"
   },

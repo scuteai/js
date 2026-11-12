@@ -23,7 +23,7 @@ export const getMeaningfulError = (error: ScuteError | Error) => {
   ) {
     isFatal = true;
     const serverErrorMsg = error.json?.error;
-    message = serverErrorMsg;
+    message = typeof serverErrorMsg === "string" && serverErrorMsg ? serverErrorMsg : "Something went wrong.";
 
     if (error.code === 500) {
       message = "Something went wrong.";

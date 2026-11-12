@@ -16,7 +16,7 @@ export const CSRF_TOKEN_KEY = "X-CSRF-Token";
  * unsuffixed name as a fallback on read for live users mid-migration.
  */
 export const csrfCookieKey = (appId: string | number): string => {
-  if (!appId) {
+  if (appId === undefined || appId === null || appId === "") {
     throw new Error("csrfCookieKey called without an appId");
   }
   return `${CSRF_TOKEN_KEY}__${appId}`;

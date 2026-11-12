@@ -32,6 +32,20 @@ export const createMemoryStorage = (): ScuteStorage => {
   };
 };
 
+const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]", "::1"];
+
+/** Cookies are Secure by default; only http://localhost pages go without. */
+const defaultSecure = (): boolean => {
+  try {
+    const loc = typeof window !== "undefined" ? window.location : undefined;
+    if (!loc) return true;
+    const local = LOCAL_HOSTS.includes(loc.hostname) || loc.hostname.endsWith(".localhost");
+    return !(loc.protocol === "http:" && local);
+  } catch {
+    return true;
+  }
+};
+
 export abstract class ScuteCookieStorage extends ScuteStorage {
   protected readonly defaultCookieOptions?: CookieAttributes;
 
@@ -40,6 +54,9 @@ export abstract class ScuteCookieStorage extends ScuteStorage {
     this.defaultCookieOptions = {
       path: "/",
       ...defaultCookieOptions,
+      // Secure unless the adapter says otherwise, or the page is plain
+      // http on localhost (local development).
+      secure: defaultCookieOptions?.secure ?? defaultSecure(),
     };
   }
 

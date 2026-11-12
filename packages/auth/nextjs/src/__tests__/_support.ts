@@ -38,19 +38,30 @@ export const makeJwt = (payload: Record<string, unknown>, sig = "sig") =>
   `${b64url({ alg: "RS256", typ: "JWT" })}.${b64url(payload)}.${sig}`;
 
 export const makeAccess = (
-  opts: { uuid?: string; expIn?: number; tag?: string } = {}
+  opts: { uuid?: string; expIn?: number; tag?: string; aud?: string } = {}
 ) =>
   makeJwt({
     uuid: opts.uuid ?? "user-1",
     exp: nowSec() + (opts.expIn ?? 900),
     ...(opts.tag ? { tag: opts.tag } : {}),
+    ...(opts.aud ? { aud: opts.aud } : {}),
   });
 
-export const makeRefresh = (opts: { expIn?: number; tag?: string } = {}) =>
+export const makeRefresh = (opts: { expIn?: number; tag?: string; aud?: string } = {}) =>
   makeJwt({
     exp: nowSec() + (opts.expIn ?? 30 * 24 * 3600),
     ...(opts.tag ? { tag: opts.tag } : {}),
+    ...(opts.aud ? { aud: opts.aud } : {}),
   });
+
+/**
+ * Legacy (unsuffixed) cookies are shared by every app on the origin; js-core
+ * only migrates or deletes one whose token names this app. These do.
+ */
+export const makeLegacyAccess = (opts: { uuid?: string; expIn?: number; tag?: string } = {}) =>
+  makeAccess({ tag: "legacy", ...opts, aud: APP_ID });
+export const makeLegacyRefresh = (opts: { expIn?: number; tag?: string } = {}) =>
+  makeRefresh({ tag: "legacy", ...opts, aud: APP_ID });
 
 export const APP_DATA = {
   id: APP_ID,

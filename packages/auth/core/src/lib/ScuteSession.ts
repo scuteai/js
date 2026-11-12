@@ -13,6 +13,7 @@ import {
   Deferred,
   getLocalStorage,
   isBrowser,
+  jwtDecode,
 } from "./helpers";
 import { UniqueIdentifier } from "./types/general";
 import { ScuteIdentifier, ScuteTokenPayload } from "./types/scute";
@@ -23,6 +24,34 @@ const AUTO_REFRESH_TICK_DURATION = 30 * 1000;
 
 // in seconds
 const EXPIRY_MARGIN = 10;
+
+/** Legacy (unsuffixed) slots that hold a session token. */
+const TOKEN_KINDS: StorageKeyKind[] = ["access", "refresh", "impersonator"];
+
+/**
+ * Whether a legacy unsuffixed value can be attributed to `appId`. The
+ * legacy slots are shared by every Scute app on the origin, so a session
+ * token is only taken (migrated, or deleted on sign-out) when its claims
+ * name this app (`aud`, `app_id` or `appId`). Other kinds (remembered
+ * identifier, credential ids) hold no session and keep the old behaviour.
+ */
+const legacyBelongsTo = (kind: StorageKeyKind, value: string, appId: unknown) => {
+  if (!TOKEN_KINDS.includes(kind)) return true;
+  try {
+    const raw = kind === "impersonator" ? (JSON.parse(value)?.access as string) : value;
+    const claims = jwtDecode<Record<string, unknown>>(raw);
+    const named = [claims.aud, claims.app_id, claims.appId].flat();
+    return named.some((v) => v !== undefined && v !== null && String(v) === String(appId));
+  } catch {
+    return false;
+  }
+};
+
+/** The access token expires within `marginSeconds` (or has no valid expiry). */
+const expiresWithinMargin = (session: Session, marginSeconds = EXPIRY_MARGIN) => {
+  const at = session.accessExpiresAt?.getTime?.();
+  return typeof at !== "number" || Number.isNaN(at) || at < Date.now() + marginSeconds * 1000;
+};
 
 /** ticks before the current session expires */
 const AUTO_REFRESH_TICK_THRESHOLD = 3;
@@ -70,6 +99,8 @@ export abstract class ScuteSession {
 
     const legacy = await this.scuteStorage.getItem(legacyKey(kind));
     if (!legacy) return null;
+    // Another app's (or an unattributable) session token is not ours to take.
+    if (!legacyBelongsTo(kind, legacy, this.appId)) return null;
 
     // Forward-migrate to the namespaced slot. Best-effort: any error here is
     // logged via the storage adapter but does not break the read.
@@ -113,11 +144,15 @@ export abstract class ScuteSession {
       this._scopedKey(kind),
       cookieOptions as any,
     );
+    // The legacy slot is shared by every app on the origin: only clear it
+    // when its value is this app's.
+    let ownsLegacy = false;
     try {
-      await this.scuteStorage.removeItem(
-        legacyKey(kind),
-        cookieOptions as any,
-      );
+      const legacy = await this.scuteStorage.getItem(legacyKey(kind));
+      ownsLegacy = !!legacy && legacyBelongsTo(kind, legacy, this.appId);
+      if (ownsLegacy) {
+        await this.scuteStorage.removeItem(legacyKey(kind), cookieOptions as any);
+      }
     } catch {
       /* legacy key may not exist; harmless */
     }
@@ -125,7 +160,10 @@ export abstract class ScuteSession {
     if (localStorage) {
       try {
         localStorage.removeItem(this._scopedKey(kind));
-        localStorage.removeItem(legacyKey(kind));
+        const legacy = localStorage.getItem(legacyKey(kind));
+        if (legacy && legacyBelongsTo(kind, legacy, this.appId)) {
+          localStorage.removeItem(legacyKey(kind));
+        }
       } catch {
         /* private-mode quirks */
       }
@@ -265,7 +303,10 @@ export abstract class ScuteSession {
 
             session = unAuthenticatedState();
           } else {
-            if (refreshedSession.access) {
+            if (!refreshedSession.access) {
+              // The refresh ended the session (no refresh token to use).
+              session = unAuthenticatedState();
+            } else {
               this.debug("#_getSession", "refreshed");
               session = {
                 access: refreshedSession.access,
@@ -284,7 +325,9 @@ export abstract class ScuteSession {
             "expiring session"
           );
 
-          await this._expireSession();
+          // The expired token is gone from storage and is not checked or
+          // reported as a live session either.
+          session = await this._expireSession();
         }
       }
     }
@@ -578,11 +621,25 @@ export abstract class ScuteSession {
    * @see {@link ScuteClient.getAuthToken}
    */
   protected async _getAuthToken(session: Session) {
-    if (!session.access) {
+    if (!session.access || expiresWithinMargin(session, 0)) {
       return { data: null, error: new InvalidAuthTokenError() };
     }
 
     return { data: { access: session.access }, error: null };
+  }
+
+  /**
+   * The stored access token, refreshed first (like getSession) when it
+   * expires within the margin. Never returns an expired token.
+   * @internal
+   */
+  protected async _currentAuthToken() {
+    let session = await this.initialSessionState();
+    if (session.access && expiresWithinMargin(session)) {
+      const { data } = await this._getSession();
+      session = data.session ?? unAuthenticatedState();
+    }
+    return this._getAuthToken(session);
   }
 
   /**
@@ -712,11 +769,11 @@ export abstract class ScuteSession {
 
         if (refreshError) {
           return { data: null, error: refreshError };
-        } else {
-          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
         }
 
+        // Persist first, so listeners of TOKEN_REFRESHED read the new tokens.
         session = await this.setSession(tokenPayload);
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, session);
       }
     } else {
       if (!session.refresh && this.refreshProxyCallback) {
@@ -739,17 +796,30 @@ export abstract class ScuteSession {
 
         if (refreshError) {
           return { data: null, error: refreshError };
-        } else {
-          this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED);
-          session = await this.setSession(tokenPayload);
         }
+
+        session = await this.setSession(tokenPayload);
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.TOKEN_REFRESHED, session);
       } else {
+        // Nothing to refresh with: the session ends here, and listeners
+        // hear about it.
+        const ended = unAuthenticatedState();
+        this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.SIGNED_OUT, ended);
         await this._signOut(session.access);
-        session = unAuthenticatedState();
+        session = ended;
       }
     }
 
     return { data: session, error: null };
+  }
+
+  /**
+   * Whether `error` means the server rejected the session (vs a transient
+   * failure).
+   * @internal
+   */
+  protected _isSessionRejected(error: unknown) {
+    return isSessionRejected(error);
   }
 
   /**

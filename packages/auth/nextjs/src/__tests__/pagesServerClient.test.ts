@@ -8,6 +8,8 @@ import {
   createUpstream,
   lastCookie,
   makeAccess,
+  makeLegacyRefresh,
+  makeLegacyAccess,
   makeRefresh,
   settle,
   type Upstream,
@@ -82,18 +84,22 @@ describe("createPagesServerClient storage", () => {
     ]);
   });
 
-  // Known limitation, tracked separately: after a deletion, reads fall back
-  // to req.cookies for the rest of the request (see the Pages Node handler
-  // refresh-failure test).
-  it("a deleted cookie is still read back from req.cookies", async () => {
+  // A deletion written in this request wins over req.cookies (last write
+  // wins, as in the edge adapter).
+  it("a deleted cookie is not read back from req.cookies", async () => {
     const { storage, res } = create({ k: "stale" });
     await storage.removeItem("k");
     expect(setCookiesOf(res)).toEqual(["k=; Max-Age=0; Path=/"]);
-    expect(await storage.getItem("k")).toBe("stale");
+    expect(await storage.getItem("k")).toBeNull();
   });
 
   it("removeSession leaves exactly one deletion per cookie name", async () => {
-    const { client, res } = create({ [ACCESS_KEY]: makeAccess(), [REFRESH_KEY]: makeRefresh() });
+    const { client, res } = create({
+      [ACCESS_KEY]: makeAccess(),
+      [REFRESH_KEY]: makeRefresh(),
+      "sc-access-token": makeLegacyAccess(),
+      "sc-refresh-token": makeLegacyRefresh(),
+    });
     await client.removeSession();
     await client.removeSession();
     const names = setCookiesOf(res).map((c) => c.split("=")[0]);

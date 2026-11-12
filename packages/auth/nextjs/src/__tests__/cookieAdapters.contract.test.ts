@@ -26,6 +26,8 @@ import {
   createUpstream,
   isDeletion,
   makeAccess,
+  makeLegacyAccess,
+  makeLegacyRefresh,
   makeNextRequest,
   makeRefresh,
   makeRouteContext,
@@ -201,11 +203,12 @@ describe.each(harnesses)("$name: cookie contract", (h) => {
     });
 
     // Known limitation, tracked separately (REF-41): with no namespaced
-    // cookie, the legacy unsuffixed cookie is read and copied into this
-    // app's namespace without Expires/Max-Age; the original is left alone.
-    it("falls back to legacy unsuffixed cookies and forward-migrates them", async () => {
-      const access = makeAccess({ tag: "legacy" });
-      const refresh = makeRefresh({ tag: "legacy" });
+    // cookie, a legacy unsuffixed cookie whose token names this app is read
+    // and copied into this app's namespace without Expires/Max-Age; the
+    // original is left alone.
+    it("falls back to this app's legacy unsuffixed cookies and forward-migrates them", async () => {
+      const access = makeLegacyAccess();
+      const refresh = makeLegacyRefresh();
       const { client, writes } = h.create({ [LEGACY_ACCESS_KEY]: access, [LEGACY_REFRESH_KEY]: refresh });
       const s = await client.initialSessionState();
       expect(s.access).toBe(access);
@@ -230,6 +233,19 @@ describe.each(harnesses)("$name: cookie contract", (h) => {
       // legacy originals are not cleared by the migration
       expect(byName(writes(), LEGACY_ACCESS_KEY)).toEqual([]);
       expect(byName(writes(), LEGACY_REFRESH_KEY)).toEqual([]);
+    });
+
+    it("never takes a legacy cookie whose token doesn't name this app", async () => {
+      const { client, writes } = h.create({
+        [LEGACY_ACCESS_KEY]: makeAccess({ tag: "legacy" }),
+        [LEGACY_REFRESH_KEY]: makeRefresh({ aud: "app-other" }),
+      });
+      const s = await client.initialSessionState();
+      expect(s.status).toBe("unauthenticated");
+      expect(s.access).toBeFalsy();
+      expect(s.refresh).toBeFalsy();
+      expect(byName(writes(), ACCESS_KEY)).toEqual([]);
+      expect(byName(writes(), REFRESH_KEY)).toEqual([]);
     });
   });
 
@@ -287,8 +303,8 @@ describe.each(harnesses)("$name: cookie contract", (h) => {
       const { client, writes } = h.create({
         [ACCESS_KEY]: makeAccess(),
         [REFRESH_KEY]: makeRefresh(),
-        [LEGACY_ACCESS_KEY]: makeAccess(),
-        [LEGACY_REFRESH_KEY]: makeRefresh(),
+        [LEGACY_ACCESS_KEY]: makeLegacyAccess(),
+        [LEGACY_REFRESH_KEY]: makeLegacyRefresh(),
       });
       await client.removeSession();
       if (!h.persists) {

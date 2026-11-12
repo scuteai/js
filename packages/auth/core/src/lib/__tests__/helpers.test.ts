@@ -71,12 +71,11 @@ describe("decodeAccessToken", () => {
     expect(decoded?.userId).toBe(42);
   });
 
-  // Known limitation, tracked separately: a non-numeric `exp` is accepted
-  // and produces an Invalid Date.
-  it("accepts a non-numeric exp and yields an Invalid Date", () => {
-    const decoded = decodeAccessToken(makeJwt({ uuid: "u", exp: "tomorrow" }));
-    expect(decoded).not.toBeNull();
-    expect(Number.isNaN(decoded!.expiresAt.getTime())).toBe(true);
+  // A non-numeric `exp` is refused: an Invalid Date never compares as
+  // expired, so such a token would count as authenticated forever.
+  it.each(["tomorrow", "9999999999", null, Number.NaN, -1])("rejects a non-numeric or invalid exp (%s)", (exp) => {
+    expect(decodeAccessToken(makeJwt({ uuid: "u", exp }))).toBeNull();
+    expect(decodeRefreshToken(makeJwt({ exp }))).toBeNull();
   });
 });
 
@@ -173,11 +172,12 @@ describe("isMaybePhoneNumber", () => {
     expect(isMaybePhoneNumber("")).toBe("");
   });
 
-  // Known limitation, tracked separately: no digit is required, so
-  // punctuation-only or whitespace-only strings count as phone numbers.
-  it("treats punctuation-only and whitespace-only strings as phone numbers", () => {
-    expect(isMaybePhoneNumber("()-")).toBe(true);
-    expect(isMaybePhoneNumber("   ")).toBe(true);
+  // At least one digit is required: punctuation-only or whitespace-only
+  // strings are not phone numbers.
+  it("does not treat punctuation-only or whitespace-only strings as phone numbers", () => {
+    expect(isMaybePhoneNumber("()-")).toBe(false);
+    expect(isMaybePhoneNumber("   ")).toBe(false);
+    expect(isMaybePhoneNumber("+")).toBe(false);
   });
 });
 

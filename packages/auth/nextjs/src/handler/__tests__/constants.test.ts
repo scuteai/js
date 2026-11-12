@@ -47,12 +47,9 @@ describe("handler/constants", () => {
       );
     });
 
-    // Known limitation, tracked separately: the guard is a falsy check, so
-    // a numeric appId 0 is rejected too.
-    it("throws for numeric appId 0 (falsy guard)", () => {
-      expect(() => csrfCookieKey(0)).toThrow(
-        "csrfCookieKey called without an appId"
-      );
+    // The guard rejects only a missing appId, so a numeric appId 0 works.
+    it("accepts numeric appId 0", () => {
+      expect(csrfCookieKey(0)).toBe("X-CSRF-Token__0");
     });
 
     it("throws for undefined / null", () => {

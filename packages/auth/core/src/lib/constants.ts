@@ -33,6 +33,23 @@ export const AUTH_CHANGE_EVENTS = {
   CONTACT_VERIFICATION_REQUIRED: "contact_verification_required",
 } as const;
 
+/**
+ * Events that carry the real session state: onAuthStateChange resolves the
+ * session for these before calling listeners. Every other event (OTP_PENDING,
+ * MFA_REQUIRED, ...) is delivered with an unauthenticated placeholder and a
+ * null user, so it must not overwrite a session.
+ */
+export const SESSION_EVENTS: readonly AuthChangeEvent[] = [
+  AUTH_CHANGE_EVENTS.INITIAL_SESSION,
+  AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
+  AUTH_CHANGE_EVENTS.SESSION_REFETCH,
+  AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
+  AUTH_CHANGE_EVENTS.SIGNED_IN,
+  AUTH_CHANGE_EVENTS.SIGNED_OUT,
+  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
+  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
+];
+
 export type AuthChangeEvent = ValueOf<typeof AUTH_CHANGE_EVENTS>;
 
 const AUTH_STATE_CHANGED = "authStateChanged";

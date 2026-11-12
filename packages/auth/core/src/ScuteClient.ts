@@ -16,6 +16,7 @@ import {
   AUTH_CHANGE_EVENTS,
   type InternalEvent,
   INTERNAL_EVENTS,
+  SESSION_EVENTS,
   SCUTE_MAGIC_PARAM,
   SCUTE_SKIP_PARAM,
   SCUTE_OAUTH_PKCE_PARAM,
@@ -322,7 +323,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
 
     this.debug("#_initialize", "start");
-    this.initializeDeferred = new Deferred();
+    const deferred = (this.initializeDeferred = new Deferred());
 
     try {
       const { error: appDataError } = await this._initializeAppData();
@@ -333,20 +334,27 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
             this._setupSessionBroadcast();
           }
 
-          this.config.autoRefreshToken = this.appData.auto_refresh !== false;
+          // The app can turn auto refresh off, never on against the
+          // client's own autoRefreshToken: false.
+          this.config.autoRefreshToken =
+            this.config.autoRefreshToken !== false && this.appData.auto_refresh !== false;
 
           await this.registerVisibilityChange();
           await this.registerRefetchInterval();
         }
       }
 
-      this.initializeDeferred.resolve({ error: appDataError });
+      deferred.resolve({ error: appDataError });
+      // A failed app data load (a transient API error) is not memoized: the
+      // next call tries again instead of failing until the client is recreated.
+      if (appDataError && this.initializeDeferred === deferred) this.initializeDeferred = null;
     } catch {
-      this.initializeDeferred.reject();
+      deferred.reject();
+      if (this.initializeDeferred === deferred) this.initializeDeferred = null;
     }
 
     this.debug("#_initialize", "end");
-    return this.initializeDeferred.promise;
+    return deferred.promise;
   }
 
   protected debug(...args: any[]) {
@@ -489,9 +497,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     );
 
     this.channel.onmessage = (msg) => {
-      if (msg.data.type === INTERNAL_EVENTS.AUTH_STATE_CHANGED) {
+      if (msg.data?.type === INTERNAL_EVENTS.AUTH_STATE_CHANGED) {
+        // Only the event name is trusted from another tab. The session and
+        // user are read again here (storage + server check), never taken
+        // from the message.
         this.emitter.emit(INTERNAL_EVENTS.AUTH_STATE_CHANGED, {
-          ...msg.data.payload,
+          event: msg.data.payload?.event,
           // prevent infinite loop
           _broadcasted: true,
         });
@@ -510,16 +521,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       user: T extends AuthenticatedSession ? ScuteUserData : null
     ) => void
   ) {
-    const sessionEvents: AuthChangeEvent[] = [
-      AUTH_CHANGE_EVENTS.INITIAL_SESSION,
-      AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
-      AUTH_CHANGE_EVENTS.SESSION_REFETCH,
-      AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
-      AUTH_CHANGE_EVENTS.SIGNED_IN,
-      AUTH_CHANGE_EVENTS.SIGNED_OUT,
-      AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
-      AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
-    ];
+    const sessionEvents = SESSION_EVENTS;
 
     let unsubscribed = false;
 
@@ -737,8 +739,8 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * Log in with magic link token.
    * @param token - Magic link token (sct_magic)
    */
-  async signInWithMagicLinkToken(token: string) {
-    const { data, error: verifyError } = await this.verifyMagicLinkToken(token);
+  async signInWithMagicLinkToken(token: string, url?: string | URL) {
+    const { data, error: verifyError } = await this.verifyMagicLinkToken(token, url);
     if (verifyError) return { error: verifyError };
 
     // If MFA, a contact to confirm or a verification code is required, the
@@ -752,6 +754,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
     if (data && "challengeCompleted" in data && data.challengeCompleted) {
       return { data, error: null };
+    }
+    // The sct_sk / sct_oauth path already signed in during verification.
+    if (data && "signedIn" in data && data.signedIn === true) {
+      return { error: null };
     }
 
     return this.signInWithTokenPayload((data as { authPayload: ScuteTokenPayload }).authPayload);
@@ -768,7 +774,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { error: new InvalidMagicLinkError() };
     }
 
-    return this.signInWithMagicLinkToken(token);
+    return this.signInWithMagicLinkToken(token, url);
   }
 
   /**
@@ -923,7 +929,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param url - (Optional) magic link url with sct_magic param. Default `window.location.href`.
    */
   getMagicLinkToken(url?: string | URL) {
-    const params = new URL(url ?? window.location.href).searchParams;
+    const href = url ?? (isBrowser() ? window.location.href : null);
+    if (!href) return null;
+    const params = new URL(href).searchParams;
     const token =
       params.get(SCUTE_MAGIC_PARAM) || params.get(SCUTE_OAUTH_PKCE_PARAM);
 
@@ -935,15 +943,10 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param url - (Optional) magic link url with sct_magic and sct_sk params. Default `window.location.href`.
    */
   private shouldSkipDeviceRegister(url?: string | URL) {
-    const skip = new URL(url ?? window.location.href).searchParams.get(
-      SCUTE_SKIP_PARAM
-    );
-
-    const pkce = new URL(url ?? window.location.href).searchParams.get(
-      SCUTE_OAUTH_PKCE_PARAM
-    );
-
-    return skip === "true" || pkce;
+    const href = url ?? (isBrowser() ? window.location.href : null);
+    if (!href) return false;
+    const params = new URL(href).searchParams;
+    return params.get(SCUTE_SKIP_PARAM) === "true" || !!params.get(SCUTE_OAUTH_PKCE_PARAM);
   }
 
   /**
@@ -959,15 +962,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       return { error };
     }
 
-    return this.verifyMagicLinkToken(token);
+    return this.verifyMagicLinkToken(token, url);
   }
 
   /**
    * Verify magic link token
    * @param token - Magic link token (sct_magic)
+   * @param url - (Optional) the link's url, read for sct_sk / sct_oauth. Default `window.location.href` in a browser.
    */
-  async verifyMagicLinkToken(token: string) {
-    const shouldSkipDeviceRegister = this.shouldSkipDeviceRegister();
+  async verifyMagicLinkToken(token: string, url?: string | URL) {
+    const shouldSkipDeviceRegister = this.shouldSkipDeviceRegister(url);
     const decodedMagicLinkToken = decodeMagicLinkToken(token);
     if (!decodedMagicLinkToken) {
       const error = new InvalidMagicLinkError();
@@ -1018,11 +1022,21 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     }
 
     if (shouldSkipDeviceRegister) {
-      await this.signInWithTokenPayload(authPayload as ScuteTokenPayload);
-    } else {
-      this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_VERIFIED);
+      const { error: signInError } = await this.signInWithTokenPayload(authPayload as ScuteTokenPayload);
+      if (signInError) {
+        return { data: null, error: signInError };
+      }
+      return {
+        data: {
+          authPayload: authPayload as ScuteTokenPayload,
+          magicPayload: decodedMagicLinkToken,
+          signedIn: true as const,
+        },
+        error: null,
+      };
     }
 
+    this.emitAuthChangeEvent(AUTH_CHANGE_EVENTS.MAGIC_VERIFIED);
     return {
       data: { authPayload: authPayload as ScuteTokenPayload, magicPayload: decodedMagicLinkToken },
       error: null,
@@ -1263,6 +1277,16 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param token - Challenge token
    */
   async cancelChallenge(token: string) {
+    const result = await this._cancelChallengeRequest(token);
+    // The sign-in's pending MFA challenge is over once it is cancelled.
+    if (!result.error && this._pendingMfaChallenge?.mfa_challenge?.token === token) {
+      this._pendingMfaChallenge = null;
+    }
+    return result;
+  }
+
+  /** @internal */
+  private async _cancelChallengeRequest(token: string) {
     return this.delete(`/challenges/${encodeURIComponent(token)}`);
   }
 
@@ -1273,8 +1297,9 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @param method - New MFA method (e.g., "totp", "email_otp", "sms_otp", "backup_code")
    */
   async switchMfaMethod(currentToken: string, method: string) {
-    // Cancel existing challenge
-    await this.cancelChallenge(currentToken);
+    // Cancel existing challenge (the pending sign-in stays: a new challenge
+    // replaces it below)
+    await this._cancelChallengeRequest(currentToken);
 
     // Create new challenge with the different method
     const appUserId = this._pendingMfaChallenge?.app_user_id;
@@ -1688,6 +1713,12 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
       await this.webauthnInitializeRegister(accessToken);
 
     if (initializeError) return { data: null, error: initializeError };
+    if (!data?.options) {
+      // An answer without registration options can't start a ceremony.
+      const error = new TechnicalError();
+      this._reportClientError(error, "webauthn-register-options");
+      return { data: null, error };
+    }
 
     return this.webauthnFinalizeRegister(
       {
@@ -1827,15 +1858,22 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * @returns true if the refresh token is revoked successfully.
    */
   async signOut(): Promise<boolean> {
-    const { data } = await this._getSession();
+    const stored = await this.initialSessionState();
+    const { data, error } = await this._getSession();
 
     this.emitAuthChangeEvent(
       AUTH_CHANGE_EVENTS.SIGNED_OUT,
       sessionUnAuthenticatedState()
     );
 
-    const session = data.session;
-    return this._signOut(session?.access);
+    // A transient failure of the pre-signout refresh (network, 5xx) leaves
+    // no confirmed session, but the stored one may still be live: revoke
+    // with it, so the result says whether the server really ended it.
+    let access = data.session?.access ?? null;
+    if (!access && error && stored.access && !this._isSessionRejected(error)) {
+      access = stored.access;
+    }
+    return this._signOut(access);
   }
 
   // ── Signing in as a user (support access, RB-49) ──
@@ -1863,11 +1901,15 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
 
     const { data } = await this._getSession();
     const own = data.session;
-    if (own?.status === "authenticated" && !decodeImpersonation(own.access)) {
+    const key = this._scopedKey("impersonator");
+    const kept = own?.status === "authenticated" && !decodeImpersonation(own.access) ? own : null;
+    if (kept) {
+      // The support person's refresh token: HttpOnly on the server, like the
+      // session's own refresh cookie.
       await this.scuteStorage.setItem(
-        this._scopedKey("impersonator"),
-        JSON.stringify({ access: own.access, refresh: own.refresh ?? null }),
-        { sameSite: "lax", httpOnly: false, path: "/", expires: own.refreshExpiresAt ?? own.accessExpiresAt } as any
+        key,
+        JSON.stringify({ access: kept.access, refresh: kept.refresh ?? null }),
+        { sameSite: "lax", httpOnly: !isBrowser(), path: "/", expires: kept.refreshExpiresAt ?? kept.accessExpiresAt } as any
       );
     }
 
@@ -1875,7 +1917,18 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     // token would bring the support person back on the next refresh).
     await this.removeSession();
     const session = (await this.setSession({ access: tokens.access, access_expires_at: tokens.access_expires_at })) as AuthenticatedSession;
-    return this._signInWithCheck(session);
+    const result = await this._signInWithCheck(session);
+    if (result.error && kept) {
+      // The session as the user didn't take: put the own session back.
+      await this.scuteStorage.removeItem(key, { sameSite: "lax", httpOnly: !isBrowser(), path: "/" } as any);
+      await this.setSession({
+        access: kept.access,
+        refresh: kept.refresh,
+        access_expires_at: kept.accessExpiresAt?.toString() ?? "",
+        refresh_expires_at: kept.refreshExpiresAt?.toString(),
+      } as Partial<ScuteTokenPayload>);
+    }
+    return result;
   }
 
   /**
@@ -1892,7 +1945,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     if (!impersonating && !raw) return false;
 
     if (impersonating) await this._signOut(access);
-    await this.scuteStorage.removeItem(key, { sameSite: "lax", httpOnly: false, path: "/" } as any);
+    await this.scuteStorage.removeItem(key, { sameSite: "lax", httpOnly: !isBrowser(), path: "/" } as any);
 
     let own: { access?: string; refresh?: string | null } | null = null;
     try {
@@ -2036,9 +2089,7 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
    * Get the access token from the current session.
    */
   async getAuthToken() {
-    const session = await this.initialSessionState();
-
-    return this._getAuthToken(session);
+    return this._currentAuthToken();
   }
 
   /**
@@ -2833,9 +2884,14 @@ class ScuteClient extends Mixin(ScuteBaseHttp, ScuteSession) {
     session?: Session | null,
     user?: ScuteUserData | null
   ) {
+    // The refresh token never leaves the session layer: listeners and the
+    // cross-tab channel get the session without it.
+    const shared = session && "refresh" in session && session.refresh
+      ? ({ ...session, refresh: undefined } as Session)
+      : session;
     this.emitter.emit(INTERNAL_EVENTS.AUTH_STATE_CHANGED, {
       event,
-      session,
+      session: shared,
       user,
     });
   }

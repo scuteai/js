@@ -336,10 +336,10 @@ describe("Pages API (Node)", () => {
     expect(res.statusCode).toBe(200);
   });
 
-  // Known limitation, tracked separately: on the Pages Node adapter a
-  // deleted cookie is read back from req.cookies (see pagesServerClient
-  // tests), so a failed refresh sends the refresh token upstream twice.
-  it("refresh failure: dead refresh token is sent upstream twice, cookies still end up cleared", async () => {
+  // On the Pages Node adapter a deletion written in this request wins over
+  // req.cookies (see pagesServerClient tests), so a failed refresh sends the
+  // dead refresh token upstream exactly once.
+  it("refresh failure: dead refresh token is sent upstream once, cookies end up cleared", async () => {
     upstream.on("POST", `/v1/auth/${APP_ID}/tokens/refresh`, () => json({ error: "revoked" }, 401));
     const dead = makeRefresh({ tag: "dead" });
     const { res, body, setCookies } = makeNodeRes();
@@ -353,8 +353,8 @@ describe("Pages API (Node)", () => {
     expect(res.statusCode).toBe(401);
     expect(body()).toBe("");
     const refreshCalls = upstream.callsTo("/tokens/refresh", "POST");
-    expect(refreshCalls).toHaveLength(2);
-    for (const c of refreshCalls) expect(c.headers.get("x-refresh-token")).toBe(dead);
+    expect(refreshCalls).toHaveLength(1);
+    expect(refreshCalls[0].headers.get("x-refresh-token")).toBe(dead);
     expect(isDeletion(lastCookie(setCookies(), REFRESH_KEY))).toBe(true);
     expect(isDeletion(lastCookie(setCookies(), ACCESS_KEY))).toBe(true);
   });

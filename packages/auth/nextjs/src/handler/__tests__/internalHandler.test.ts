@@ -23,6 +23,8 @@ import {
   json,
   lastCookie,
   makeAccess,
+  makeLegacyAccess,
+  makeLegacyRefresh,
   makeJwt,
   makeRefresh,
   makeRouteContext,
@@ -138,6 +140,9 @@ describe("routing", () => {
     expect(body).toMatch(/^[0-9a-f]{128}$/);
   });
 
+  // This helper constructs the client itself, so the constructor's app-data
+  // GET still happens here; ScuteHandler route-matches first and makes no
+  // call at all for unknown paths (see security.test.ts).
   it("unknown routes make no upstream call besides the constructor's app-data GET", async () => {
     await run({ method: "POST", path: "/auth/../../v1/apps/other/users" });
     await run({ method: "DELETE", path: "/auth/users/1" });
@@ -295,9 +300,10 @@ describe("POST /auth/sign-in", () => {
     expect(refresh.path).toBe("/");
     expect(refresh.expires).toBeInstanceOf(Date);
 
-    // only namespaced names get a value; legacy ones are only ever cleared
+    // only namespaced names get a value; legacy ones are never written
+    // (none were present, so none is cleared either)
     for (const name of [LEGACY_ACCESS_KEY, LEGACY_REFRESH_KEY]) {
-      expect(isDeletion(lastCookie(setCookies, name))).toBe(true);
+      expect(lastCookie(setCookies, name)?.value ?? "").toBe("");
     }
   });
 
@@ -350,7 +356,7 @@ describe("POST /auth/sign-in", () => {
     expect(res.status).toBe(401);
     expect(body).toBe("");
     expect(isDeletion(lastCookie(setCookies, ACCESS_KEY))).toBe(true);
-    expect(isDeletion(lastCookie(setCookies, LEGACY_ACCESS_KEY))).toBe(true);
+    expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
   });
 
   // SIGN_IN_MAX_DELAY_MS: only an access token issued in the last 30s may
@@ -361,7 +367,7 @@ describe("POST /auth/sign-in", () => {
     ["issued ~15 minutes ago", 5],
     ["expired an hour ago", -3600],
     ["claiming to be issued 2 minutes in the future", 900 + 120],
-  ])("rejects a presented access token %s: 401, no upstream token call, session cleared", async (_label, expIn) => {
+  ])("rejects a presented access token %s: 401, no upstream token call, existing session kept", async (_label, expIn) => {
     const presented = makeAccess({ expIn, tag: `presented${expIn}` });
     const { res, body, setCookies } = await run({
       path: "/auth/sign-in",
@@ -373,8 +379,8 @@ describe("POST /auth/sign-in", () => {
     expect(body).toBe("");
     expect(upstream.callsTo("/tokens/")).toEqual([]);
     expect(upstream.callsTo("/current_user")).toEqual([]);
-    expect(isDeletion(lastCookie(setCookies, ACCESS_KEY))).toBe(true);
-    expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
+    // the token is checked before the session is touched
+    expect(setCookies).toEqual([]);
   });
 
   it("accepts a presented access token issued within the last 30s", async () => {
@@ -441,12 +447,12 @@ describe("POST /auth/sign-in", () => {
     expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
   });
 
-  it("ignores legacy unsuffixed session cookies during sign-in and clears them", async () => {
+  it("ignores this app's legacy unsuffixed session cookies during sign-in and clears them", async () => {
     upstream.on("POST", `/v1/auth/${APP_ID}/tokens/refresh`, () => json({ error: "revoked" }, 401));
     const { res, setCookies } = await run({
       path: "/auth/sign-in",
       headers: { Authorization: `Bearer ${makeAccess()}` },
-      cookies: { [LEGACY_ACCESS_KEY]: makeAccess({ tag: "legacy" }), [LEGACY_REFRESH_KEY]: makeRefresh({ tag: "legacy" }) },
+      cookies: { [LEGACY_ACCESS_KEY]: makeLegacyAccess(), [LEGACY_REFRESH_KEY]: makeLegacyRefresh() },
       csrf: true,
     });
     expect(res.status).toBe(200);
@@ -457,18 +463,18 @@ describe("POST /auth/sign-in", () => {
     expect(lastCookie(setCookies, REFRESH_KEY)!.value).toBe(upstream.issued.rotateRefresh);
   });
 
-  it("401s before minting a session upstream when app data is unavailable", async () => {
+  it("401s before minting a session upstream when app data is unavailable, keeping the existing session", async () => {
     upstream.on("GET", `/v1/apps/${APP_ID}`, () => json({ error: "boom" }, 500));
     const { res, setCookies } = await run({
       path: "/auth/sign-in",
       headers: { Authorization: `Bearer ${makeAccess()}` },
+      cookies: { [ACCESS_KEY]: makeAccess({ tag: "existing" }), [REFRESH_KEY]: makeRefresh({ tag: "existing" }) },
       csrf: true,
     });
     expect(res.status).toBe(401);
     expect(upstream.callsTo("/tokens/rotate_access")).toEqual([]);
     expect(upstream.callsTo("/current_user", "DELETE")).toEqual([]);
-    expect(isDeletion(lastCookie(setCookies, ACCESS_KEY))).toBe(true);
-    expect(isDeletion(lastCookie(setCookies, REFRESH_KEY))).toBe(true);
+    expect(setCookies).toEqual([]);
   });
 });
 
@@ -512,8 +518,10 @@ describe("POST /auth/refresh", () => {
     expect(lastCookie(setCookies, ACCESS_KEY)!.httpOnly).toBeUndefined();
   });
 
-  it("with only an access cookie, rotates it via rotate_access (secret key) instead", async () => {
-    const access = makeAccess({ tag: "only-access" });
+  // With no refresh cookie, the JS-readable access cookie is held to the
+  // sign-in rule: only one issued in the last 30s may mint a session.
+  it("with only a just-issued access cookie, rotates it via rotate_access (secret key) instead", async () => {
+    const access = makeAccess({ expIn: 900 - 5, tag: "only-access" });
     const { res, body } = await run({
       path: "/auth/refresh",
       cookies: { [ACCESS_KEY]: access },
@@ -524,12 +532,26 @@ describe("POST /auth/refresh", () => {
     expect(upstream.callsTo("/tokens/rotate_access")[0].headers.get("x-authorization")).toBe(access);
   });
 
-  // Known limitation, tracked separately: with no session the refresh
-  // endpoint answers 200 {"access":null} rather than 401.
-  it("answers 200 with access:null when there is no session", async () => {
+  it.each([
+    ["issued 31s ago", 900 - 31],
+    ["issued ~15 minutes ago", 5],
+    ["expired", -60],
+  ])("with only an access cookie %s: 401, no token minted, cookies untouched", async (_label, expIn) => {
+    const { res, body, setCookies } = await run({
+      path: "/auth/refresh",
+      cookies: { [ACCESS_KEY]: makeAccess({ expIn, tag: `stale${expIn}` }) },
+      csrf: true,
+    });
+    expect(res.status).toBe(401);
+    expect(body).toBe("");
+    expect(upstream.callsTo("/tokens/")).toEqual([]);
+    expect(setCookies).toEqual([]);
+  });
+
+  it("answers 401 when there is no session", async () => {
     const { res, body } = await run({ path: "/auth/refresh", csrf: true });
-    expect(res.status).toBe(200);
-    expect(body).toBe('{"access":null}');
+    expect(res.status).toBe(401);
+    expect(body).toBe("");
     expect(nonAppDataCalls()).toEqual([]);
   });
 
@@ -540,7 +562,12 @@ describe("POST /auth/refresh", () => {
     );
     const { res, body, setCookies } = await run({
       path: "/auth/refresh",
-      cookies: { [REFRESH_KEY]: dead, [ACCESS_KEY]: makeAccess({ expIn: -10 }) },
+      cookies: {
+        [REFRESH_KEY]: dead,
+        [ACCESS_KEY]: makeAccess({ expIn: -10 }),
+        [LEGACY_ACCESS_KEY]: makeLegacyAccess(),
+        [LEGACY_REFRESH_KEY]: makeLegacyRefresh(),
+      },
       csrf: true,
     });
     expect(res.status).toBe(401);
@@ -551,6 +578,23 @@ describe("POST /auth/refresh", () => {
     for (const name of [ACCESS_KEY, REFRESH_KEY, LEGACY_ACCESS_KEY, LEGACY_REFRESH_KEY]) {
       expect(isDeletion(lastCookie(setCookies, name))).toBe(true);
     }
+  });
+
+  it.each([
+    ["an upstream 500", () => json({ error: "boom" }, 500), 502],
+    ["an upstream 503", () => json({ error: "down" }, 503), 502],
+    ["a dropped connection", () => { throw new TypeError("fetch failed"); }, 503],
+  ])("on %s: keeps the session cookies and answers %i", async (_label, reply, status) => {
+    upstream.on("POST", `/v1/auth/${APP_ID}/tokens/refresh`, reply as any);
+    const { res, body, setCookies } = await run({
+      path: "/auth/refresh",
+      cookies: { [REFRESH_KEY]: makeRefresh({ tag: "alive" }), [ACCESS_KEY]: makeAccess({ expIn: -10 }) },
+      csrf: true,
+    });
+    expect(res.status).toBe(status);
+    expect(body).toBe("");
+    expect(setCookies).toEqual([]);
+    expect(upstream.callsTo("/current_user", "DELETE")).toEqual([]);
   });
 
   it("still returns 401 if signOut throws during the failure cleanup", async () => {
@@ -623,7 +667,12 @@ describe("POST /auth/sign-out", () => {
     const access = makeAccess({ tag: "live" });
     const { res, body, setCookies, responseSetCookies } = await run({
       path: "/auth/sign-out",
-      cookies: { [ACCESS_KEY]: access, [REFRESH_KEY]: makeRefresh() },
+      cookies: {
+        [ACCESS_KEY]: access,
+        [REFRESH_KEY]: makeRefresh(),
+        [LEGACY_ACCESS_KEY]: makeLegacyAccess(),
+        [LEGACY_REFRESH_KEY]: makeLegacyRefresh(),
+      },
       csrf: true,
     });
     expect(res.status).toBe(200);
