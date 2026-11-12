@@ -12,6 +12,7 @@ import {
   authenticatedSession,
   createFakeClient,
   deferred,
+  flush,
   makeWrapper,
   setUrl,
   type FakeClient,
@@ -178,11 +179,23 @@ describe("default views", () => {
     setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
     const { client } = renderGate();
     await screen.findByRole("heading", { name: "Add a passkey" });
-    fireEvent.click(screen.getByRole("button", { name: "Add a passkey" }));
-    await screen.findByRole("heading", { name: "Passkey added" });
+    // The success screen stays 800ms: fake timers (restored in afterEach).
+    vi.useFakeTimers();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Add a passkey" }));
+    });
+    await flush();
+    expect(screen.getByRole("heading", { name: "Passkey added" })).toBeTruthy();
     expect(client.addDevice).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(PROTECTED)).toBeNull();
-    await waitFor(() => expect(screen.getByText(PROTECTED)).toBeTruthy(), { timeout: 3000 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(799);
+    });
+    expect(screen.queryByText(PROTECTED)).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getByText(PROTECTED)).toBeTruthy();
   });
 
   it("shows the app after Skip for now", async () => {

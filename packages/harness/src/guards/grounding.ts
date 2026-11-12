@@ -6,6 +6,13 @@ export type GroundingOptions = {
   args?: Record<string, string[]>;
   /** Shorter values aren't checked. Default 3. */
   minLength?: number;
+  /**
+   * Refuse calls with values to ground when no conversation came with them
+   * (the adapter didn't pass `messages`), instead of letting them through.
+   * Default false: without a transcript the guard has nothing to check
+   * against and passes. In "monitor" mode a refusal reaches onAlert.
+   */
+  requireTranscript?: boolean;
   when?: When;
   mode?: Mode;
 };
@@ -68,8 +75,9 @@ function seen(value: string | number, text: string, known: string[]): boolean {
  * Arguments have to come from the person, a tool result, or values you
  * grounded (run.ground()), not from the model's imagination. An invented
  * invoice id or email gets an "ask for it" instead of a call. Without a
- * transcript (messages) there is nothing to check against, so it passes;
- * adapters that have the conversation pass it along.
+ * transcript (messages) there is nothing to check against, so by default it
+ * passes; adapters that have the conversation pass it along. Set
+ * `requireTranscript` to refuse those calls instead (fail closed).
  */
 export function grounding(options: GroundingOptions = {}): Guard {
   const minLength = options.minLength ?? 3;
@@ -87,11 +95,18 @@ export function grounding(options: GroundingOptions = {}): Guard {
     mode: options.mode,
     before(call) {
       if (!matches(call, options.when)) return;
+      const values = valuesOf(call).filter(({ value }) => String(value).length >= minLength);
+      if (!values.length) return;
+      if (!call.messages.length && options.requireTranscript) {
+        return call.deny(
+          "This call can't be checked: no conversation came with it, so its arguments can't be traced to the person or a tool result.",
+          "no_transcript"
+        );
+      }
       const known = call.run.groundedValues();
       if (!call.messages.length && !known.length) return { kind: "proceed", reason: "no_transcript" };
       const text = evidence(call.messages);
-      for (const { name, value } of valuesOf(call)) {
-        if (String(value).length < minLength) continue;
+      for (const { name, value } of values) {
         if (!seen(value, text, known)) {
           return call.guide(
             `Don't guess ${name}: "${String(value)}" isn't from the person or a tool result. Ask the person, or look it up with a tool.`,

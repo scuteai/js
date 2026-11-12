@@ -35,6 +35,7 @@ import {
   flush,
   makeWrapper,
   setUrl,
+  unauthenticatedSession,
   type FakeClient,
 } from "./fakeScuteClient";
 
@@ -94,6 +95,26 @@ afterEach(() => {
 });
 
 describe("initialization", () => {
+  it("subscribes to auth events once across view changes", async () => {
+    const client = createFakeClient();
+    otpSignIn(client);
+    const { result } = await renderAtLogin(client);
+    await act(async () => {
+      await result.current.flow.submitIdentifier("ada@example.com");
+    });
+    expect(result.current.flow.view).toBe("otp_input");
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED));
+    expect(result.current.flow.view).toBe("mfa_verify");
+    act(() => client.emitSignedIn());
+    expect(result.current.flow.view).toBe("authenticated");
+    await flush();
+    // One for AuthContextProvider, one for the flow; each replay of
+    // INITIAL_SESSION would be a session refetch with the real client.
+    expect(client.onAuthStateChange).toHaveBeenCalledTimes(2);
+    expect(client.unsubscribes.every((u: any) => u.mock.calls.length === 0)).toBe(true);
+    expect(client.listenerCount).toBe(2);
+  });
+
   it("starts in the loading view until the SDK finishes initializing", async () => {
     const init = deferred<any>();
     const client = createFakeClient({ _initialize: vi.fn(() => init.promise) });
@@ -140,7 +161,7 @@ describe("initialization", () => {
     expect(result.current.flow.user).toEqual(USER);
   });
 
-  it("lands on login even though signed in when the session resolves before init", async () => {
+  it("stays authenticated when the session resolves before init", async () => {
     const init = deferred<any>();
     const client = createFakeClient({ _initialize: vi.fn(() => init.promise) });
     const { result } = renderFlow(client);
@@ -148,8 +169,9 @@ describe("initialization", () => {
     expect(result.current.flow.view).toBe("authenticated");
     await act(async () => init.resolve({ error: null }));
     await flush();
-    // Known limitation, tracked separately: the init effect reads isAuthenticated from the first render, so a SIGNED_IN that lands before _initialize() resolves is replaced by "login".
-    expect(result.current.flow.view).toBe("login");
+    // The init effect reads the live session (a ref), not the first render's,
+    // so a SIGNED_IN that lands before _initialize() resolves is kept.
+    expect(result.current.flow.view).toBe("authenticated");
     expect(result.current.auth.isAuthenticated).toBe(true);
     expect(result.current.flow.isAuthenticated).toBe(true);
   });
@@ -277,6 +299,17 @@ describe("magic link callback", () => {
     await waitFor(() => expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD));
     expect(hrefAtVerify).not.toContain("sct_sk");
     expect(result.current.flow.view).not.toBe("webauthn_register");
+  });
+
+  it("shows the error when the final token exchange is refused", async () => {
+    setUrl(`/cb?sct_magic=${MAGIC_TOKEN}&sct_sk=true`);
+    const client = createFakeClient();
+    client.tokenExchangeError = { code: 401, message: "Token payload rejected" };
+    const { result } = renderFlow(client);
+    await waitFor(() => expect(result.current.flow.view).toBe("error"));
+    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
+    expect(result.current.flow.error).toBe("Token payload rejected");
+    expect(result.current.auth.isAuthenticated).toBe(false);
   });
 
   it("sct_sk with any value other than true doesn't skip the offer", async () => {
@@ -882,6 +915,24 @@ describe("magic link polling", () => {
     expect(client.getMagicLinkStatus).not.toHaveBeenCalled();
   });
 
+  it("shows the error instead of waiting when the final token exchange is refused", async () => {
+    const client = createFakeClient();
+    client.tokenExchangeError = { code: 401, message: "Token payload rejected" };
+    magicLinkSignIn(client, "ml_42");
+    client.getMagicLinkStatus.mockResolvedValue({ data: AUTH_PAYLOAD, error: null });
+    const { result } = await atMagicPending(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(client.signInWithTokenPayload).toHaveBeenCalledWith(AUTH_PAYLOAD);
+    expect(result.current.flow.view).toBe("error");
+    expect(result.current.flow.error).toBe("Token payload rejected");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(client.getMagicLinkStatus).toHaveBeenCalledTimes(1);
+  });
+
   it("stops polling after 10 minutes and shows an error", async () => {
     const client = createFakeClient();
     magicLinkSignIn(client);
@@ -896,7 +947,9 @@ describe("magic link polling", () => {
       await vi.advanceTimersByTimeAsync(9 * 60_000);
     });
     const calls = client.getMagicLinkStatus.mock.calls.length;
-    expect(calls).toBeLessThanOrEqual(300);
+    // One poll every 2s from 2s to 598s; the one due at 600s finds the
+    // deadline passed and stops without asking.
+    expect(calls).toBe(299);
     expect(result.current.flow.view).toBe("error");
     expect(result.current.flow.error).toBe("The sign-in link timed out. Please try again.");
 
@@ -1052,7 +1105,7 @@ describe("OTP verification", () => {
     expect(result.current.flow.error).toBe("Invalid code");
   });
 
-  it("stores the MFA challenge but not the grace-period fields", async () => {
+  it("stores the MFA challenge and the grace-period fields", async () => {
     const client = createFakeClient();
     client.verifyOtp.mockImplementation(async () => {
       client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
@@ -1068,9 +1121,10 @@ describe("OTP verification", () => {
     expect(result.current.flow.view).toBe("mfa_enroll");
     expect(result.current.flow.mfaChallenge).toEqual(mfaRequiredData.mfaChallenge);
     expect(result.current.flow.mfaAvailableMethods).toEqual(["totp", "backup_code"]);
-    // Known limitation, tracked separately (REF-16): submitOtp copies the MFA fields by hand, so the grace-period fields are not stored on the OTP path.
-    expect(result.current.flow.mfaGracePeriod).toBe(false);
-    expect(result.current.flow.mfaGraceDaysRemaining).toBeUndefined();
+    // The OTP path stores the MFA answer the same way as every other path
+    // (REF-16), the grace-period fields included.
+    expect(result.current.flow.mfaGracePeriod).toBe(true);
+    expect(result.current.flow.mfaGraceDaysRemaining).toBe(4);
   });
 });
 
@@ -1231,6 +1285,46 @@ describe("passkey registration offer", () => {
 });
 
 describe("MFA views", () => {
+  it("forgets the authenticator key once the factor set up with the sign-in's pass is verified", async () => {
+    setUrl(`/cb?sct_magic=${MAGIC_TOKEN}`);
+    const methods = ["totp", "sms"];
+    const client = createFakeClient({
+      verifyMagicLinkToken: vi.fn(async () => {
+        client.pendingMfaChallenge = { mfa_required: true, mfa_enrollment_required: true, available_methods: methods, setup_token: "scsetup_1" };
+        client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED);
+        return {
+          data: { mfaRequired: true, mfaEnrollmentRequired: true, availableMethods: methods, setupToken: "scsetup_1" },
+          error: null,
+        };
+      }),
+      enrollMfaWithSetupToken: vi.fn(async () => ({
+        data: {
+          enrollment: { id: "enr_1", method: "totp" },
+          provisioning_uri: "otpauth://totp/Acme:ada?secret=TOTPSECRET",
+          secret: "TOTPSECRET",
+        },
+        error: null,
+      })),
+      verifyMfaEnrollmentWithSetupToken: vi.fn(async () => {
+        client.emitSignedIn();
+        return { data: null, error: null };
+      }),
+    });
+    const { result } = renderFlow(client);
+    await waitFor(() => expect(result.current.flow.view).toBe("mfa_enroll"));
+    await act(async () => {
+      await result.current.flow.startMfaSetup("totp");
+    });
+    expect(result.current.flow.mfaSetup?.secret).toBe("TOTPSECRET");
+    await act(async () => {
+      expect(await result.current.flow.submitMfaSetupCode("123456")).toBe(true);
+    });
+    expect(client.verifyMfaEnrollmentWithSetupToken).toHaveBeenCalledWith("scsetup_1", "enr_1", "123456");
+    expect(result.current.flow.view).toBe("authenticated");
+    expect(result.current.flow.mfaSetup).toBeNull();
+    expect(JSON.stringify(result.current.flow)).not.toContain("TOTPSECRET");
+  });
+
   async function atMfaVerify(client: FakeClient) {
     client.signInOrUp.mockImplementation(async () => {
       client.emit(AUTH_CHANGE_EVENTS.MFA_REQUIRED);
@@ -1455,7 +1549,9 @@ describe("security", () => {
     const { client, result } = await renderAtLogin();
     act(() => client.emitSignedIn());
     expect(result.current.flow.view).toBe("authenticated");
-    act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_REFETCH));
+    // The real client sends the unauthenticated state when the refetch finds
+    // no session (an event without one would be resolved from storage).
+    act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_REFETCH, unauthenticatedSession(), null));
     expect(result.current.auth.isAuthenticated).toBe(false);
     expect(result.current.flow.view).toBe("login");
     expect(result.current.flow.isAuthenticated).toBe(false);

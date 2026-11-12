@@ -55,29 +55,117 @@ export const DEFAULT_APP_DATA = {
 
 export type FakeClient = ReturnType<typeof createFakeClient>;
 
+// Same list as ScuteClient.onAuthStateChange's sessionEvents: for these the
+// real client resolves the stored session before calling a listener when the
+// event came without one.
+const SESSION_EVENTS: readonly string[] = [
+  AUTH_CHANGE_EVENTS.INITIAL_SESSION,
+  AUTH_CHANGE_EVENTS.SESSION_EXPIRED,
+  AUTH_CHANGE_EVENTS.SESSION_REFETCH,
+  AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
+  AUTH_CHANGE_EVENTS.SIGNED_IN,
+  AUTH_CHANGE_EVENTS.SIGNED_OUT,
+  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
+  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
+];
+
+// Events the real client forces a fresh session fetch for (no SESSION_REFETCH
+// event is emitted for those).
+const FORCED_REFETCH_EVENTS: readonly string[] = [
+  AUTH_CHANGE_EVENTS.INITIAL_SESSION,
+  AUTH_CHANGE_EVENTS.TOKEN_REFRESHED,
+  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_START,
+  AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS,
+];
+
+type Handler = (payload: { event: string; session?: any; user?: any }) => Promise<void>;
+
 export function createFakeClient(overrides: Record<string, unknown> = {}) {
-  const listeners = new Set<Listener>();
+  // One internal handler per subscriber, like the real client's emitter.
+  const handlers = new Set<Handler>();
   const unsubscribes: Array<ReturnType<typeof vi.fn>> = [];
+  let initPromise: Promise<{ error: any }> | null = null;
+
+  // The real _initialize() runs once and is shared; the session lookup waits
+  // for it. Calls its implementation without going through the spy, so tests
+  // counting the hook's own _initialize() calls are unaffected.
+  const ensureInitialized = () => {
+    if (!initPromise) {
+      const impl = client._initialize?.getMockImplementation?.() ?? client._initialize;
+      initPromise = Promise.resolve()
+        .then(() => impl())
+        .then((r: any) => ({ error: r?.error ?? null }), (error: unknown) => ({ error }));
+    }
+    return initPromise;
+  };
+
+  // ScuteClient._getSession: the stored session (null when settings failed).
+  const getStoredSession = async () => {
+    const { error } = await ensureInitialized();
+    if (error) return { session: null, user: null };
+    return { session: client.session, user: client.user };
+  };
+
+  const dispatch = (payload: { event: string; session?: any; user?: any }) => {
+    for (const handler of [...handlers]) void handler(payload);
+  };
 
   const client: any = {
-    listeners,
+    /** The stored session and user, what the real client's _getSession reads. */
+    session: unauthenticatedSession() as any,
+    user: null as any,
+    /** Set to an error to make signInWithTokenPayload fail (no session, no event). */
+    tokenExchangeError: null as any,
     unsubscribes,
+    get listenerCount() {
+      return handlers.size;
+    },
+    /**
+     * Mirrors ScuteClient.onAuthStateChange: replays INITIAL_SESSION (with the
+     * stored session, once _initialize() settles) to every new subscriber; a
+     * session event without a session (or with an access token but no user)
+     * is delivered after the stored session is read; any other event without
+     * a session reaches listeners as the unauthenticated state + null user.
+     */
     onAuthStateChange: vi.fn((cb: Listener) => {
-      listeners.add(cb);
+      let unsubscribed = false;
+      const handler: Handler = async ({ event, session, user }) => {
+        if (unsubscribed) return;
+        if (SESSION_EVENTS.includes(event) && (!session || (session.access !== null && !user))) {
+          const force = !user && FORCED_REFETCH_EVENTS.includes(event);
+          ({ session, user } = await getStoredSession());
+          if (!force && session?.status === "authenticated" && user) {
+            dispatch({ event: AUTH_CHANGE_EVENTS.SESSION_REFETCH, session, user });
+          }
+        }
+        if (unsubscribed) return;
+        cb(event, session ?? unauthenticatedSession(), user ?? null);
+      };
+      handlers.add(handler);
+      void handler({ event: AUTH_CHANGE_EVENTS.INITIAL_SESSION });
       const unsubscribe = vi.fn(() => {
-        listeners.delete(cb);
+        unsubscribed = true;
+        handlers.delete(handler);
       });
       unsubscribes.push(unsubscribe);
       return unsubscribe;
     }),
     /**
-     * Mirrors ScuteClient.onAuthStateChange: an event emitted without a
-     * session reaches listeners as the unauthenticated state + null user.
+     * ScuteClient.emitAuthChangeEvent. A session event that brings a session
+     * stores it first (the real client persists before emitting); a sign-out
+     * or expiry clears it, and is emitted with the unauthenticated state the
+     * way the real client's signOut and _expireSession emit it.
      */
     emit(event: string, session?: any, user?: any) {
-      for (const cb of [...listeners]) {
-        cb(event, session ?? unauthenticatedSession(), user ?? null);
+      if (event === AUTH_CHANGE_EVENTS.SIGNED_OUT || event === AUTH_CHANGE_EVENTS.SESSION_EXPIRED) {
+        client.session = unauthenticatedSession();
+        client.user = null;
+        session ??= unauthenticatedSession();
+      } else if (session && SESSION_EVENTS.includes(event)) {
+        client.session = session;
+        if (user !== undefined) client.user = user;
       }
+      dispatch({ event, session, user });
     },
     /** Convenience: emit SIGNED_IN with a real-looking session + user. */
     emitSignedIn(user: any = USER) {
@@ -95,8 +183,11 @@ export function createFakeClient(overrides: Record<string, unknown> = {}) {
       error: null,
     })),
     getAppData: vi.fn(async () => ({ data: { ...DEFAULT_APP_DATA }, error: null })),
-    // Like the real client: stores the session, emits SIGNED_IN, returns { error: null }.
+    // Like the real client: stores the session, emits SIGNED_IN, returns
+    // { error: null }; or, with `tokenExchangeError` set, fails without a
+    // session or an event.
     signInWithTokenPayload: vi.fn(async (payload: any) => {
+      if (client.tokenExchangeError) return { error: client.tokenExchangeError };
       client.emit(
         AUTH_CHANGE_EVENTS.SIGNED_IN,
         authenticatedSession(payload?.access ?? ACCESS_TOKEN),

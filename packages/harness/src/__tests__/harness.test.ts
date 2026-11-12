@@ -1,9 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHarness, guards, memoryStore, toolPermission, type DecisionEvent } from "../index";
 import { base, fakeScute } from "./fake-scute";
 
 const CHECK = "/v1/auth/app1/agent/check";
 const MINT = "/v1/apps/app1/authz/agents/support-bot/tasks";
+
+// The harness falls back to SCUTE_* from the environment; tests that leave a
+// setting out mean "not configured", whatever the shell running them has.
+beforeEach(() => {
+  vi.stubEnv("SCUTE_SECRET", undefined);
+  vi.stubEnv("SCUTE_APP_ID", undefined);
+  vi.stubEnv("SCUTE_BASE_URL", undefined);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("naming convention", () => {
   it("maps tool names to permissions", () => {
@@ -269,6 +280,32 @@ describe("runs", () => {
     await run.revoke();
     expect(scute.seen.at(-1)!.path).toBe(`${MINT}/task1/revoke`);
     await expect(run.token()).rejects.toThrow(/task is closed/);
+  });
+
+  it("revoke a task token from your backend when they have the secret", async () => {
+    const scute = fakeScute();
+    const run = createHarness({ ...base, fetch: scute.fetch }).run({ token: "sct_from_backend" });
+    await run.startVerification({ method: "email_otp" }); // opens the session
+
+    await run.revoke();
+
+    expect(scute.paths("/v1/auth/app1/agent/sessions/sess1/end")).toHaveLength(1);
+    expect(scute.seen.at(-1)).toMatchObject({ path: `${MINT}/task1/revoke`, auth: "Bearer sk_test" });
+    await expect(run.token()).rejects.toThrow(/task is closed/);
+    expect((await run.check("read_invoice", { id: 1 })).kind).toBe("deny");
+  });
+
+  it("stop a task-token run without the secret, and say the task is still live", async () => {
+    const scute = fakeScute();
+    const run = createHarness({ agent: "support-bot", appId: "app1", baseUrl: "https://scute.test", fetch: scute.fetch }).run({
+      token: "sct_from_backend",
+    });
+
+    await expect(run.complete()).rejects.toMatchObject({ code: "no_credentials", message: expect.stringMatching(/can't be completed without SCUTE_SECRET/) });
+    await expect(run.revoke()).rejects.toMatchObject({ code: "no_credentials" });
+    await expect(run.token()).rejects.toThrow(/task is closed/);
+    expect((await run.check("read_invoice", { id: 1 })).kind).toBe("deny");
+    expect(scute.paths(CHECK)).toHaveLength(0);
   });
 
   it("list the tools inside the task's ceiling", async () => {

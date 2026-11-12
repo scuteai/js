@@ -4,7 +4,7 @@ export type SseEvent = { event?: string; id?: string; data: string };
 
 export function parseSse(text: string): SseEvent[] {
   const events: SseEvent[] = [];
-  for (const block of text.replace(/\r\n/g, "\n").split("\n\n")) {
+  for (const block of text.replace(/\r\n?/g, "\n").split("\n\n")) {
     if (!block.trim()) continue;
     const ev: SseEvent = { data: "" };
     const data: string[] = [];

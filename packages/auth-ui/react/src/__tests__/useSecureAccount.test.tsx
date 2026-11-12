@@ -4,6 +4,7 @@ import { useAuth } from "@scute/react-hooks";
 import { useSecureAccount } from "../useSecureAccount";
 import {
   AUTH_CHANGE_EVENTS,
+  USER,
   createFakeClient,
   deferred,
   makeWrapper,
@@ -154,15 +155,30 @@ describe("loading", () => {
     expect(r.result.current.sa.loading).toBe(false);
   });
 
-  it("silently keeps stale enrollments when listMfaMethods returns an error", async () => {
+  it("reports a returned listMfaMethods error and keeps the last known rows", async () => {
     const r = await signedIn();
     r.client.listMfaMethods.mockResolvedValueOnce({ data: null, error: { message: "500" } });
     await act(async () => {
       await r.result.current.sa.refresh();
     });
-    // Known limitation, tracked separately: only thrown errors are reported; a returned { error } leaves `error` null and the old rows in place.
-    expect(r.result.current.sa.error).toBeNull();
+    // A returned { error } is reported like a thrown one; the rows keep the
+    // last known state and `error` says they may be stale.
+    expect(r.result.current.sa.error).toEqual({ code: "config_load_failed", message: "500" });
     expect(row(r, "totp").enrolled).toBe(true);
+    expect(r.result.current.sa.loading).toBe(false);
+  });
+
+  it("clears the load error on the next successful refresh", async () => {
+    const r = await signedIn();
+    r.client.listMfaMethods.mockResolvedValueOnce({ data: null, error: { message: "500" } });
+    await act(async () => {
+      await r.result.current.sa.refresh();
+    });
+    expect(r.result.current.sa.error).not.toBeNull();
+    await act(async () => {
+      await r.result.current.sa.refresh();
+    });
+    expect(r.result.current.sa.error).toBeNull();
   });
 });
 
@@ -205,24 +221,47 @@ describe("allow-list", () => {
     });
     expect(row(r, "passkey").allowed).toBe(false);
     expect(row(r, "totp").allowed).toBe(false);
-    // Known limitation, tracked separately: a returned { error } from getAppData is not reported in `error`.
-    expect(r.result.current.sa.error).toBeNull();
+    // A returned { error } from getAppData is reported in `error`.
+    expect(r.result.current.sa.error).toEqual({ code: "config_load_failed", message: "503" });
   });
+});
 
-  it("never marks the passkey row as enrolled from real app data", async () => {
+describe("passkey enrollment state", () => {
+  it("is not enrolled when the current user has no passkey", async () => {
     const r = await signedIn();
-    // Known limitation, tracked separately: passkey enrollment is read from appData._currentUserHasPasskey, which the SDK and API do not set.
+    expect(r.result.current.auth.user?.webauthn_enabled).toBeUndefined();
     expect(row(r, "passkey").enrolled).toBe(false);
   });
 
-  it("only reports the passkey as enrolled if appData carries _currentUserHasPasskey", async () => {
-    const r = await signedIn({
-      getAppData: vi.fn(async () => ({
-        data: { passkeys_enabled: true, mfa_methods_allowed: [], _currentUserHasPasskey: true },
-        error: null,
-      })),
-    });
+  it("is enrolled when the current user's webauthn_enabled is true", async () => {
+    const r = setup({ listMfaMethods: vi.fn(async () => ({ data: ENROLLED, error: null })) });
+    act(() => r.client.emitSignedIn({ ...USER, webauthn_enabled: true }));
+    await waitFor(() => expect(r.result.current.sa.loading).toBe(false));
     expect(row(r, "passkey").enrolled).toBe(true);
+  });
+
+  it("follows the refetched user after a passkey is added", async () => {
+    const r = await signedIn();
+    // The real client refetches the user on WEBAUTHN_REGISTER_SUCCESS; the
+    // server now reports a credential.
+    r.client.addDevice.mockImplementation(async () => {
+      r.client.user = { ...USER, webauthn_enabled: true };
+      r.client.emit(AUTH_CHANGE_EVENTS.WEBAUTHN_REGISTER_SUCCESS);
+      return { data: { id: "cred_1" }, error: null };
+    });
+    expect(row(r, "passkey").enrolled).toBe(false);
+    await act(async () => {
+      await r.result.current.sa.startEnroll("passkey");
+    });
+    await waitFor(() => expect(row(r, "passkey").enrolled).toBe(true));
+  });
+
+  it("is not enrolled once signed out", async () => {
+    const r = setup({ listMfaMethods: vi.fn(async () => ({ data: ENROLLED, error: null })) });
+    act(() => r.client.emitSignedIn({ ...USER, webauthn_enabled: true }));
+    await waitFor(() => expect(row(r, "passkey").enrolled).toBe(true));
+    act(() => r.client.emit(AUTH_CHANGE_EVENTS.SIGNED_OUT));
+    expect(row(r, "passkey").enrolled).toBe(false);
   });
 });
 

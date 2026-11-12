@@ -51,7 +51,13 @@ type RunState = {
   usd: number;
 };
 
-type CheckOptions = { id?: string; messages?: unknown[]; approvedByUser?: boolean };
+type CheckOptions = {
+  id?: string;
+  messages?: unknown[];
+  approvedByUser?: boolean;
+  /** @internal false: a call that may run isn't charged to the budgets yet (it waits on the person's approval). */
+  reserve?: boolean;
+};
 
 const HOUR = 3600_000;
 
@@ -164,9 +170,9 @@ export class Run {
 
   /** The task token, starting the task on first use. */
   async token(): Promise<string> {
-    if (this.options.token) return this.options.token;
     const s = await this.load();
     if (s.closed) throw new ScuteHarnessError("This run's task is closed; start a new run", 409, "task_closed");
+    if (this.options.token) return this.options.token;
     if (s.token && !(s.expiresAt && Date.parse(s.expiresAt) <= Date.now() + 5000)) return s.token;
     this.minting ??= this.mint().finally(() => {
       this.minting = undefined;
@@ -243,22 +249,56 @@ export class Run {
     return this.agent((t) => this.harness.client.signWithProperty(t, name, input));
   }
 
-  /** The job is done: close the task (and its session). */
+  /**
+   * The job is done: close the task (and its session). For a run on a task
+   * token from your backend, closing the task needs SCUTE_SECRET here too;
+   * without it the run still stops, and this throws `no_credentials` so you
+   * know your backend has to close the task.
+   */
   complete() {
     return this.close("complete");
   }
 
-  /** Stop this run now: the task token stops working everywhere. */
+  /**
+   * Stop this run now: the task token stops working everywhere. On a task
+   * token from your backend without SCUTE_SECRET, the run stops but the
+   * token stays live until your backend revokes it: this throws
+   * `no_credentials` so that isn't missed.
+   */
   revoke() {
     return this.close("revoke");
   }
 
   private async close(verb: "complete" | "revoke") {
     const s = await this.load();
-    if (s.sessionId && s.token) await this.harness.client.endSession(s.token, s.sessionId).catch(() => undefined);
-    if (s.taskId) await this.harness.client.closeTask(this.harness.agent, s.taskId, verb);
+    const token = this.options.token ?? s.token;
+    let taskId = s.taskId;
+    let lookup: unknown;
+    if (this.options.token && !taskId && this.harness.client.canManage) {
+      // A backend token: its task id comes from Scute. Asked with the token
+      // directly: a run already stopped here may still hold a live token.
+      try {
+        taskId = (await this.harness.client.whoami(this.options.token)).task;
+      } catch (e) {
+        lookup = e;
+      }
+    }
+    if (s.sessionId && token) await this.harness.client.endSession(token, s.sessionId).catch(() => undefined);
+    // Closed here first: this run makes no more calls, whatever Scute answers next.
+    const alreadyDead = lookup instanceof ScuteHarnessError && lookup.status === 401 && lookup.code === "invalid_task_token";
     s.closed = true;
     await this.save();
+    if (taskId) {
+      await this.harness.client.closeTask(this.harness.agent, taskId, verb);
+      return;
+    }
+    if (!this.options.token || alreadyDead) return;
+    if (lookup) throw lookup;
+    throw new ScuteHarnessError(
+      `This run is stopped, but the task can't be ${verb === "revoke" ? "revoked" : "completed"} without SCUTE_SECRET: have your backend ${verb} it`,
+      401,
+      "no_credentials"
+    );
   }
 
   // ── Session and verification ──
@@ -531,7 +571,7 @@ export class Run {
       const verdict = await this.harness.evaluate(call);
       // A call that may run takes its share of the budgets now, before
       // the next check in line looks at them.
-      if (runs(verdict)) await this.reserve(call);
+      if (runs(verdict) && options.reserve !== false) await this.reserve(call);
       return verdict;
     });
   }

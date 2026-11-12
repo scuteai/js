@@ -25,6 +25,21 @@ describe("args", () => {
     expect((await run.check("refund_invoice", { note: "too long" })).kind).toBe("guide");
     expect((await run.check("send_email", { to: "a@evil.test" })).message).toBe("Only example.com addresses.");
   });
+
+  it("holds min and max for numeric strings, and refuses bounded values it can't read as numbers", async () => {
+    const run = harness([guards.args({ refund_invoice: { amount: { min: 1, max: 500 } } })]).run();
+
+    expect(await run.check("refund_invoice", { amount: "900" })).toMatchObject({ kind: "guide", message: "amount can be at most 500." });
+    expect(await run.check("refund_invoice", { amount: " 9e2 " })).toMatchObject({ kind: "guide", message: "amount can be at most 500." });
+    expect(await run.check("refund_invoice", { amount: "0.5" })).toMatchObject({ kind: "guide", message: "amount has to be at least 1." });
+    expect((await run.check("refund_invoice", { amount: "90" })).kind).toBe("proceed");
+    expect((await run.check("refund_invoice", { amount: "90.50" })).kind).toBe("proceed");
+
+    // Fail closed: a tool reading these with parseInt or Number could get past the bound.
+    for (const amount of ["900abc", "0x3E8", "", "lots", NaN, true, [900], { value: 900 }]) {
+      expect(await run.check("refund_invoice", { amount }), String(amount)).toMatchObject({ kind: "guide", message: "amount has to be a number." });
+    }
+  });
 });
 
 describe("budget", () => {
@@ -97,10 +112,34 @@ describe("grounding", () => {
     expect((await run.check("refund_invoice", { invoice_id: "INV-1234" }, { messages })).kind).toBe("proceed");
   });
 
-  it("lets calls through when there's no transcript to check against", async () => {
+  it("lets calls through when there's no transcript to check against (the intended default)", async () => {
+    // Owner decision: without messages there's nothing to check against, so
+    // the default passes (recorded as no_transcript). requireTranscript opts
+    // into failing closed.
     const v = await harness([guards.grounding()]).run().check("refund_invoice", { invoice_id: "X-1" });
     expect(v).toMatchObject({ kind: "proceed" });
     expect(v.results[0].decision.reason).toBe("no_transcript");
+  });
+
+  it("refuses calls without a transcript when requireTranscript is set", async () => {
+    const run = harness([guards.grounding({ requireTranscript: true })]).run();
+
+    const v = await run.check("refund_invoice", { invoice_id: "X-1" });
+    expect(v).toMatchObject({ kind: "deny", decision: { reason: "no_transcript" } });
+    run.ground("X-1"); // grounded values alone don't stand in for the conversation
+    expect((await run.check("refund_invoice", { invoice_id: "X-1" })).kind).toBe("deny");
+    // Nothing to ground: nothing to refuse.
+    expect((await run.check("get_weather", { city: "Paris" })).kind).toBe("proceed");
+    // With the conversation it checks as usual.
+    expect((await run.check("refund_invoice", { invoice_id: "X-1" }, { messages: [user("refund X-1")] })).kind).toBe("proceed");
+  });
+
+  it("alerts on a missing transcript in monitor mode", async () => {
+    const alerts: unknown[] = [];
+    const run = harness([guards.grounding({ requireTranscript: true, mode: "monitor" })], { onAlert: (e: unknown) => alerts.push(e) }).run();
+
+    expect((await run.check("refund_invoice", { invoice_id: "X-1" })).kind).toBe("proceed");
+    expect(alerts).toMatchObject([{ guard: "grounding", decision: { kind: "deny", reason: "no_transcript" } }]);
   });
 });
 

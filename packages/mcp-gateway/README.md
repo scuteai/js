@@ -60,5 +60,5 @@ Signing in isn't a tool: the MCP client signs the person in when it connects (OA
 
 ## Notes
 
-- Tool pinning checks the definitions it has seen in `tools/list`. Keep pinning on (`pinning: true`, the default) and review held tools in Scute.
+- Tool pinning checks the definitions it has seen in `tools/list`. When a client calls a tool before any `tools/list` has been reported, the gateway lists the upstream's tools itself first; while Scute can't confirm the pins, tool calls are refused. Keep pinning on (`pinning: true`, the default) and review held tools in Scute.
 - JSON-RPC batches that contain `tools/*` requests are refused; send them one at a time (MCP 2025-06-18 dropped batching).

@@ -111,6 +111,7 @@ export class McpGateway {
   private quarantined = new Set<string>();
   private resourceId?: string;
   private lastReport = "";
+  private pinCheck?: Promise<boolean>;
 
   constructor(readonly config: GatewayConfig) {
     const appId = config.appId ?? env("SCUTE_APP_ID");
@@ -211,6 +212,12 @@ export class McpGateway {
 
   private session(caller: Caller): Promise<Session> {
     const key = caller.claims.jti ?? caller.token;
+    const cachedUntil = this.expiries.get(key);
+    if (cachedUntil !== undefined && cachedUntil <= Date.now()) {
+      // The task token behind this session has expired: start a new task.
+      this.expiries.delete(key);
+      this.sessions.delete(key);
+    }
     if (this.sessions.size > 500) {
       // Drop sessions whose token has expired, so the map doesn't grow.
       const now = Date.now();
@@ -290,8 +297,15 @@ export class McpGateway {
     if (typeof name !== "string") return json({ jsonrpc: "2.0", id: msg.id ?? null, error: { code: -32602, message: "tools/call needs a tool name" } });
     const args = (msg.params?.arguments && typeof msg.params.arguments === "object" ? msg.params.arguments : {}) as Record<string, unknown>;
 
-    if (this.config.pinning !== false && this.quarantined.has(name)) {
-      return this.rpcResult(msg, toolError(`${name} is new or changed and is held for review in Scute. Don't retry it; tell the person.`));
+    if (this.config.pinning !== false) {
+      // Quarantine is learned from tools/list. A client may call a tool without
+      // listing first (or the gateway may have restarted), so learn it now.
+      if (!(await this.ensurePinsKnown(req))) {
+        return this.rpcResult(msg, toolError("Scute couldn't confirm this server's tools are reviewed, so tool calls are paused. Try again shortly."));
+      }
+      if (this.quarantined.has(name)) {
+        return this.rpcResult(msg, toolError(`${name} is new or changed and is held for review in Scute. Don't retry it; tell the person.`));
+      }
     }
 
     let session: Session;
@@ -419,7 +433,18 @@ export class McpGateway {
   private async rewrite(res: Response, id: RpcMessage["id"], change: (result: unknown) => Promise<unknown>): Promise<Response> {
     const type = res.headers.get("content-type") ?? "";
     const headers = new Headers(res.headers);
-    const fix = async (m: RpcMessage) => (m && m.id === id && "result" in m ? { ...m, result: await change(m.result) } : m);
+    const isAnswer = (m: unknown): m is RpcMessage => !!m && typeof m === "object" && (m as RpcMessage).id === id && "result" in (m as object);
+    // Only the parse is allowed to fail open (a body that isn't JSON-RPC passes
+    // on unchanged). A failure in `change` (pinning, guards, the after hooks)
+    // must never let the upstream's unchecked answer through.
+    const fix = async (m: RpcMessage): Promise<{ msg: RpcMessage; failed: boolean }> => {
+      try {
+        return { msg: { ...m, result: await change(m.result) }, failed: false };
+      } catch {
+        const error = { code: -32603, message: "Gateway error: the upstream's answer couldn't be checked" };
+        return { msg: { jsonrpc: "2.0", id: id ?? null, error }, failed: true };
+      }
+    };
 
     if (type.includes("text/event-stream") && res.body) {
       const decoder = new TextDecoder();
@@ -428,18 +453,21 @@ export class McpGateway {
       const emit = async (raw: string, controller: TransformStreamDefaultController<Uint8Array>) => {
         const [ev] = parseSse(raw);
         if (!ev) return;
-        let out = `${raw}\n\n`;
+        let msg: unknown;
         try {
-          const msg = JSON.parse(ev.data) as RpcMessage;
-          if (msg && msg.id === id && "result" in msg) out = formatSse([{ ...ev, data: JSON.stringify(await fix(msg)) }]);
+          msg = JSON.parse(ev.data);
         } catch {
-          // not a JSON-RPC message: pass it on unchanged
+          msg = undefined; // not a JSON-RPC message: pass it on unchanged
         }
+        const out = isAnswer(msg) ? formatSse([{ ...ev, data: JSON.stringify((await fix(msg)).msg) }]) : `${raw}\n\n`;
         controller.enqueue(encoder.encode(out));
       };
       const stream = res.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
         async transform(chunk, controller) {
-          buffer += decoder.decode(chunk, { stream: true }).replace(/\r\n/g, "\n");
+          buffer += decoder.decode(chunk, { stream: true });
+          // SSE lines end in \r\n, \n or a lone \r. Hold a trailing \r: its \n may be in the next chunk.
+          const held = buffer.endsWith("\r") ? "\r" : "";
+          buffer = buffer.slice(0, buffer.length - held.length).replace(/\r\n?/g, "\n") + held;
           let end: number;
           while ((end = buffer.indexOf("\n\n")) !== -1) {
             const raw = buffer.slice(0, end);
@@ -448,6 +476,7 @@ export class McpGateway {
           }
         },
         async flush(controller) {
+          buffer = buffer.replace(/\r\n?/g, "\n");
           if (buffer.trim()) await emit(buffer, controller);
         },
       }));
@@ -456,16 +485,58 @@ export class McpGateway {
 
     const text = await res.text();
     if (type.includes("json") && text) {
+      let msg: unknown;
       try {
-        return new Response(JSON.stringify(await fix(JSON.parse(text) as RpcMessage)), { status: res.status, headers });
+        msg = JSON.parse(text);
       } catch {
-        // not JSON after all: pass it on as it came
+        msg = undefined; // not JSON after all: pass it on as it came
+      }
+      if (isAnswer(msg)) {
+        const fixed = await fix(msg);
+        return new Response(JSON.stringify(fixed.msg), { status: fixed.failed ? 502 : res.status, headers });
       }
     }
     return new Response(text, { status: res.status, headers });
   }
 
   // ── Tool pinning ──────────────────────────────────────────────────────────
+
+  /**
+   * Make sure the quarantine list is known before a tool call: when no
+   * tools/list has been reported yet, list the upstream's tools with the
+   * gateway's own credentials and report them. False when that fails, so
+   * the call is refused rather than run unchecked.
+   */
+  private async ensurePinsKnown(req: Request): Promise<boolean> {
+    if (!this.secret || this.lastReport) return true;
+    this.pinCheck ??= this.fetchAndReportTools(req).finally(() => { this.pinCheck = undefined; });
+    return this.pinCheck;
+  }
+
+  private async fetchAndReportTools(req: Request): Promise<boolean> {
+    try {
+      const tools: McpTool[] = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < 20; page++) {
+        const id = `scute-gateway-pins-${page}`;
+        const res = await this.forward(req, JSON.stringify({ jsonrpc: "2.0", id, method: "tools/list", ...(cursor ? { params: { cursor } } : {}) }));
+        if (!res.ok) return false;
+        const text = await res.text();
+        const messages = (res.headers.get("content-type") ?? "").includes("text/event-stream")
+          ? parseSse(text).map((e) => { try { return JSON.parse(e.data) as RpcMessage; } catch { return undefined; } })
+          : [JSON.parse(text) as RpcMessage];
+        const result = messages.find((m) => m?.id === id && "result" in m)?.result as { tools?: McpTool[]; nextCursor?: string } | undefined;
+        if (!result || !Array.isArray(result.tools)) return false;
+        tools.push(...result.tools);
+        cursor = typeof result.nextCursor === "string" && result.nextCursor ? result.nextCursor : undefined;
+        if (!cursor) break;
+      }
+      await this.reportTools(tools);
+      return this.lastReport !== "";
+    } catch {
+      return false;
+    }
+  }
 
   /** Report the listed tools to Scute; new or changed ones come back quarantined. */
   private async reportTools(tools: McpTool[]) {

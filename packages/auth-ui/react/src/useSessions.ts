@@ -25,7 +25,10 @@ export type UseSessionsResult = {
   error: string | null;
   /** Re-pull the list from the server. */
   refetch: () => Promise<void>;
-  /** Revoke a single session by id. The list is refetched on success. */
+  /**
+   * Revoke a single session by id. The list is refetched on success; revoking
+   * this device's own session (`isCurrent`) signs out locally instead.
+   */
   revoke: (id: string | number) => Promise<RevokeResult>;
   /** True if the id matches the currently-active session (i.e. "this device"). */
   isCurrent: (id: string | number) => boolean;
@@ -96,6 +99,8 @@ export function useSessions(): UseSessionsResult {
 
   const revoke = useCallback<UseSessionsResult["revoke"]>(
     async (id) => {
+      // This device's own session (nickname "current", as `isCurrent`).
+      const ownSession = sessions.find((s) => s.id === id)?.nickname === "current";
       const res = await scuteClient.revokeSession(id);
       if (res.error) {
         return {
@@ -106,10 +111,21 @@ export function useSessions(): UseSessionsResult {
           },
         };
       }
+      if (ownSession) {
+        // The server no longer accepts this device's tokens: sign out here
+        // too (clears the stored session, SIGNED_OUT), no list to refetch.
+        try {
+          await scuteClient.signOut();
+        } catch {
+          // The local session is cleared before the server call that may fail.
+        }
+        setSessions([]);
+        return { ok: true, data: {} };
+      }
       await refetch();
       return { ok: true, data: {} };
     },
-    [scuteClient, refetch]
+    [scuteClient, refetch, sessions]
   );
 
   // The session list returned by the server tags the active one with

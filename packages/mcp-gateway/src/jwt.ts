@@ -84,7 +84,13 @@ export async function verifyAccessToken(
   if (!key) return null;
   const s = await subtle();
   const signed = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
-  const valid = await s.verify("RSASSA-PKCS1-v1_5", key, base64UrlBytes(parts[2]), signed);
+  let valid: boolean;
+  try {
+    // A malformed signature is an invalid token (401), not a gateway error.
+    valid = await s.verify("RSASSA-PKCS1-v1_5", key, base64UrlBytes(parts[2]), signed);
+  } catch {
+    return null;
+  }
   if (!valid) return null;
 
   const now = (options.now ?? Date.now()) / 1000;
