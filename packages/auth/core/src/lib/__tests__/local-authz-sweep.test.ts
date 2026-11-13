@@ -92,6 +92,8 @@ describe("toSqlWhere: an empty list under NOT", () => {
     }
   })();
 
+  // Needs the sqlite3 CLI (present on the ubuntu CI runners and macOS);
+  // skipped where it is not installed rather than failing.
   it.skipIf(!hasSqlite)("selects the same rows as matchesFilter in a real database (rows with a NULL region stay out)", () => {
     const { sql } = toSqlWhere(filter, { columns: { key: "id", region: "region" } });
     const rows = [{ id: "1", region: "eu" }, { id: "2", region: null }];

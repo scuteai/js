@@ -1,5 +1,5 @@
 import { ScuteBaseHttp } from "./lib/ScuteBaseHttp";
-import { accessTokenHeader, refreshTokenHeaders } from "./lib/helpers";
+import { accessTokenHeader, isBrowser, refreshTokenHeaders } from "./lib/helpers";
 import { SCUTE_CLIENT_IP_HEADER, requireClientIp } from "./lib/clientIp";
 
 import type {
@@ -164,14 +164,17 @@ class ScuteAdminApi extends ScuteBaseHttp {
   }
 
   /**
-   * Set secret key for admin (management) API.
+   * Set secret key for admin (management) API. Ignored in a browser.
    * @param secretKey Secret Key
    */
   async setSecretKey(secretKey: string) {
-    if (typeof window !== "undefined" && secretKey) {
+    // Never use a secret key from a browser: anyone who loads the page can
+    // read it. Warn and drop it, so it is not sent on any request.
+    if (isBrowser() && secretKey) {
       console.warn(
-        "[Scute] DANGER! You are setting API Secret Key likely in the browser. This is extremely dangerous for production."
+        "[Scute] DANGER! An API Secret Key was passed in the browser. It is ignored and not sent: keep secret keys on your server."
       );
+      return;
     }
 
     this.secretKey = secretKey;

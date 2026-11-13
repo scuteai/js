@@ -92,7 +92,10 @@ test.describe("Sign-in links", () => {
     await other.page.context().close();
   });
 
-  test("MFA required: the waiting page does not sign in when the link is opened elsewhere", async ({
+  // D2 (API owner decision): with MFA owed, the waiting page waits for the
+  // device that opened the link to finish its second step (409
+  // sign_in_pending), and gets its own session only after that.
+  test("MFA required: the waiting page waits for the other device's second step, then signs in", async ({
     signin,
     settings,
     server,
@@ -119,13 +122,19 @@ test.describe("Sign-in links", () => {
     await other.expectView("mfa_verify");
 
     // The waiting page must not get a session that skipped MFA: it says to
-    // finish on the other device and stops waiting.
-    await signin.expectView("error");
+    // finish on the other device and keeps waiting.
     await expect(signin.page.getByText("Finish on the other device")).toBeVisible();
-    await signin.expectNoSpinnerAfter(4_000);
+    await signin.expectView("magic_pending");
     await signin.expectSignedOut();
     await expectNoSession(signin);
     expect((await server.sessions(email)).filter((s) => s.type === "xlogin")).toEqual([]);
+
+    // The other device finishes its second step: both are signed in.
+    await other.typeCode(await nextTotp(factors));
+    await other.expectSignedIn(email);
+    await signin.expectView("authenticated", 30_000);
+    await signin.expectSignedIn(email);
+    expect((await server.sessions(email)).filter((s) => s.type === "xlogin")).toHaveLength(1);
     await other.page.context().close();
   });
 
@@ -155,7 +164,11 @@ test.describe("Sign-in links", () => {
     expect(await server.ageMagicLinkClaim(sent[0].id)).toBe(true);
     release();
 
-    await expect(signin.view()).not.toHaveAttribute("data-scute-view", "magic_pending", { timeout: 20_000 });
+    // The window closed: the waiting page says so (the "with a message" of
+    // the title) rather than only leaving magic_pending.
+    await signin.expectView("error", 20_000);
+    await expect(signin.page.getByText("The sign-in link timed out")).toBeVisible();
+    await signin.expectSignedOut();
     await signin.expectNoSpinnerAfter(1_000);
   });
 });

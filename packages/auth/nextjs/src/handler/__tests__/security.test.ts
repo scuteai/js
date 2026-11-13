@@ -133,9 +133,11 @@ describe("CSRF enforcement on state-changing endpoints", () => {
     expect(tokenCalls()).toEqual([]);
   });
 
-  // Known limitation, tracked separately: there is no Origin / Referer
-  // check; CSRF protection is the X-CSRF-Token header plus the HttpOnly
-  // SameSite=Lax double-submit cookie.
+  // By design: there is no Origin / Referer check. CSRF protection is the
+  // custom X-CSRF-Token header (a cross-site page cannot set it without a
+  // CORS preflight, which is refused, see below) plus the HttpOnly
+  // SameSite=Lax double-submit cookie. An Origin check would be defence in
+  // depth only.
   it("accepts a valid double-submit even with a cross-origin Origin and Referer", async () => {
     const r = await call(
       withCsrf({
@@ -153,8 +155,10 @@ describe("CSRF enforcement on state-changing endpoints", () => {
     expect(r.res.status).toBe(200);
   });
 
-  // Known limitation, tracked separately (REF-41): the legacy unsuffixed
-  // `X-CSRF-Token` cookie is still accepted for this app.
+  // By design (REF-41 migration window, see csrf.ts): the legacy unsuffixed
+  // `X-CSRF-Token` cookie is still accepted for this app, so tabs opened
+  // before the per-app cookie names keep working. It still has to match
+  // the header.
   it("still accepts the legacy unsuffixed X-CSRF-Token cookie", async () => {
     const r = await call({
       path: "/auth/sign-out",
@@ -210,11 +214,11 @@ describe("refresh token confidentiality", () => {
     expect(r.res.status).toBe(200);
     const rt = upstream.issued.rotateRefresh;
     expect(allResponseText(r)).not.toContain(rt);
-    for (const c of parseCookies(r.history)) {
-      if (c.value.includes(rt)) {
-        expect(c.name).toBe(REFRESH_KEY);
-        expect(c.httpOnly).toBe(true);
-      }
+    const withToken = parseCookies(r.history).filter((c) => c.value.includes(rt));
+    expect(withToken.length).toBeGreaterThan(0);
+    for (const c of withToken) {
+      expect(c.name).toBe(REFRESH_KEY);
+      expect(c.httpOnly).toBe(true);
     }
   });
 
@@ -510,13 +514,13 @@ describe("no SSRF-style proxying", () => {
     ];
     for (const method of ["GET", "POST", "PUT", "DELETE", "PATCH"]) {
       for (const path of paths) {
-        await call({ path, method, headers: attackerHeaders });
+        const r = await call({ path, method, headers: attackerHeaders });
+        expect(r.res.status).toBe(400);
       }
     }
-    // the only upstream traffic is the per-request app-data GET
-    for (const c of upstream.calls) {
-      expect(`${c.method} ${c.url}`).toBe(`GET ${BASE_URL}/v1/apps/${APP_ID}`);
-    }
+    // none of these is a handler route, so nothing goes upstream at all
+    // (not even the client's app-data GET)
+    expect(upstream.calls).toEqual([]);
   });
 
   it("the upstream origin is always the configured baseUrl and incoming headers are not forwarded", async () => {

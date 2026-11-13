@@ -193,6 +193,36 @@ test.describe("MFA set in the dashboard, met by the developer's app", () => {
     await signin.expectSignedIn(email);
   });
 
+  // D22: an email code isn't a second step after an email sign-in. The
+  // dashboard warns (doesn't block) and the sign-in refuses with a reason.
+  test("Required with only email codes: the dashboard warns, and an email sign-in can't finish", async ({
+    browser,
+    server,
+    settings,
+    signin,
+  }) => {
+    const dash = await Dashboard.open(browser, server, settings);
+    await dash.setPolicy("Required");
+    await dash.setMethod("Email code", true);
+    for (const m of ["Authenticator app", "SMS code", "Backup codes"] as Method[]) await dash.setMethod(m, false);
+    await expect(dash.page.getByText("People who sign in by email can't finish")).toBeVisible();
+    await expect(dash.saveBar()).toContainText("Email sign-ins can't finish MFA");
+    await dash.setGraceDays(0);
+    await dash.save();
+    const app = await settings.read();
+    expect(app.mfa_policy).toBe("required");
+    expect(app.mfa_methods_allowed).toEqual(["email"]);
+    await dash.close();
+
+    const email = newEmail("dev-mfa-email-only");
+    await signin.open();
+    await signin.signInWithCode(email);
+    // REFUSALS.mfa_method_unavailable, under the code it refused.
+    await expect(signin.page.getByText("can't be set up for this way of signing in")).toBeVisible();
+    await signin.expectSignedOut();
+    await expectNoSession(signin);
+  });
+
   test("the dashboard won't save Required with nothing to use", async ({ browser, server, settings }) => {
     const dash = await Dashboard.open(browser, server, settings);
     await dash.setPolicy("Required");

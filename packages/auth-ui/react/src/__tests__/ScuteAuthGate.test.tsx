@@ -254,7 +254,10 @@ describe("default views", () => {
     [AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED, "Set up two-step verification"],
   ])("has a default view for %s", async (event, heading) => {
     const { client, container } = await renderAtLogin();
+    client.pendingMfaEnrollmentSuggestion = { mfa_grace_days_remaining: 3, available_methods: ["totp"] };
     act(() => client.emit(event));
+    // The nudge shows with the session it says the person has.
+    if (event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED) await act(async () => client.emitSignedIn());
     expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
     expect(container.querySelector("[data-scute-auth-container]")).not.toBeNull();
     expect(screen.queryByText(PROTECTED)).toBeNull();

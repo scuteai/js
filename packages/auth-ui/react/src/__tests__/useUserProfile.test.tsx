@@ -223,10 +223,12 @@ describe("updateMeta", () => {
 describe("refetch", () => {
   it("calls client.getUser()", async () => {
     const { client, result } = signedIn();
+    const before = client.getUser.mock.calls.length;
     await act(async () => {
       await result.current.refetch();
     });
-    expect(client.getUser).toHaveBeenCalledWith();
+    expect(client.getUser).toHaveBeenCalledTimes(before + 1);
+    expect(client.getUser).toHaveBeenLastCalledWith();
   });
 
   it("applies the fetched user", async () => {

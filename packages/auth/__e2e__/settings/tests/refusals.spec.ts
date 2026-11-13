@@ -82,14 +82,15 @@ test.describe("Refusals", () => {
     await settings.deactivate(id);
     await signin.open();
     await signin.submitEmail(email);
-    await expect(async () => {
-      const view = await signin.view().getAttribute("data-scute-view");
-      expect(["login", "otp_input", "error"]).toContain(view);
-    }).toPass();
-    if ((await signin.view().getAttribute("data-scute-view")) === "otp_input") await signin.typeCode("424242");
-    await signin.page.waitForTimeout(3_000);
+    // Refused at the email, or (if the API sends the code first) at the code.
+    // Wait for one of the two; the view starts on "login", so a check that
+    // accepted "login" passed before the answer came back.
+    const refusal = signin.page.getByText("It can't sign in anymore.");
+    const codeStep = signin.page.locator('[data-scute-view="otp_input"]');
+    await expect(refusal.or(codeStep).first()).toBeVisible();
+    if (await codeStep.isVisible()) await signin.typeCode("424242");
+    await expect(refusal).toBeVisible();
     await signin.expectSignedOut();
-    await expect(signin.page.locator("[data-scute-error], [role=alert]").first()).toBeVisible();
     await signin.expectNoSpinnerAfter(500);
   });
 

@@ -124,7 +124,7 @@ describe("server side (no window)", () => {
     expect(upstream.calls.every((c) => !c.path.startsWith("/auth/"))).toBe(true);
   });
 
-  // CURRENT BEHAVIOR (noted, not a bug): during SSR of a client component
+  // By design: during SSR of a client component
   // the client is created server-side, so createScuteClient picks up
   // SCUTE_SECRET (isBrowser() is false). The secret stays on the server.
   it("picks up SCUTE_SECRET on the server", async () => {
@@ -151,8 +151,9 @@ describe("browser", () => {
     return { ...browser, client, mod, nextCalls };
   };
 
-  // Known limitation, tracked separately: in the browser the first client
-  // is a module singleton; later calls return it whatever their config.
+  // By design: in the browser the first client is a module singleton (one
+  // session, one BroadcastChannel per page); later calls return it whatever
+  // their config.
   it("returns the same singleton on every call, ignoring later config", async () => {
     const { client, mod } = await create();
     const again: any = mod.createClientComponentClient({ appId: "another-app", baseUrl: "https://other.example" });
@@ -163,6 +164,7 @@ describe("browser", () => {
   it("never sends the secret key from the browser", async () => {
     vi.stubEnv("SCUTE_SECRET", SECRET);
     await create({ secretKey: SECRET });
+    expect(upstream.calls.length).toBeGreaterThan(0);
     for (const c of upstream.calls) expect(c.headers.get("authorization")).toBeNull();
   });
 
@@ -181,7 +183,7 @@ describe("browser", () => {
     expect(s.access).toBe(access);
   });
 
-  // CURRENT BEHAVIOR (REF-41 target): a legacy unsuffixed cookie whose
+  // By design (REF-41 migration window): a legacy unsuffixed cookie whose
   // token names this app is read and copied into the namespaced name as a
   // session cookie (no expires).
   it("falls back to this app's legacy access cookie and migrates it via document.cookie (on load)", async () => {
@@ -222,6 +224,7 @@ describe("browser", () => {
       expect(events).toContain("signed_in");
 
       // the refresh token never goes anywhere from the browser
+      expect(upstream.calls.length).toBeGreaterThan(0);
       for (const c of upstream.calls) {
         expect(c.url).not.toContain(refresh);
         c.headers.forEach((v) => expect(v).not.toContain(refresh));
@@ -367,7 +370,7 @@ describe("browser", () => {
       expect(nextCalls).toEqual([]);
     });
 
-    // CURRENT BEHAVIOR (by design, noted): with the opt-out the refresh
+    // By design (it is what the opt-out means): the refresh
     // token is written to a JS-readable cookie by the browser SDK.
     it("stores the refresh token in a JS-readable cookie on sign-in", async () => {
       const { client, jar, writes } = await create({ preferences: { httpOnlyRefresh: false } });

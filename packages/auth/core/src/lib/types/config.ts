@@ -5,7 +5,7 @@ import type { UniqueIdentifier } from "./general";
 export type ScuteClientConfig = {
   appId: UniqueIdentifier;
   baseUrl?: string;
-  /** IMPORTANT: Do not expose to the browser */
+  /** IMPORTANT: Do not expose to the browser. A browser client ignores it. */
   secretKey?: string;
   /**
    * The signing-in person's IP address, for a client made per request on

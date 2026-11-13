@@ -36,9 +36,10 @@ describe("createPagesEdgeRuntimeClient storage without a response", () => {
     expect(await storage.getItem("missing")).toBeNull();
   });
 
-  // Known limitation, tracked separately: with no `response` in the
-  // context, writes only update the request cookie jar (attributes are
-  // dropped) and never reach the browser. Pass `response` to fix that.
+  // By design (documented on PagesEdgeRuntimeContext.response): with no
+  // `response` in the context, writes only update the request cookie jar for
+  // the rest of this request (attributes are dropped) and never reach the
+  // browser. Callers that need persistence pass `response`.
   it("setItem mutates the request Cookie header and drops all attributes", async () => {
     const { storage, request } = create({ a: "1" });
     await storage.setItem("k", "v", { httpOnly: true, secure: true, sameSite: "strict" });

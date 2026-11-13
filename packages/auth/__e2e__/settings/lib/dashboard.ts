@@ -33,10 +33,16 @@ export class Dashboard {
   }
 
   async reload() {
-    await this.page.goto(this.path);
     // The new dashboard's tour, the first time.
     const skip = this.page.getByText("Skip tour");
-    await this.page.getByText("Second step (MFA)").or(skip).first().waitFor({ timeout: 45_000 });
+    const ready = this.page.getByText("Second step (MFA)").or(skip).first();
+    await this.page.goto(this.path);
+    // The preview deployment sometimes leaves the page's settings loading
+    // (seen once in four runs, the first page of a run): load it once more.
+    if (!(await ready.waitFor({ timeout: 45_000 }).then(() => true, () => false))) {
+      await this.page.goto(this.path);
+      await ready.waitFor({ timeout: 45_000 });
+    }
     if (await skip.isVisible()) {
       await this.page.getByText("Don't show again").click();
       await skip.click();

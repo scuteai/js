@@ -1,7 +1,18 @@
 // Passkeys (passkeys_enabled, webauthn_skip_mfa) with Chromium's virtual
 // authenticator.
 import type { CDPSession, Page } from "@playwright/test";
-import { enrollTotp, expect, expectNoSession, newEmail, nextTotp, test, type Factors, type SignInPage } from "../lib/fixtures";
+import {
+  enrollEmail,
+  enrollTotp,
+  expect,
+  expectNoSession,
+  newEmail,
+  nextTotp,
+  test,
+  TEST_CODE,
+  type Factors,
+  type SignInPage,
+} from "../lib/fixtures";
 
 async function virtualAuthenticator(page: Page): Promise<CDPSession> {
   const cdp = await page.context().newCDPSession(page);
@@ -116,6 +127,34 @@ test.describe("Passkeys", () => {
     await signin.expectSignedOut();
     await expectNoSession(signin);
     await signin.typeCode(await nextTotp(factors));
+    await signin.expectSignedIn(email);
+  });
+
+  // D22's other side: an email code is a second factor when the first step
+  // wasn't email (mfa.spec checks it isn't offered after an email code).
+  test("MFA required after a passkey sign-in: an email code is offered, can be sent again, and signs in", async ({
+    signin,
+    settings,
+  }) => {
+    await virtualAuthenticator(signin.page);
+    await settings.update({ passkeys_enabled: true });
+    const email = newEmail("pk-mfa-email");
+    await personWithPasskey(signin, email);
+    await enrollTotp(signin, {});
+    await enrollEmail(signin, email);
+    await signOut(signin);
+
+    await settings.update({ mfa_policy: "required", webauthn_skip_mfa: false });
+    await signin.open();
+    await signin.submitEmail(email);
+    await signin.expectView("mfa_verify");
+    await signin.page.getByRole("button", { name: "Email code" }).click();
+    await expect(signin.page.getByText("Enter the 6-digit code we just emailed you.")).toBeVisible();
+    await signin.page.getByRole("button", { name: /Send it again/ }).click();
+    await expect(signin.page.getByText("We sent a new code.")).toBeVisible();
+    await signin.expectSignedOut();
+    await expectNoSession(signin);
+    await signin.typeCode(TEST_CODE);
     await signin.expectSignedIn(email);
   });
 

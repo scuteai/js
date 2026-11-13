@@ -1,8 +1,8 @@
 /**
  * Security-focused characterization of @scute/js-core. Each test pins what
- * the SDK does today. Behavior that is a known limitation still passes and
- * carries a short "Known limitation" note, so a refactor can change it
- * deliberately rather than by accident.
+ * the SDK does today. Behavior that is intended but surprising carries a
+ * short "By design" note, so a refactor can change it deliberately rather
+ * than by accident.
  *
  * Related pins elsewhere: refresh single-flight, 401/network/5xx refresh
  * handling (session-lifecycle.test.ts), cookie attributes
@@ -72,8 +72,9 @@ afterEach(() => {
 });
 
 describe("where tokens are stored (plain, non-Next path)", () => {
-  // Known limitation, tracked separately: without an adapter a browser client
-  // keeps both tokens in window.localStorage (cookie attributes do not apply).
+  // By design: the plain (non-Next) browser path has no server to set an
+  // HttpOnly cookie, so without an adapter both tokens live in
+  // window.localStorage. @scute/nextjs keeps the refresh token HttpOnly.
   it("a browser client keeps the refresh token in window.localStorage", async () => {
     const { localStorage } = installBrowser();
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -465,9 +466,9 @@ describe("fail-open server flags", () => {
 });
 
 describe("secret key handling", () => {
-  // Known limitation, tracked separately: a secretKey given to a browser
-  // client only logs a warning and is then sent on every admin request.
-  it("a secretKey in the browser is warned about but still sent on admin requests", async () => {
+  // A secret key in a browser can be read by anyone who loads the page: the
+  // client warns and drops it, so no request carries it.
+  it("a secretKey in the browser is warned about and never sent", async () => {
     installBrowser();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     server.on("DELETE", CURRENT_USER, { status: 200, body: {} });
@@ -475,15 +476,17 @@ describe("secret key handling", () => {
     await ready(client);
 
     expect(warn.mock.calls.some(([m]) => String(m).includes("DANGER"))).toBe(true);
-    expect(server.callsTo("GET", `/v1/apps/${APP_ID}`)[0].headers.authorization).toBe(
-      "Bearer sk_live_leaky"
-    );
+    expect(server.callsTo("GET", `/v1/apps/${APP_ID}`)).toHaveLength(1);
+    expect(server.callsTo("GET", `/v1/apps/${APP_ID}`)[0].headers.authorization).toBeUndefined();
 
-    await client.signInWithTokenPayload({ access: accessToken() } as any);
+    const access = accessToken();
+    await client.signInWithTokenPayload({ access } as any);
     await client.signOut();
-    expect(server.callsTo("DELETE", CURRENT_USER)[0].headers.authorization).toBe(
-      "Bearer sk_live_leaky"
-    );
+    const [signOut] = server.callsTo("DELETE", CURRENT_USER);
+    expect(signOut.headers.authorization).toBeUndefined();
+    // the user's own token identifies the session being ended
+    expect(signOut.headers["x-authorization"]).toBe(access);
+    expect(JSON.stringify(server.calls)).not.toContain("sk_live_leaky");
   });
 
   it("a server-side client sends the secret key only on admin requests, not on end-user ones", async () => {

@@ -26,6 +26,11 @@ export default async function globalSetup() {
   if (!answer.ok) throw new Error(`ensure_real_app: ${answer.e}`);
   const app = answer.v as { app_id: string; secret: string; slug: string };
 
+  // Something else on the port would answer the readiness check below and
+  // the suite would test it instead of the example.
+  const busy = await fetch(origin).then(() => true, () => false);
+  if (busy) throw new Error(`port ${env.realAppPort} is already in use: stop what runs on ${origin} first`);
+
   const dir = fileURLToPath(new URL("../../../../examples/with-nextjs-mfa-rbac/", import.meta.url));
   const log = openSync(fileURLToPath(new URL("./.next-dev.log", import.meta.url)), "w");
   const child = spawn("npx", ["next", "dev", "-p", String(env.realAppPort)], {
