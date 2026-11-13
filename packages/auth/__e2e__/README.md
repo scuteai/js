@@ -77,6 +77,13 @@ lifetimes, refresh and sign-out, sessions ended on the server, refusals
 protection's code step), the device fingerprint and trusted devices, and,
 read only, a dashboard's sign-in page.
 
+`tests/developer-mfa.spec.ts` takes the developer's side: a test developer
+(an owner of the suite's workspace, signed in with a link made on the
+server) sets MFA on the app's Authentication page of the dashboard at
+`SCUTE_E2E_DASHBOARD_URL`, and the app's sign-in meets the result: Required,
+Optional, Off, the methods allowed, 0 days to set it up (set up inside
+ScuteSignIn), and Save refused with no method. Skipped without a dashboard.
+
 It never runs against production (it refuses `api.scute.io`) and never
 emails or texts anyone: every address is a test identity
 (`...+scute_test@example.com`, code `424242`, the app has `test_identities`
