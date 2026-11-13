@@ -218,9 +218,10 @@ describe("App Router route handler", () => {
     expect(lastCookie(ctx.setCookies(), REFRESH_KEY)!.value).toBe(upstream.issued.refreshedRefresh);
   });
 
-  // CURRENT BEHAVIOR: CSRF header and Authorization are read from
-  // context.headers(), cookies from context.cookies(); the NextRequest's own
-  // headers/cookies are ignored for auth decisions.
+  // By design: the App Router handler takes the CSRF header and
+  // Authorization from context.headers() and cookies from context.cookies()
+  // (next/headers); the NextRequest's own headers/cookies are not used for
+  // auth decisions.
   it("reads the CSRF header from context.headers(), not from the request", async () => {
     const { handler } = route({ [CSRF_COOKIE]: CSRF }, {});
     const res = await handler(

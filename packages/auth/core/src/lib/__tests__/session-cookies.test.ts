@@ -130,6 +130,7 @@ describe("cookies written on sign in (server side / node)", () => {
       refresh: refreshToken(),
     } as any);
 
+    expect(storage.writes.length).toBeGreaterThan(0);
     for (const write of storage.writes) {
       expect(write.options.secure).toBe(true);
       expect(write.options.domain).toBeUndefined();
@@ -139,6 +140,7 @@ describe("cookies written on sign in (server side / node)", () => {
   it("an adapter constructed with secure: false writes cookies without Secure", async () => {
     const storage = new RecordingCookieStorage({ secure: false });
     await newClient(storage).signInWithTokenPayload({ access: accessToken(), refresh: refreshToken() } as any);
+    expect(storage.writes.length).toBeGreaterThan(0);
     for (const write of storage.writes) expect(write.options.secure).toBe(false);
   });
 
@@ -258,7 +260,7 @@ describe("cookie removal", () => {
     await newClient(storage).signOut();
 
     expect(storage.jar.get(KEYS.lastLogin)).toBe("ada@example.com");
-    expect(storage.jar.get(KEYS.cred)).toBeDefined();
+    expect(storage.jar.get(KEYS.cred)).toBe(JSON.stringify({ user_1: ["c1"] }));
   });
 
   it("clearRememberedIdentifier deletes namespaced and legacy last-login", async () => {

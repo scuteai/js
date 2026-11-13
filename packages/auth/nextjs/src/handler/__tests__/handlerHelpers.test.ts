@@ -163,6 +163,7 @@ describe("fetchWithCsrf", () => {
   it("uses relative URLs only (never leaves the current origin)", async () => {
     install();
     await fetchWithCsrf("refresh", { method: "POST" }, "https://evil.example");
+    expect(calls.length).toBeGreaterThan(0);
     for (const c of calls) {
       expect(c.url.startsWith("/")).toBe(true);
       expect(c.url.startsWith("//")).toBe(false);

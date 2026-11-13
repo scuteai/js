@@ -79,7 +79,8 @@ describe("createServerComponentClient refresh policy", () => {
     expect(upstream.callsTo("/tokens/")).toEqual([]);
   });
 
-  // CURRENT BEHAVIOR: server components never refresh. With an expired
+  // By design: server components cannot write cookies, so they never
+  // refresh (autoRefreshToken is false, test above). With an expired
   // access token and a valid refresh token the session is reported as
   // expired for this render (the middleware / client must refresh); the
   // expired token is not sent upstream either.

@@ -86,8 +86,9 @@ describe("createRouteHandlerClient storage", () => {
     expect(s.access).toBe(legacy);
   });
 
-  // CURRENT BEHAVIOR: using the route handler client where cookies are
-  // read-only throws Next's ReadonlyRequestCookiesError on the first write.
+  // By design: using the route handler client where cookies are read-only
+  // (a server component) surfaces Next's ReadonlyRequestCookiesError on the
+  // first write instead of silently losing the session.
   it("with a read-only cookies store: setSession throws Next's read-only error", async () => {
     const client: any = createRouteHandlerClient({ cookies: () => makeSealedCookies() as any }, clientConfig());
     await expect(client.setSession({ access: makeAccess() })).rejects.toThrow(
@@ -126,6 +127,7 @@ describe("createRouteHandlerClient session flows", () => {
     const ctx = makeRouteContext({ [REFRESH_KEY]: makeRefresh() });
     const client = createRouteHandlerClient({ cookies: ctx.context.cookies }, clientConfig());
     await client.refreshSession();
+    expect(upstream.callsTo("/tokens/refresh")).toHaveLength(1);
     for (const c of upstream.calls) expect(c.path).toContain(APP_ID);
   });
 });

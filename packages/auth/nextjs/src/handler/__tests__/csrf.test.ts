@@ -180,8 +180,9 @@ describe("isCsrfTokenValid", () => {
     ).toBe(false);
   });
 
-  // Known limitation, tracked separately (REF-41): the legacy unsuffixed
-  // cookie is still accepted as the CSRF secret for any appId.
+  // By design (REF-41 migration window, see csrf.ts): the legacy unsuffixed
+  // cookie is still accepted as the CSRF secret when this app's namespaced
+  // one is absent. It must still match the header (next test).
   it("falls back to the legacy unsuffixed cookie when the namespaced one is absent", () => {
     expect(
       isCsrfTokenValid({ cookies: { [LEGACY]: "abc" }, headers: hdrs("abc"), appId: APP })

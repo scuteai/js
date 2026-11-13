@@ -14,6 +14,8 @@ vi.mock("@fingerprintjs/fingerprintjs", () => ({
 }));
 
 import ScuteClient, { createClient } from "../ScuteClient";
+import ScuteAdminApi from "../ScuteAdminApi";
+import ScuteVerifyApi from "../ScuteVerifyApi";
 import { AUTH_CHANGE_EVENTS } from "../lib/constants";
 import {
   BaseHttpError,
@@ -87,8 +89,8 @@ describe("construction", () => {
     expect(client).toBeInstanceOf(ScuteClient);
     expect(client.appId).toBe(APP_ID);
     expect(client.baseUrl).toBe(BASE_URL);
-    expect(client.admin).toBeDefined();
-    expect(client.verifications).toBeDefined();
+    expect(client.admin).toBeInstanceOf(ScuteAdminApi);
+    expect(client.verifications).toBeInstanceOf(ScuteVerifyApi);
   });
 
   it("defaults baseUrl to https://api.scute.io", async () => {
@@ -676,7 +678,7 @@ describe("fingerprinting (browser)", () => {
       preferences: { refetchInverval: 0 },
     });
     await ready(client);
-    await new Promise((r) => setTimeout(r, 20));
+    // no wait for the agent: a request sent before it has loaded waits for it
 
     await client.sendLoginMagicLink("ada@example.com");
     await client.getUserMetafieldState("user_1");
