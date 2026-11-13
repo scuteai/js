@@ -1182,27 +1182,37 @@ describe("passkey registration offer", () => {
     expect(result.current.flow.view).toBe("authenticated");
   });
 
-  it("shows a failed sign-in on the offer; registerPasskey retries it and stops before addDevice if it fails again", async () => {
+  // The offer says "You're signed in": it waits for the exchange that stores
+  // the session (and, behind a Next.js handler, sets its cookies).
+  it("shows the passkey offer only after the token exchange has stored the session", async () => {
+    const client = createFakeClient();
+    const exchange = deferred<void>();
+    const signIn = client.signInWithTokenPayload.getMockImplementation()!;
+    client.signInWithTokenPayload.mockImplementationOnce(async (p: any) => {
+      await exchange.promise;
+      return signIn(p);
+    });
+    setUrl(`/auth/callback?sct_magic=${MAGIC_TOKEN}`);
+    const { result } = renderFlow(client);
+    await waitFor(() => expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1));
+    await flush();
+    expect(result.current.flow.view).not.toBe("webauthn_register");
+    expect(result.current.auth.isAuthenticated).toBe(false);
+
+    await act(async () => exchange.resolve());
+    await waitFor(() => expect(result.current.flow.view).toBe("webauthn_register"));
+    expect(result.current.auth.isAuthenticated).toBe(true);
+  });
+
+  it("a refused token exchange never shows the passkey offer: the error view, no session, no device", async () => {
     const client = createFakeClient();
     client.signInWithTokenPayload.mockResolvedValueOnce({ error: { message: "Session rejected" } });
-    const { result } = await renderAtRegister(client);
-    await waitFor(() => expect(result.current.flow.error).toBe("Session rejected"));
+    setUrl(`/auth/callback?sct_magic=${MAGIC_TOKEN}`);
+    const { result } = renderFlow(client);
+    await waitFor(() => expect(result.current.flow.view).toBe("error"));
+    expect(result.current.flow.error).toBe("Session rejected");
     expect(result.current.flow.isAuthenticated).toBe(false);
-
-    client.signInWithTokenPayload.mockResolvedValueOnce({ error: { message: "Still rejected" } });
-    await act(async () => {
-      await result.current.flow.registerPasskey();
-    });
-    expect(result.current.flow.error).toBe("Still rejected");
     expect(client.addDevice).not.toHaveBeenCalled();
-    expect(result.current.flow.view).toBe("webauthn_register");
-
-    await act(async () => {
-      await result.current.flow.registerPasskey();
-    });
-    expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(3);
-    expect(client.addDevice).toHaveBeenCalledTimes(1);
-    expect(result.current.flow.view).toBe("webauthn_register_success");
   });
 
   it("registerPasskey shows an addDevice error and the signed-in user can still skip to authenticated", async () => {
@@ -1260,27 +1270,6 @@ describe("passkey registration offer", () => {
     expect(result.current.flow.view).toBe("authenticated");
     expect(result.current.flow.isAuthenticated).toBe(true);
     expect(result.current.auth.isAuthenticated).toBe(true);
-  });
-
-  it("skipPasskey shows a returned sign-in error and stays on the offer", async () => {
-    const client = createFakeClient();
-    client.signInWithTokenPayload
-      .mockResolvedValueOnce({ error: { message: "Session rejected" } })
-      .mockResolvedValueOnce({ error: { message: "Session rejected" } });
-    const { result } = await renderAtRegister(client);
-    await act(async () => {
-      await result.current.flow.skipPasskey();
-    });
-    expect(result.current.flow.error).toBe("Session rejected");
-    expect(result.current.flow.view).toBe("webauthn_register");
-    expect(result.current.flow.isAuthenticated).toBe(false);
-
-    // A later successful skip continues.
-    await act(async () => {
-      await result.current.flow.skipPasskey();
-    });
-    expect(result.current.flow.view).toBe("authenticated");
-    expect(result.current.flow.error).toBeNull();
   });
 });
 
@@ -1341,22 +1330,38 @@ describe("MFA views", () => {
   it.each([
     [AUTH_CHANGE_EVENTS.MFA_REQUIRED, "mfa_verify"],
     [AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_REQUIRED, "mfa_enroll"],
-    [AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED, "mfa_enroll_suggest"],
   ])("%s moves to %s", async (event, view) => {
     const { client, result } = await renderAtLogin();
     act(() => client.emit(event));
     expect(result.current.flow.view).toBe(view);
   });
 
-  it("the grace period nudge stays up when the sign-in completes, until Continue", async () => {
+  // The SDK announces the nudge before it stores the session; the nudge
+  // ("You're signed in") waits for SIGNED_IN.
+  it("the grace period nudge shows once the sign-in completes, and stays up until Continue", async () => {
     const { client, result } = await renderAtLogin();
     client.pendingMfaEnrollmentSuggestion = { mfa_grace_days_remaining: 5, available_methods: ["totp"] };
     act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED));
+    await flush();
+    expect(result.current.flow.view).toBe("login");
+    expect(result.current.auth.isAuthenticated).toBe(false);
     await act(async () => client.emitSignedIn());
     await flush();
     expect(result.current.flow.view).toBe("mfa_enroll_suggest");
     expect(result.current.flow.mfaGraceDaysRemaining).toBe(5);
     act(() => result.current.flow.skipMfaEnrollment());
+    expect(result.current.flow.view).toBe("authenticated");
+  });
+
+  it("a nudge from a sign-in whose exchange failed doesn't show on a later sign-in without one", async () => {
+    const { client, result } = await renderAtLogin();
+    client.pendingMfaEnrollmentSuggestion = { mfa_grace_days_remaining: 5, available_methods: ["totp"] };
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED));
+    // The exchange failed (no SIGNED_IN); the next sign-in brings no nudge,
+    // so the SDK clears its suggestion.
+    client.pendingMfaEnrollmentSuggestion = null;
+    await act(async () => client.emitSignedIn());
+    await flush();
     expect(result.current.flow.view).toBe("authenticated");
   });
 
@@ -1515,13 +1520,16 @@ describe("security", () => {
       await exchange.promise;
       return signIn(p);
     });
-    const { result } = await renderAtRegister(client);
+    setUrl(`/auth/callback?sct_magic=${MAGIC_TOKEN}`);
+    const { result } = renderFlow(client);
+    await waitFor(() => expect(client.signInWithTokenPayload).toHaveBeenCalledTimes(1));
     // The exchange hasn't finished, so there's no session in this flow yet:
     // the expiry is about an earlier visit's session.
     act(() => client.emit(AUTH_CHANGE_EVENTS.SESSION_EXPIRED));
-    expect(result.current.flow.view).toBe("webauthn_register");
+    expect(result.current.flow.view).toBe("magic_verifying");
     await act(async () => exchange.resolve());
-    await waitFor(() => expect(result.current.auth.isAuthenticated).toBe(true));
+    await waitFor(() => expect(result.current.flow.view).toBe("webauthn_register"));
+    expect(result.current.auth.isAuthenticated).toBe(true);
     await act(async () => {
       await result.current.flow.skipPasskey();
     });
@@ -1605,17 +1613,12 @@ describe("security", () => {
     expect(result.current.auth.isAuthenticated).toBe(false);
   });
 
-  it("skipPasskey shows a thrown sign-in error and does not authenticate", async () => {
+  it("a thrown token exchange error shows the error view, not the passkey offer", async () => {
     const client = createFakeClient();
-    client.signInWithTokenPayload
-      .mockRejectedValueOnce(new Error("storage unavailable"))
-      .mockRejectedValueOnce(new Error("storage unavailable"));
-    const { result } = await renderAtRegister(client);
-    await waitFor(() => expect(result.current.flow.error).toBe("storage unavailable"));
-    await act(async () => {
-      await result.current.flow.skipPasskey();
-    });
-    expect(result.current.flow.view).toBe("webauthn_register");
+    client.signInWithTokenPayload.mockRejectedValueOnce(new Error("storage unavailable"));
+    setUrl(`/auth/callback?sct_magic=${MAGIC_TOKEN}`);
+    const { result } = renderFlow(client);
+    await waitFor(() => expect(result.current.flow.view).toBe("error"));
     expect(result.current.flow.error).toBe("storage unavailable");
     expect(result.current.flow.isAuthenticated).toBe(false);
     expect(result.current.auth.isAuthenticated).toBe(false);

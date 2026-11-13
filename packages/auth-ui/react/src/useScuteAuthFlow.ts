@@ -256,6 +256,10 @@ export function useScuteAuthFlow() {
   // True while the verified payload is exchanged for a session just before
   // the passkey offer, so the sign-in events don't move the flow on.
   const offeringPasskeyRef = useRef(false);
+  // The SDK announces an MFA nudge (MFA_ENROLLMENT_SUGGESTED) before it has
+  // stored the session; the nudge says "You're signed in", so it shows only
+  // once SIGNED_IN confirms the session exists.
+  const suggestionPendingRef = useRef(false);
   const isAuthenticatedRef = useRef(isAuthenticated);
   // The magic link token, kept (the URL is scrubbed) for the code step that
   // attack protection may ask for: once verified, the same link signs in.
@@ -351,23 +355,28 @@ export function useScuteAuthFlow() {
   // exchanged right away because server-side sign-in (the Next.js handler)
   // only accepts a freshly issued access token; holding it until the user
   // clicks would fail after 30 seconds.
+  // The offer says the person is signed in, so it shows only once the
+  // exchange has stored the session (cookies set by a Next.js handler too):
+  // leaving the page earlier would lose the sign-in.
   const offerPasskey = useCallback(async (payload: any) => {
     offeringPasskeyRef.current = true;
     setAuthPayload(payload);
-    setView("webauthn_register");
+    let result: { error?: any } | undefined;
     try {
-      const result = await scuteClient.signInWithTokenPayload(payload);
-      if (result?.error) {
-        setError(messageOf(result.error) || "Sign-in failed");
-      } else {
-        exchangedPayloadRef.current = payload;
-      }
+      result = await scuteClient.signInWithTokenPayload(payload);
     } catch (err: any) {
-      setError(messageOf(err) || "Sign-in failed");
+      result = { error: err ?? {} };
     } finally {
       offeringPasskeyRef.current = false;
     }
-  }, [scuteClient]);
+    if (result?.error) {
+      fail(result.error, "We couldn't sign you in");
+      setView("error");
+      return;
+    }
+    exchangedPayloadRef.current = payload;
+    setView("webauthn_register");
+  }, [scuteClient, fail]);
 
   // The session ended: forget everything tied to it and start over at login.
   const resetAfterSignOut = useCallback(() => {
@@ -496,6 +505,7 @@ export function useScuteAuthFlow() {
         const view = viewRef.current;
         if (view === "loading" || view === "magic_verifying") return;
         if (event === AUTH_CHANGE_EVENTS.SESSION_EXPIRED && !isAuthenticatedRef.current) return;
+        suggestionPendingRef.current = false;
         resetAfterSignOut();
         return;
       }
@@ -505,7 +515,13 @@ export function useScuteAuthFlow() {
       }
       // The passkey offer and the MFA nudge come with a session already: the
       // person moves on from them.
-      if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && !KEEP_WHEN_SIGNED_IN.includes(viewRef.current)) {
+      // A nudge from a sign-in whose exchange failed doesn't carry over: the
+      // SDK clears its suggestion for a sign-in without one.
+      const suggested = suggestionPendingRef.current && !!scuteClient.pendingMfaEnrollmentSuggestion;
+      if (event === AUTH_CHANGE_EVENTS.SIGNED_IN) suggestionPendingRef.current = false;
+      if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && suggested) {
+        setView("mfa_enroll_suggest");
+      } else if (event === AUTH_CHANGE_EVENTS.SIGNED_IN && !KEEP_WHEN_SIGNED_IN.includes(viewRef.current)) {
         setView("authenticated");
       }
       if (event === AUTH_CHANGE_EVENTS.MAGIC_PENDING || event === AUTH_CHANGE_EVENTS.MAGIC_NEW_DEVICE_PENDING) {
@@ -542,7 +558,8 @@ export function useScuteAuthFlow() {
       if (event === AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED) {
         const suggestion = scuteClient.pendingMfaEnrollmentSuggestion;
         if (suggestion) applySuggestion(suggestion);
-        setView("mfa_enroll_suggest");
+        // Shown on the SIGNED_IN that follows, once the session is stored.
+        suggestionPendingRef.current = true;
       }
       // Only with a live session; otherwise SIGNED_IN moves the flow on.
       if (event === AUTH_CHANGE_EVENTS.MFA_VERIFIED && isAuthenticatedRef.current) {

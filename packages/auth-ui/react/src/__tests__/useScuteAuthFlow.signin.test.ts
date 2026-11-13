@@ -442,8 +442,11 @@ describe("MFA", () => {
     client.pendingMfaEnrollmentSuggestion = { mfa_grace_days_remaining: 4, available_methods: ["totp"] };
     const { result } = await renderAtLogin(client);
     act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED));
-    expect(result.current.flow.view).toBe("mfa_enroll_suggest");
     expect(result.current.flow.mfaGraceDaysRemaining).toBe(4);
+    // The nudge itself waits for the session (SIGNED_IN).
+    expect(result.current.flow.view).toBe("login");
+    await act(async () => client.emitSignedIn());
+    await waitFor(() => expect(result.current.flow.view).toBe("mfa_enroll_suggest"));
     expect(result.current.flow.mfaGracePeriod).toBe(true);
   });
 });
