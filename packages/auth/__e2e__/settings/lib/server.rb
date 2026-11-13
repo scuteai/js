@@ -214,6 +214,13 @@ module E2E
     { id: ml.id, token: ml.token }
   end
 
+  # Make the person's sessions look this many minutes old (past or inside
+  # the app's re-verify window).
+  def age_sessions(public_id, email, minutes)
+    au = app_user(public_id, email)
+    TokenSession.where(app_user_id: au.id).update_all(created_at: minutes.to_i.minutes.ago)
+  end
+
   def end_sessions(public_id, email)
     au = app_user(public_id, email)
     n = 0
