@@ -109,10 +109,17 @@ test.describe("Refusals", () => {
   test("too many codes for one address: a clear message, the form back", async ({ signin }) => {
     const email = newEmail("ratelimit");
     await signedUp(signin, email);
-    // The API allows 5 sends a minute per address; spend them.
-    await signin.client(async (c, e) => {
-      for (let i = 0; i < 5; i++) await c.sendLoginOtp(e, undefined, false);
+    // The API allows 5 sends a minute per address, counted per clock minute:
+    // 5 sends that straddle a minute boundary leave room for more. Send until
+    // the API refuses, then submit within that same minute.
+    const refusedAfter = await signin.client(async (c, e) => {
+      for (let i = 1; i <= 12; i++) {
+        const r = await c.sendLoginOtp(e, undefined, false);
+        if (r.error) return i;
+      }
+      return 0;
     }, email);
+    expect(refusedAfter, "the per-address limit must refuse a send").toBeGreaterThan(0);
     await signin.submitEmail(email);
     await expect(signin.page.locator("#scute-signin-email-error")).toBeVisible();
     const text = await signin.page.locator("#scute-signin-email-error").innerText();
