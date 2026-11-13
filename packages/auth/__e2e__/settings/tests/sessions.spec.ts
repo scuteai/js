@@ -14,7 +14,14 @@ test.describe("Sessions", () => {
     await settings.update({ access_expiration: 20 });
     const email = newEmail("sess-refresh");
     await signedIn(signin, email);
-    await signin.page.waitForTimeout(25_000);
+    // The page refreshes on its own (ScuteSession's auto-refresh ticks every
+    // 30 s and refreshes a token that runs out within three ticks), not only
+    // when asked for the session below.
+    const refreshes: string[] = [];
+    signin.page.on("request", (r) => {
+      if (r.method() === "POST" && r.url().endsWith("/tokens/refresh")) refreshes.push(r.url());
+    });
+    await expect.poll(() => refreshes.length, { timeout: 40_000, message: "no refresh while the page sat open" }).toBeGreaterThan(0);
     const user = await signin.client((c) => c.getSession().then((r: any) => r.data?.session?.status));
     expect(user).toBe("authenticated");
     await signin.page.reload();
@@ -106,19 +113,29 @@ test.describe("Sessions", () => {
     await signin.expectNoSpinnerAfter(5_000);
   });
 
-  test("settings changed while the page is open apply after a reload", async ({ signin, settings, server }) => {
+  // D13 (API): a sign-in method the app turned off is refused even from a
+  // page that loaded before the change (403 sign_in_method_disabled).
+  test("settings changed while the page is open: the old method is refused, then the page follows the new one", async ({
+    signin,
+    settings,
+    server,
+  }) => {
     const email = newEmail("sess-flip");
     await signin.open();
+    await expect(signin.page.getByText("we will send you a sign-in code")).toBeVisible();
     await settings.update({ email_auth_type: "magic" });
     const sent = await holdMagicLinks(signin.page, server);
-    // Still the code (the page read the settings when it loaded).
-    await signin.signInWithCode(email);
-    await signin.expectSignedIn(email);
-    await signin.page.getByTestId("sign-out").click();
+
+    // The page still asks for a code (it read the settings when it loaded):
+    // refused with a reason, nothing pending.
+    await signin.submitEmail(email);
+    await expect(signin.page.locator("#scute-signin-email-error")).toContainText("Sign-in codes by email are turned off");
     await signin.expectView("login");
+    await signin.expectSignedOut();
     expect(sent).toHaveLength(0);
 
-    await signin.page.reload();
+    // Then it follows the new setting: a sign-in link.
+    await expect(signin.page.getByText("we will send you a sign-in link")).toBeVisible();
     await signin.submitEmail(email);
     await signin.expectView("magic_pending");
     expect(sent).toHaveLength(1);

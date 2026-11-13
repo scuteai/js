@@ -54,6 +54,8 @@ test.describe("Devices", () => {
     await signin.open({ fp: "0" });
     await signin.signInWithCode(email);
     await signin.expectSignedIn(email);
+    // Not vacuous: the sign-in did send requests (at least the code check).
+    expect(requests.some((r) => r.url().endsWith("/otps/verify"))).toBe(true);
     for (const r of requests) expect(await r.headerValue("x-fingerprint")).toBeNull();
   });
 
