@@ -131,6 +131,23 @@ broker (<code>settings/lib/broker.mjs</code>, about 30 seconds to start). Tests 
 at a time: they share one app and reset its settings first. Tests tagged
 <code>@webkit</code> also run in WebKit. Each test fails if its page sends more than
 150 API requests (a refresh or poll loop).</p>
+<hr>
+<a id="md:real-app-suite-mfa-in-exampleswith-nextjs-mfa-rbac-real-inboxes" class="tsd-anchor"></a><h1><a href="#md:real-app-suite-mfa-in-exampleswith-nextjs-mfa-rbac-real-inboxes">Real-app suite: MFA in examples/with-nextjs-mfa-rbac, real inboxes</a></h1><p><code>real-app/</code> runs the Next.js example app, unchanged (<code>next dev</code>, its id and
+secret as environment variables), against the settings suite&#39;s API. The
+developer changes MFA in the dashboard; an end user signs up and in with
+the code from a real inbox (Mailosaur), sets up a second step on the app&#39;s
+own <code>/account</code> page and opens its server-protected pages. Covers: Required
+with a grace period (nudge, authenticator from its key, backup codes, used
+backup code refused, no session before the second step), Required with 0
+days (set up inside the sign-in), Optional then Off, and &quot;A passkey counts
+as both&quot; on and off (Chromium&#39;s virtual authenticator).</p>
+<p>Needs everything the settings suite needs, plus <code>SCUTE_E2E_DASHBOARD_URL</code>,
+<code>MAILOSAUR_SERVER_ID</code> and <code>MAILOSAUR_API_KEY</code> (same env file), and port 3000
+free (<code>SCUTE_E2E_REAL_APP_PORT</code>). The app it signs in to is
+<code>e2e-mfa nextjs example</code> in the suite&#39;s workspace, with test identities off,
+so real emails are sent.</p>
+<pre><code class="language-bash"><span class="hl-3">npx</span><span class="hl-0"> </span><span class="hl-4">pnpm@8.4.0</span><span class="hl-0"> </span><span class="hl-4">turbo</span><span class="hl-0"> </span><span class="hl-4">run</span><span class="hl-0"> </span><span class="hl-4">build</span><span class="hl-0"> </span><span class="hl-5">--filter=with-nextjs-mfa-rbac^...</span><br/><span class="hl-3">cd</span><span class="hl-0"> </span><span class="hl-4">packages/auth/__e2e__</span><span class="hl-0"> &amp;&amp; </span><span class="hl-3">npx</span><span class="hl-0"> </span><span class="hl-4">playwright</span><span class="hl-0"> </span><span class="hl-4">test</span><span class="hl-0"> </span><span class="hl-5">-c</span><span class="hl-0"> </span><span class="hl-4">playwright.real-app.config.ts</span>
+</code><button>Copy</button></pre>
 </section></div>
 <div class="col-sidebar">
 <div class="page-menu">
@@ -166,7 +183,8 @@ at a time: they share one app and reset its settings first. Tests tagged
 <li>
 <ul>
 <li><a href="#md:what-it-needs"><span>What it needs</span></a></li>
-<li><a href="#md:run-it-1"><span>Run it</span></a></li></ul></li></ul></li></ul></div></details></div>
+<li><a href="#md:run-it-1"><span>Run it</span></a></li></ul></li>
+<li><a href="#md:real-app-suite-mfa-in-exampleswith-nextjs-mfa-rbac-real-inboxes"><span>Real-<wbr/>app suite: MFA in examples/with-<wbr/>nextjs-<wbr/>mfa-<wbr/>rbac, real inboxes</span></a></li></ul></li></ul></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="../index.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-4"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-namespace)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M9.33 16V7.24H10.77L13.446 14.74C13.43 14.54 13.41 14.296 13.386 14.008C13.37 13.712 13.354 13.404 13.338 13.084C13.33 12.756 13.326 12.448 13.326 12.16V7.24H14.37V16H12.93L10.266 8.5C10.282 8.692 10.298 8.936 10.314 9.232C10.33 9.52 10.342 9.828 10.35 10.156C10.366 10.476 10.374 10.784 10.374 11.08V16H9.33Z" fill="var(--color-text)"></path></g></svg><span>Scute</span></a>
 <ul class="tsd-small-nested-navigation">
