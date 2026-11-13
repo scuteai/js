@@ -128,7 +128,11 @@ module E2E
   # A link claimed long ago: its status poll is past the API's window.
   def age_magic_link_claim(public_id, id)
     ml = MagicLink.find_by!(id: id, app_id: app(public_id).id)
-    ml.update_columns(claimed_at: 10.minutes.ago) if ml.claimed_at
+    # The status window counts from the later of the two (MagicLink#x_login_expired?).
+    if ml.claimed_at
+      ml.update_columns(claimed_at: 10.minutes.ago,
+                        sign_in_completed_at: ml.sign_in_completed_at && 10.minutes.ago)
+    end
     !ml.claimed_at.nil?
   end
 
