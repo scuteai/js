@@ -8,6 +8,7 @@
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:settings": "playwright test -c playwright.settings.config.ts",
+    "test:real-app": "playwright test -c playwright.real-app.config.ts",
     "install:browsers": "playwright install chromium webkit"
   },
   "dependencies": {

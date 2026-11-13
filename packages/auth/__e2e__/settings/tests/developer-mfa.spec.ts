@@ -1,9 +1,8 @@
 // MFA from a developer's side: the developer turns it on in the dashboard
 // (SCUTE_E2E_DASHBOARD_URL, its app's Authentication page) and their app,
 // built on ScuteSignIn and the SDK, meets the result against the same API.
-// The developer is a test identity who owns the suite's workspace; the
-// dashboard sign-in link is made on the server, never emailed.
-import type { Browser, Page } from "@playwright/test";
+import type { Browser } from "@playwright/test";
+import { Dashboard as Dash, dashboardUrl as dashboard, type Method } from "../lib/dashboard";
 import {
   enrollTotp,
   expect,
@@ -11,7 +10,6 @@ import {
   makeBackupCodes,
   newEmail,
   nextTotp,
-  settingsEnv,
   test,
   type AppSettings,
   type Factors,
@@ -19,89 +17,9 @@ import {
   type SignInPage,
 } from "../lib/fixtures";
 
-const dashboard = settingsEnv?.dashboardUrl?.replace(/\/$/, "");
-const WORKSPACE_SLUG = "e2e-mfa-sdk-browser-tests";
-const developer = `e2e-mfa-dev-${Date.now().toString(36)}+scute_test@example.com`;
-
-type Policy = "Off" | "Optional" | "Required";
-type Method = "Authenticator app" | "Email code" | "SMS code" | "Backup codes";
-
-/** The developer, signed in to the dashboard on the app's Authentication page. */
-class Dashboard {
-  constructor(readonly page: Page, readonly path: string) {}
-
-  static async open(browser: Browser, server: Server, settings: AppSettings) {
-    await server.op("ensure_developer", developer);
-    const link = await server.op<{ token: string }>("dashboard_magic_link", developer);
-    const page = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
-    await page.goto(`${dashboard}/?sct_magic=${encodeURIComponent(link.token)}`);
-    // Signed in: the dashboard offers a passkey first (skipped, as most do),
-    // then shows the workspace.
-    const workspace = page.getByRole("button", { name: "Switch workspace" });
-    const skipPasskey = page.getByRole("button", { name: "Skip for now" });
-    await expect(skipPasskey.or(workspace).first()).toBeVisible({ timeout: 45_000 });
-    if (await skipPasskey.isVisible()) await skipPasskey.click();
-    await expect(workspace).toBeVisible({ timeout: 45_000 });
-    const { slug } = await settings.read();
-    const d = new Dashboard(page, `${dashboard}/${WORKSPACE_SLUG}/apps/${slug}/authentication`);
-    await d.reload();
-    return d;
-  }
-
-  async reload() {
-    await this.page.goto(this.path);
-    // The new dashboard's tour, the first time.
-    const skip = this.page.getByText("Skip tour");
-    await this.page.getByText("Second step (MFA)").or(skip).first().waitFor({ timeout: 45_000 });
-    if (await skip.isVisible()) {
-      await this.page.getByText("Don't show again").click();
-      await skip.click();
-    }
-    await expect(this.page.getByText("Second step (MFA)")).toBeVisible({ timeout: 30_000 });
-  }
-
-  policy(name: Policy) {
-    return this.page.getByRole("radiogroup", { name: "Who's asked for a second step" }).getByRole("radio", { name: new RegExp(`^${name}`) });
-  }
-
-  method(name: Method) {
-    return this.page.getByRole("switch", { name, exact: true });
-  }
-
-  async setPolicy(name: Policy) {
-    await this.policy(name).click();
-    await expect(this.policy(name)).toHaveAttribute("aria-checked", "true");
-  }
-
-  async setMethod(name: Method, on: boolean) {
-    const s = this.method(name);
-    if ((await s.getAttribute("aria-checked")) !== String(on)) await s.click();
-    await expect(s).toHaveAttribute("aria-checked", String(on));
-  }
-
-  /** "Time to set it up", in days (Required only). */
-  async setGraceDays(days: number) {
-    const slider = this.page.getByRole("slider", { name: "Time to set it up, in days" });
-    await slider.focus();
-    await slider.press("Home");
-    for (let i = 0; i < days; i++) await slider.press("ArrowRight");
-    await expect(slider).toHaveAttribute("aria-valuenow", String(days));
-  }
-
-  saveBar() {
-    return this.page.getByRole("region", { name: "Unsaved changes" });
-  }
-
-  async save() {
-    await this.saveBar().getByRole("button", { name: "Save" }).click();
-    await expect(this.page.getByText("Saved. New sign-ins use it right away.")).toBeVisible();
-    await expect(this.saveBar()).toHaveCount(0);
-  }
-
-  async close() {
-    await this.page.context().close();
-  }
-}
+const Dashboard = {
+  open: async (browser: Browser, server: Server, settings: AppSettings) => Dash.open(browser, server, (await settings.read()).slug),
+};
 
 async function signOut(signin: SignInPage) {
   await signin.page.getByTestId("sign-out").click();

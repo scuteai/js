@@ -9,6 +9,9 @@
 //   SCUTE_E2E_PORT         the test page's port (default 4317)
 //   SCUTE_E2E_BROKER_PORT  the local console broker's port (default 4318)
 //   SCUTE_E2E_DASHBOARD_URL  optional: a dashboard whose sign-in page is read
+//   MAILOSAUR_SERVER_ID, MAILOSAUR_API_KEY  optional: real inboxes for the
+//                          real-app suite (real-app/)
+//   SCUTE_E2E_REAL_APP_PORT  the example app's port (default 3000)
 
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -60,6 +63,10 @@ export function loadSettingsEnv(processEnv = process.env) {
       pagePort: Number(pick("SCUTE_E2E_PORT") || 4317),
       brokerPort: Number(pick("SCUTE_E2E_BROKER_PORT") || 4318),
       dashboardUrl: pick("SCUTE_E2E_DASHBOARD_URL").replace(/\/+$/, "") || null,
+      mailosaur: pick("MAILOSAUR_SERVER_ID") && pick("MAILOSAUR_API_KEY")
+        ? { serverId: pick("MAILOSAUR_SERVER_ID"), apiKey: pick("MAILOSAUR_API_KEY") }
+        : null,
+      realAppPort: Number(pick("SCUTE_E2E_REAL_APP_PORT") || 3000),
     },
   };
 }
