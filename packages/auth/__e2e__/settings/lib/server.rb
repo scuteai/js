@@ -56,6 +56,24 @@ module E2E
     { app_id: a.public_id, secret: key.raw_token, workspace_id: ws.id }
   end
 
+  # The app a real example app signs in to: the defaults, but real codes
+  # by email (no test identities), and a new API key for its server.
+  def ensure_real_app(name, origin)
+    raise "app names start with #{KEY_PREFIX}" unless name.start_with?(KEY_PREFIX)
+
+    ws = workspace
+    a = ws.apps.kept.find_by(name: name) || App.create!(workspace: ws, name: name, origin: origin)
+    a.update!(origin: origin, **DEFAULTS, test_identities: false)
+    ApiKey.where(bearer: a).where("nickname LIKE ?", "#{KEY_PREFIX} %").destroy_all
+    key = ApiKey.create!(bearer: a, nickname: "#{KEY_PREFIX} #{Time.current.utc.iso8601}")
+    { app_id: a.public_id, secret: key.raw_token, slug: a.slug }
+  end
+
+  def reset_real_app(public_id)
+    app(public_id).update!(**DEFAULTS, test_identities: false)
+    true
+  end
+
   def reset(public_id)
     a = app(public_id)
     a.update!(**DEFAULTS)

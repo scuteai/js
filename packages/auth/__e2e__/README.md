@@ -125,3 +125,29 @@ broker (`settings/lib/broker.mjs`, about 30 seconds to start). Tests run one
 at a time: they share one app and reset its settings first. Tests tagged
 `@webkit` also run in WebKit. Each test fails if its page sends more than
 150 API requests (a refresh or poll loop).
+
+---
+
+# Real-app suite: MFA in examples/with-nextjs-mfa-rbac, real inboxes
+
+`real-app/` runs the Next.js example app, unchanged (`next dev`, its id and
+secret as environment variables), against the settings suite's API. The
+developer changes MFA in the dashboard; an end user signs up and in with
+the code from a real inbox (Mailosaur), sets up a second step on the app's
+own `/account` page and opens its server-protected pages. Covers: Required
+with a grace period (nudge, authenticator from its key, backup codes, used
+backup code refused, no session before the second step), Required with 0
+days (set up inside the sign-in), Optional then Off, and "A passkey counts
+as both" on and off (Chromium's virtual authenticator).
+
+Needs everything the settings suite needs, plus `SCUTE_E2E_DASHBOARD_URL`,
+`MAILOSAUR_SERVER_ID` and `MAILOSAUR_API_KEY` (same env file), and port 3000
+free (`SCUTE_E2E_REAL_APP_PORT`). The app it signs in to is
+`e2e-mfa nextjs example` in the suite's workspace, with test identities off,
+so real emails are sent.
+
+```bash
+npx pnpm@8.4.0 turbo run build --filter=with-nextjs-mfa-rbac^...
+cd packages/auth/__e2e__ && npx playwright test -c playwright.real-app.config.ts
+```
+

@@ -1,1 +1,4 @@
 settings/.results/
+real-app/.results/
+real-app/.state.json
+real-app/.next-dev.log
