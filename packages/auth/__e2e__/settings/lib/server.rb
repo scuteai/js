@@ -154,6 +154,44 @@ module E2E
     end
   end
 
+  # ── The developer: a test identity who owns the suite's workspace and
+  # signs in to the dashboard (its app, by name, in its own workspace).
+  DASHBOARD_APP_NAME = "scute-dashboard"
+  DEVELOPER = /\Ae2e-mfa-dev-[a-z0-9-]+\+scute_test@example\.com\z/
+
+  def developer_email!(email)
+    email = email.to_s.downcase
+    raise "developer emails look like e2e-mfa-dev-...+scute_test@example.com" unless email.match?(DEVELOPER)
+
+    email
+  end
+
+  def dashboard_app
+    App.kept.find_by!(name: DASHBOARD_APP_NAME)
+  end
+
+  # The developer, an owner of the suite's workspace (and of nothing else).
+  def ensure_developer(email)
+    email = developer_email!(email)
+    au = dashboard_app.find_or_create_app_user_with_email(email)
+    user = au.user
+    user.update!(name: "E2E Developer", onboarded_at: user.onboarded_at || Time.current, email_confirmed_at: user.email_confirmed_at || Time.current)
+    m = WorkspaceMembership.find_or_initialize_by(workspace: workspace, user: user)
+    m.update!(role: "owner", status: "active", accepted_at: m.accepted_at || Time.current)
+    { user_id: user.id, workspace_id: workspace.id }
+  end
+
+  # A dashboard sign-in link for the developer, made like the API makes one,
+  # not sent anywhere.
+  def dashboard_magic_link(email)
+    email = developer_email!(email)
+    a = dashboard_app
+    au = a.find_or_create_app_user_with_email(email)
+    t = MagicToken.create(30.minutes, { webauthnEnabled: false, uuid: au.id, aid: a.public_id, user_status: au.status, email: au.user&.email })
+    ml = MagicLink.create!(app_id: a.id, app_user_id: au.id, token: t.to_jwt(MagicLink::SECRET))
+    { id: ml.id, token: ml.token }
+  end
+
   def end_sessions(public_id, email)
     au = app_user(public_id, email)
     n = 0
@@ -171,7 +209,7 @@ STDIN.each_line do |line|
   begin
     req = JSON.parse(line)
     op = req["op"].to_s
-    raise "unknown op #{op}" unless E2E.respond_to?(op) && !%w[workspace app app_user].include?(op)
+    raise "unknown op #{op}" unless E2E.respond_to?(op) && !%w[workspace app app_user developer_email! dashboard_app].include?(op)
 
     # rails runner keeps the query cache on for the whole script; every op
     # must see what the API wrote since the last one.

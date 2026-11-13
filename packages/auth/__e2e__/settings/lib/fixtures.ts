@@ -242,9 +242,10 @@ export class SignInPage {
     await this.page.getByRole("button", { name: "Continue" }).click();
   }
 
-  /** Fill a step's code boxes (they send themselves once full). */
+  /** Fill a step's code boxes (they send themselves once full); not the
+   * "Trust this device" checkbox the MFA step shows above them. */
   async typeCode(code: string) {
-    await this.view().locator("input").first().fill(code);
+    await this.view().locator("input:not([type=checkbox])").first().fill(code);
   }
 
   /** Email, then the emailed code. */
