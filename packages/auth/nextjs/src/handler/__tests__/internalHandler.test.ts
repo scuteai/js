@@ -125,9 +125,10 @@ describe("routing", () => {
     expect(responseSetCookies).toEqual([]);
   });
 
-  // CURRENT BEHAVIOR: routing is `pathname.endsWith("/auth/<handler>")`, so
-  // the handler answers under ANY prefix, not just where it is mounted.
-  // Harmless for a catch-all route file, but worth knowing for REF-42.
+  // By design: routing is `pathname.endsWith("/auth/<handler>")`, so the
+  // handler answers under any prefix, wherever its catch-all route file is
+  // mounted (app/api/auth/[...scute], pages/api/auth/[...scute], a custom
+  // handlersPrefix). Worth knowing for REF-42.
   it.each([
     "/api/auth/csrf",
     "/some/deep/nested/auth/csrf",
@@ -193,8 +194,9 @@ describe("GET /auth/csrf", () => {
     );
   });
 
-  // CURRENT BEHAVIOR (REF-41 target): a legacy unsuffixed token is adopted
-  // as this app's token and re-issued under the namespaced name.
+  // By design (REF-41 migration window, see csrf.ts / internalHandler.ts): a
+  // legacy unsuffixed token is adopted as this app's token and re-issued
+  // under the namespaced name, so a mid-migration tab keeps working.
   it("adopts a legacy unsuffixed token and migrates it to the namespaced cookie", async () => {
     const { body, responseSetCookies } = await run({
       method: "GET",
@@ -572,8 +574,8 @@ describe("POST /auth/refresh", () => {
     });
     expect(res.status).toBe(401);
     expect(body).toBe("");
-    // CURRENT BEHAVIOR: declares JSON but sends no body
-    expect(res.headers.get("content-type")).toBe("application/json");
+    // no body, so no Content-Type that claims one
+    expect(res.headers.get("content-type")).toBeNull();
     expect(body).not.toContain("sensitive-upstream-detail");
     for (const name of [ACCESS_KEY, REFRESH_KEY, LEGACY_ACCESS_KEY, LEGACY_REFRESH_KEY]) {
       expect(isDeletion(lastCookie(setCookies, name))).toBe(true);

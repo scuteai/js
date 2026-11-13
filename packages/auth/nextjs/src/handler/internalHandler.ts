@@ -213,11 +213,10 @@ const internalHandler = async (
       try {
         await scute.signOut();
       } catch {}
+      // No body, so no Content-Type: a JSON type with an empty body breaks
+      // a caller that parses it.
       return new Response(null, {
         status: 401,
-        headers: {
-          "Content-Type": "application/json",
-        },
       });
     }
 
