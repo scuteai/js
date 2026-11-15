@@ -97,6 +97,7 @@ export function Button({
   variant = "secondary",
   busy,
   align,
+  lastUsed,
   className,
   children,
   disabled,
@@ -105,6 +106,8 @@ export function Button({
   variant?: "primary" | "secondary";
   busy?: boolean;
   align?: "start";
+  /** Tag it "Last used": the way this browser last signed in. */
+  lastUsed?: boolean;
 }) {
   return (
     <button
@@ -114,11 +117,13 @@ export function Button({
       aria-busy={busy || undefined}
       data-variant={variant}
       data-align={align}
+      data-last-used={lastUsed || undefined}
       data-scute-button={variant}
       className={`scute-signin__btn${className ? ` ${className}` : ""}`}
     >
       {busy && <Spinner />}
       {children}
+      {lastUsed && <span className="scute-signin__last-used" data-scute-last-used>Last used</span>}
     </button>
   );
 }

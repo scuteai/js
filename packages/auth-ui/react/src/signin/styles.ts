@@ -266,6 +266,24 @@ export const SIGN_IN_CSS = `
 .scute-signin__btn[data-variant="secondary"]:disabled { color: var(--scute-ink-soft); cursor: default; }
 .scute-signin__btn[data-align="start"] { justify-content: flex-start; }
 .scute-signin__btn svg { flex-shrink: 0; }
+/* "Last used": a ring around the way this browser last signed in, and a tag on its corner. */
+.scute-signin__btn[data-last-used]:not(:focus-visible) {
+  outline: 2px solid var(--scute-ink-strong);
+  outline-offset: 3px;
+}
+.scute-signin__last-used {
+  position: absolute;
+  top: -12px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--scute-ink-strong);
+  color: var(--scute-panel);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  pointer-events: none;
+}
 
 .scute-signin__mt-12 { margin-top: 12px; }
 .scute-signin__mt-24 { margin-top: 24px; }

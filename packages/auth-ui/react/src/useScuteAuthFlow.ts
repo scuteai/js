@@ -1,5 +1,6 @@
 "use client";
 
+import { commitLastUsedMethod, getLastUsedMethod, markLastUsedMethod, pendingLastUsedMethod, type LastUsedMethod } from "./signin/lastUsed";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AUTH_CHANGE_EVENTS, useScuteClient, useAuth } from "@scute/react-hooks";
 import { scrubAuthTokensFromUrl } from "@scute/js-core";
@@ -276,6 +277,29 @@ export function useScuteAuthFlow() {
   useEffect(() => {
     isAuthenticatedRef.current = isAuthenticated;
   }, [isAuthenticated]);
+
+  // "Last used": the way this browser last signed in (read on the client,
+  // after the first render, so server and client render the same). A
+  // method started here (or in another tab, or before an OAuth or SSO
+  // round trip) becomes the last used one once a session arrives.
+  const [lastUsedMethod, setLastUsedMethod] = useState<LastUsedMethod | null>(null);
+  useEffect(() => {
+    setLastUsedMethod(getLastUsedMethod());
+  }, []);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const committed = commitLastUsedMethod();
+    if (committed) setLastUsedMethod(committed);
+  }, [isAuthenticated]);
+  const noteMethod = useCallback((method: LastUsedMethod) => {
+    markLastUsedMethod(method);
+    // The session may already be here (a passkey signs in before
+    // signInOrUp returns).
+    if (isAuthenticatedRef.current) {
+      const committed = commitLastUsedMethod();
+      if (committed) setLastUsedMethod(committed);
+    }
+  }, []);
 
   useEffect(() => () => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -582,6 +606,9 @@ export function useScuteAuthFlow() {
     // core's shouldSkipDeviceRegister, which can't see them once scrubbed.
     const landing = typeof window !== "undefined" ? new URL(window.location.href).searchParams : null;
     const skipPasskeyOffer = !!landing && (landing.get("sct_sk") === "true" || !!landing.get("sct_oauth"));
+    // A link opened where no sign-in was started (another device, or an
+    // inbox on another browser): it was the email.
+    if (landing?.get("sct_magic") && !pendingLastUsedMethod()) markLastUsedMethod("email");
     magicTokenRef.current = magicToken;
     skipPasskeyOfferRef.current = skipPasskeyOffer;
 
@@ -749,6 +776,7 @@ export function useScuteAuthFlow() {
     setIdentifier(email);
     setSubmitting(true);
     clearError();
+    markLastUsedMethod(email.includes("@") ? "email" : "phone");
 
     try {
       const { data, error: signError } = await scuteClient.signInOrUp(email);
@@ -786,6 +814,7 @@ export function useScuteAuthFlow() {
       }
       if (!data) {
         // WebAuthn succeeded — SIGNED_IN event will fire
+        noteMethod("passkey");
       } else if (handleStep(data)) {
         // View change handled by event listener (MFA_REQUIRED,
         // MFA_ENROLLMENT_REQUIRED or CONTACT_VERIFICATION_REQUIRED)
@@ -798,7 +827,7 @@ export function useScuteAuthFlow() {
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [identifier, scuteClient, fail, clearError, handleStep]);
+  }, [identifier, scuteClient, fail, clearError, handleStep, noteMethod]);
 
   // Resolves to true when the code was accepted, false when it wasn't.
   const submitOtp = useCallback(async (code: string): Promise<boolean> => {
@@ -1191,6 +1220,7 @@ export function useScuteAuthFlow() {
 
   /** Sign in with an OAuth provider the app has set up, like "google". Leaves the page. */
   const signInWithOAuth = useCallback((provider: string) => {
+    markLastUsedMethod(provider);
     scuteClient.signInWithOAuthProvider(provider);
   }, [scuteClient]);
 
@@ -1343,6 +1373,12 @@ export function useScuteAuthFlow() {
     finishingOnOtherDevice,
     /** How the app signs in by email (its email_auth_type): "link", "code", or null until known. */
     emailSignIn,
+    /**
+     * The way this browser last finished signing in ("email", "phone",
+     * "passkey", "sso" or an OAuth provider like "google"), or null. Kept in
+     * localStorage; the sign-in tags that option "Last used".
+     */
+    lastUsedMethod,
 
     // Resend of the link or the code
     resendIn,

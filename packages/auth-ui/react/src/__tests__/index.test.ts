@@ -19,6 +19,8 @@ describe("@scute/auth-ui-react public surface", () => {
         "ScuteAuthGate",
         "ScuteSignIn",
         "useScuteSignInStep",
+        "getLastUsedMethod",
+        "markLastUsedMethod",
         "useAlternatePhones",
         "useElementAccessRequests",
         "useElementDecisionLog",

@@ -81,6 +81,8 @@ export type ScuteSignInPreview = {
   mfaGraceDaysRemaining?: number;
   /** On "mfa_verify": show "Trust this device" for this many days (the app allows device trust). */
   deviceTrustDays?: number;
+  /** On "login": the way this browser last signed in, tagged "Last used" ("email", "phone", "passkey", "sso" or "google"). */
+  lastUsed?: string;
 };
 
 export type ScuteSignInProps = {
@@ -94,6 +96,13 @@ export type ScuteSignInProps = {
    * different email" later starts empty.
    */
   defaultEmail?: string;
+  /**
+   * Tag the way this browser last signed in "Last used" (the Continue
+   * button for an email, phone, passkey or SSO sign-in; "Continue with
+   * Google" for Google), when the first step offers more than one way.
+   * Kept in localStorage, nothing is sent. Default true.
+   */
+  showLastUsed?: boolean;
   /**
    * Draw one step with sample data instead of running the sign-in: for a
    * settings preview, docs or screenshots. Needs no Scute client or

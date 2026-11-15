@@ -20,6 +20,7 @@ import {
   useInPreview,
   type StepInfo,
 } from "./parts";
+import { FIELD_METHODS } from "./lastUsed";
 import { previewFlow, previewOf } from "./preview";
 import { SIGN_IN_CSS } from "./styles";
 import { themeVars } from "./theme";
@@ -54,7 +55,7 @@ export function ScuteSignIn({ preview, ...props }: ScuteSignInProps) {
 // nothing. A new step or new sample data starts the step afresh.
 function PreviewSignIn({ preview, onSignedIn: _unused, ...props }: ScuteSignInProps & { preview: NonNullable<ScuteSignInProps["preview"]> }) {
   const p = previewOf(preview);
-  const stepKey = [p.view, p.email, p.error, p.errorCode, p.mfaMethod, p.verificationMethod].join("|");
+  const stepKey = [p.view, p.email, p.error, p.errorCode, p.mfaMethod, p.verificationMethod, p.lastUsed].join("|");
   return <SignInView auth={previewFlow(p)} preview stepKey={stepKey} {...props} />;
 }
 
@@ -131,6 +132,7 @@ export function SignInView({
   legal = {},
   methods = {},
   defaultEmail,
+  showLastUsed = true,
   preview = false,
   stepKey,
 }: Omit<ScuteSignInProps, "onSignedIn" | "preview"> & { auth: ScuteAuthFlow; preview?: boolean; stepKey?: string }) {
@@ -184,7 +186,7 @@ export function SignInView({
             )}
             <main className="scute-signin__main" data-scute-auth-container>
               <div key={stepKey ?? view} className="scute-signin__step" data-scute-view={view}>
-                <Step auth={auth} copy={copy} methods={methods} defaultEmail={defaultEmail} defaultEmailUsed={defaultEmailUsed} />
+                <Step auth={auth} copy={copy} methods={methods} showLastUsed={showLastUsed} defaultEmail={defaultEmail} defaultEmailUsed={defaultEmailUsed} />
               </div>
             </main>
             <Legal {...legal} />
@@ -214,13 +216,13 @@ function Legal({ termsUrl, privacyUrl }: { termsUrl?: string; privacyUrl?: strin
 
 type EmailDefault = { defaultEmail?: string; defaultEmailUsed: { current: boolean } };
 
-function Step({ auth, copy, methods, ...email }: { auth: ScuteAuthFlow } & Pick<ScuteSignInProps, "copy" | "methods"> & EmailDefault) {
+function Step({ auth, copy, methods, showLastUsed, ...email }: { auth: ScuteAuthFlow } & Pick<ScuteSignInProps, "copy" | "methods" | "showLastUsed"> & EmailDefault) {
   const preview = useInPreview();
   switch (auth.view) {
     case "loading":
       return <Waiting center>Loading</Waiting>;
     case "login":
-      return <EmailStep auth={auth} copy={copy ?? {}} google={!!methods?.google} {...email} />;
+      return <EmailStep auth={auth} copy={copy ?? {}} google={!!methods?.google} showLastUsed={showLastUsed !== false} {...email} />;
     case "magic_pending":
       return <InboxStep auth={auth} />;
     case "magic_verifying":
@@ -395,8 +397,8 @@ function Different({ auth }: { auth: ScuteAuthFlow }) {
   return <TextButton onClick={auth.retry}>{number ? "Use a different number" : "Use a different email"}</TextButton>;
 }
 
-function EmailStep({ auth, copy, google, defaultEmail, defaultEmailUsed }: {
-  auth: ScuteAuthFlow; copy: NonNullable<ScuteSignInProps["copy"]>; google: boolean;
+function EmailStep({ auth, copy, google, showLastUsed, defaultEmail, defaultEmailUsed }: {
+  auth: ScuteAuthFlow; copy: NonNullable<ScuteSignInProps["copy"]>; google: boolean; showLastUsed: boolean;
 } & EmailDefault) {
   const preview = useInPreview();
   const [email, setEmail] = useState(() => auth.identifier || (defaultEmailUsed.current ? "" : defaultEmail ?? ""));
@@ -409,6 +411,11 @@ function EmailStep({ auth, copy, google, defaultEmail, defaultEmailUsed }: {
   const error = errorText(auth.error, auth.errorCode);
   const busy = auth.submitting;
   const field = fieldFor(auth.identifierTypes);
+  // "Last used" on the option this browser last signed in with, only when
+  // there is more than one to pick from.
+  const last = showLastUsed && google ? auth.lastUsedMethod : null;
+  const lastField = !!last && FIELD_METHODS.includes(last);
+  const lastGoogle = last === "google";
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -445,14 +452,14 @@ function EmailStep({ auth, copy, google, defaultEmail, defaultEmailUsed }: {
           data-scute-input
         />
         {error && <ErrorBox id="scute-signin-email-error">{error}</ErrorBox>}
-        <Button type="submit" variant="primary" busy={busy} className="scute-signin__mt-24">
+        <Button type="submit" variant="primary" busy={busy} lastUsed={lastField} className="scute-signin__mt-24">
           {copy.continueLabel ?? "Continue"}
         </Button>
       </form>
       {google && (
         <>
           <div className="scute-signin__or" aria-hidden="true">or</div>
-          <Button disabled={busy} onClick={() => auth.signInWithOAuth("google")}>
+          <Button disabled={busy} lastUsed={lastGoogle} onClick={() => auth.signInWithOAuth("google")}>
             <GoogleIcon />
             Continue with Google
           </Button>

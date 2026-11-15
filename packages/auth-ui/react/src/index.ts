@@ -53,6 +53,9 @@ export type {
 export { ScuteSignIn } from "./signin/ScuteSignIn";
 export type { ScuteAuthFlow } from "./signin/ScuteSignIn";
 export { useScuteSignInStep } from "./signin/parts";
+// "Last used": the way this browser last signed in (localStorage). markLastUsedMethod("sso") before a sign-in your page starts itself.
+export { getLastUsedMethod, markLastUsedMethod } from "./signin/lastUsed";
+export type { LastUsedMethod } from "./signin/lastUsed";
 export type { StepInfo as ScuteSignInStep } from "./signin/parts";
 export type {
   ScuteSignInProps,
