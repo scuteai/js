@@ -73,6 +73,7 @@ export function previewFlow(p: ScuteSignInPreview): ScuteAuthFlow {
     finishingOnOtherDevice: false,
     mfaFactorNotAllowed: view === "mfa_enroll_suggest" && !!p.mfaFactorNotAllowed,
     emailSignIn: null,
+    lastUsedMethod: p.lastUsed ?? null,
 
     resendIn: 0,
     resending: false,

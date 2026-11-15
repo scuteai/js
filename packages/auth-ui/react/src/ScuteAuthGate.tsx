@@ -26,6 +26,8 @@ export type ScuteAuthGateProps = {
   methods?: ScuteSignInMethods;
   /** The email the field starts with (same as ScuteSignIn's). */
   defaultEmail?: string;
+  /** Tag the way this browser last signed in "Last used" (same as ScuteSignIn's). Default true. */
+  showLastUsed?: boolean;
 };
 
 /**
@@ -51,6 +53,7 @@ export function ScuteAuthGate({
   legal,
   methods,
   defaultEmail,
+  showLastUsed,
 }: ScuteAuthGateProps) {
   const auth = useScuteAuthFlow();
   const isOpen = auth.isAuthenticated && auth.view === "authenticated";
@@ -86,6 +89,6 @@ export function ScuteAuthGate({
 
   // Default UI: the sign-in, on this gate's flow.
   return (
-    <SignInView auth={auth} appearance={appearance} copy={copy} legal={legal} methods={methods} defaultEmail={defaultEmail} />
+    <SignInView auth={auth} appearance={appearance} copy={copy} legal={legal} methods={methods} defaultEmail={defaultEmail} showLastUsed={showLastUsed} />
   );
 }
