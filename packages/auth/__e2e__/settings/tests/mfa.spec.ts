@@ -157,7 +157,7 @@ test.describe("MFA", () => {
     await signin.expectView("mfa_enroll_suggest");
     await expect(signin.page.getByText(/will soon need a second step/)).toBeVisible();
     await signin.expectSignedIn(email);
-    await signin.page.getByRole("button", { name: "Continue" }).click();
+    await signin.page.getByRole("button", { name: "Not now" }).click();
     await signin.expectView("authenticated");
     await signin.expectSignedIn(email);
   });
