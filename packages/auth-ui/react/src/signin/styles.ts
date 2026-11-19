@@ -356,6 +356,19 @@ export const SIGN_IN_CSS = `
   box-decoration-break: clone;
 }
 
+.scute-signin__qr {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+.scute-signin__qr svg {
+  width: 176px;
+  height: 176px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #fff;
+}
+
 .scute-signin__boxes { display: flex; gap: 8px; margin-top: 28px; }
 .scute-signin__box {
   flex: 1;

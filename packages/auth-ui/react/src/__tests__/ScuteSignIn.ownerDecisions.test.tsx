@@ -7,7 +7,7 @@
  * other device finishes (D2), a challenge link that signs nobody in (D16),
  * a sign-in method the app turned off (D13, D20) and an idle sign-out (D14).
  */
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScuteSignIn } from "../signin/ScuteSignIn";
 import {
@@ -117,6 +117,8 @@ describe("D18: setting up a second factor while signing in", () => {
     expect(screen.getByRole("link", { name: "Open in your authenticator app" }).getAttribute("href")).toBe(
       "otpauth://totp/Acme:ada?secret=ABCD"
     );
+    expect(screen.getByText("Scan this QR code with your authenticator app, then enter the 6-digit code it shows.")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "QR code for your authenticator app" }).querySelector("svg path")).toBeTruthy();
     expect(screen.getByText("ABCD")).toBeTruthy();
 
     await paste("Authenticator app", "123456");
@@ -225,6 +227,28 @@ describe("D17: optional MFA whose factor the app no longer accepts", () => {
     await paste("Authenticator app", "123456");
     expect(client.verifyMfaEnrollment).toHaveBeenCalledWith("enr_9", "123456");
     await screen.findByRole("heading", { name: "You're in" });
+  });
+
+  it("in a grace period, offers to set one up now from the allowed methods, or not now", async () => {
+    const client = setupClient();
+    client.pendingMfaEnrollmentSuggestion = { available_methods: ["totp", "sms", "email", "backup_codes"], mfa_grace_days_remaining: 7 };
+    renderSignIn(client);
+    await screen.findByRole("heading", { name: "Sign in" });
+    act(() => client.emit(AUTH_CHANGE_EVENTS.MFA_ENROLLMENT_SUGGESTED));
+    act(() => client.emitSignedIn());
+    await screen.findByRole("heading", { name: "Set up two-step verification" });
+    expect(screen.getByText(/Set one up now, or later in your account settings\./)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Not now" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Set one up now" }));
+    const choices = screen.getByRole("group", { name: "Second step" });
+    expect(within(choices).getAllByRole("button").map((b) => b.textContent)).toEqual(["Authenticator app", "Text message", "Email"]);
+  });
+
+  it("in a grace period with nothing to set up here, only goes on", () => {
+    render(<ScuteSignIn preview={{ view: "mfa_enroll_suggest", mfaGraceDaysRemaining: 3, mfaMethods: ["backup_codes"] }} />);
+    expect(screen.queryByRole("button", { name: "Set one up now" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeTruthy();
   });
 
   it("keeps the grace period copy for a grace period", () => {

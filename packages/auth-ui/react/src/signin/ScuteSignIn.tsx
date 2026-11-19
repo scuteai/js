@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { renderSVG } from "uqr";
 import { APP_SETTINGS_UNAVAILABLE, useScuteAuthFlow } from "../useScuteAuthFlow";
 import { errorText, failureFor, isBackupCode, MFA_LABELS, MFA_LEADS, MFA_SETUP_LABELS, REFUSALS, switchableMethod } from "./messages";
 import {
@@ -307,6 +308,7 @@ function Step({ auth, copy, methods, showLastUsed, ...email }: { auth: ScuteAuth
           </>
         );
       }
+      const graceCanSetUp = (auth.mfaAvailableMethods ?? []).some((m) => m === "totp" || m === "sms" || m === "email");
       return (
         <>
           <Title>Set up two-step verification</Title>
@@ -315,10 +317,16 @@ function Step({ auth, copy, methods, showLastUsed, ...email }: { auth: ScuteAuth
             {typeof auth.mfaGraceDaysRemaining === "number"
               ? ` (in ${auth.mfaGraceDaysRemaining} day${auth.mfaGraceDaysRemaining === 1 ? "" : "s"})`
               : ""}
-            . Set one up in your account settings.
+            . {graceCanSetUp ? "Set one up now, or later in your account settings." : "Set one up in your account settings."}
           </Lead>
-          <Button variant="primary" autoFocus={!preview} onClick={auth.skipMfaEnrollment} className="scute-signin__mt-28">
-            Continue
+          {graceCanSetUp && (
+            <Button variant="primary" autoFocus={!preview} onClick={auth.setUpMfaNow} className="scute-signin__mt-28">
+              Set one up now
+            </Button>
+          )}
+          <Button variant={graceCanSetUp ? undefined : "primary"} autoFocus={!preview && !graceCanSetUp} onClick={auth.skipMfaEnrollment}
+                  className={graceCanSetUp ? "scute-signin__mt-12" : "scute-signin__mt-28"}>
+            {graceCanSetUp ? "Not now" : "Continue"}
           </Button>
         </>
       );
@@ -846,11 +854,20 @@ function MfaSetupCode({ auth, setup }: { auth: ScuteAuthFlow; setup: MfaSetup })
       <Title focus={false}>Set up two-step verification</Title>
       {method === "totp" ? (
         <>
-          <Lead>Add this account to your authenticator app, then enter the 6-digit code it shows.</Lead>
+          <Lead>
+            {link
+              ? "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
+              : "Add this account to your authenticator app, then enter the 6-digit code it shows."}
+          </Lead>
           {link && (
-            <p className="scute-signin__status">
-              <a className="scute-signin__link" href={link}>Open in your authenticator app</a>
-            </p>
+            <>
+              <div className="scute-signin__qr" role="img" aria-label="QR code for your authenticator app"
+                   // An SVG made here from the otpauth link: paths only, no text from the server.
+                   dangerouslySetInnerHTML={{ __html: renderSVG(link, { border: 2 }) }} />
+              <p className="scute-signin__status">
+                <a className="scute-signin__link" href={link}>Open in your authenticator app</a>
+              </p>
+            </>
           )}
           {setup.secret && (
             <p className="scute-signin__status">

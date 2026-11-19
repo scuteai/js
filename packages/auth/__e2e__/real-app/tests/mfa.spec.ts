@@ -153,7 +153,7 @@ test.describe("MFA in the Next.js example app, real inboxes", () => {
     await signInWithEmail(page, email);
     await expectView(page, "mfa_enroll_suggest");
     await expect(page.getByText(/will soon need a second step to sign in \(in 7 days\)/)).toBeVisible();
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Not now" }).click();
     await expectOnAccount(page, email);
     await expect(page.getByRole("status").filter({ hasText: "This app requires a second step." })).toBeVisible();
     // Only what the dashboard allows is offered.
@@ -276,7 +276,7 @@ test.describe("MFA in the Next.js example app, real inboxes", () => {
     for (let i = 0; i < 4 && !/\/account$/.test(page.url()); i++) {
       const current = await view(page).getAttribute("data-scute-view").catch(() => null);
       if (current === "webauthn_register") await page.getByRole("button", { name: "Skip for now" }).click();
-      else if (current === "mfa_enroll_suggest") await page.getByRole("button", { name: "Continue" }).click();
+      else if (current === "mfa_enroll_suggest") await page.getByRole("button", { name: "Not now" }).click();
       else await page.waitForTimeout(500);
       if (current) await expect(view(page)).not.toHaveAttribute("data-scute-view", current, { timeout: 30_000 }).catch(() => {});
     }
